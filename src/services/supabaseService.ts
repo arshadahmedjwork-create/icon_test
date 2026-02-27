@@ -1,6 +1,6 @@
 import { supabase } from '../lib/supabaseClient';
 // import { Database } from '../types/supabase'; // We might need to generate types, but for now we'll use 'any' or manual types
-import { User, Judge, EventConfig, Deadline, Registration, Abstract, Session, Evaluation, Certificate, EvaluationCriteria } from '../types';
+import { User, Judge, EventConfig, Event, Deadline, Registration, Abstract, Session, Evaluation, Certificate, EvaluationCriteria } from '../types';
 import bcrypt from 'bcryptjs';
 import { sendAccountCreationEmail } from './emailService';
 
@@ -148,6 +148,71 @@ export const resetUserPassword = async (email: string): Promise<string> => {
     if (error) throw error;
 
     return tempPassword;
+};
+
+export const resetStudentPassword = async (email: string): Promise<string> => {
+    const { data: student, error: fetchError } = await supabase
+        .from('event_students')
+        .select('*')
+        .eq('email', email)
+        .limit(1)
+        .maybeSingle();
+
+    if (fetchError || !student) {
+        throw new Error("No student account found with this email address.");
+    }
+
+    const chars = 'ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
+    let tempPassword = '';
+    for (let i = 0; i < 10; i++) tempPassword += chars.charAt(Math.floor(Math.random() * chars.length));
+
+    const hashedPassword = await bcrypt.hash(tempPassword, 10);
+    const { error: updateError } = await supabase
+        .from('event_students')
+        .update({ password: hashedPassword }) // Or add a mustChangePassword equivalent to student if schema has it
+        .eq('id', student.id);
+
+    if (updateError) throw updateError;
+
+    return tempPassword;
+};
+
+export const getStudentPayments = async (studentId: string) => {
+    const { data, error } = await supabase
+        .from('payments')
+        .select('*')
+        .eq('eventStudentId', studentId);
+    if (error) throw error;
+    return data;
+};
+
+export const getStudentDashboardStats = async (studentId: string) => {
+    // 1. Fetch student for selected events
+    const { data: student } = await supabase
+        .from('event_students')
+        .select('selectedEvents')
+        .eq('id', studentId)
+        .single();
+
+    // 2. Count submissions
+    const { count: abstractsSubmitted } = await supabase
+        .from('submissions')
+        .select('id', { count: 'exact', head: true })
+        .eq('studentId', studentId);
+
+    // 3. Count payments
+    const { count: paymentsMade } = await supabase
+        .from('payments')
+        .select('id', { count: 'exact', head: true })
+        .eq('eventStudentId', studentId)
+        .eq('status', 'PAID');
+
+    return {
+        eventsEnrolled: student?.selectedEvents?.length || 0,
+        abstractsSubmitted: abstractsSubmitted || 0,
+        paymentsMade: paymentsMade || 0,
+        certificates: 0 // TODO: implement certificates counting if table exists
+    };
 };
 
 // --- DASHBOARD STATS ---
@@ -357,6 +422,62 @@ export const updateEventConfig = async (config: EventConfig) => {
     // For this mock-to-real port, let's keep it simple: assume criteria are static or managed separately.
 };
 
+// --- EVENT MASTER (Dynamic Events) ---
+
+export const getEvents = async (): Promise<Event[]> => {
+    const { data, error } = await supabase.from('event_master').select('*').order('created_at', { ascending: false });
+    if (error) throw error;
+    return data.map((e: any) => ({
+        id: e.id,
+        name: e.name,
+        type: e.type,
+        mode: e.mode,
+        capacity: e.capacity,
+        criterias: e.assessment_criteria,
+        rules: e.rules,
+        judgeInstructions: e.judge_instructions,
+        abstractDeadline: e.abstract_deadline,
+        presentationDeadline: e.presentation_deadline,
+    }));
+};
+
+export const addEvent = async (event: Omit<Event, "id">) => {
+    const dbEvent = {
+        name: event.name,
+        type: event.type,
+        mode: event.mode,
+        capacity: event.capacity,
+        assessment_criteria: event.criterias,
+        rules: event.rules,
+        judge_instructions: event.judgeInstructions,
+        abstract_deadline: event.abstractDeadline,
+        presentation_deadline: event.presentationDeadline,
+    };
+    const { error } = await supabase.from('event_master').insert(dbEvent);
+    if (error) throw error;
+};
+
+export const updateEvent = async (id: string, updates: Partial<Event>) => {
+    const dbUpdates: any = {};
+    if (updates.name !== undefined) dbUpdates.name = updates.name;
+    if (updates.type !== undefined) dbUpdates.type = updates.type;
+    if (updates.mode !== undefined) dbUpdates.mode = updates.mode;
+    if (updates.capacity !== undefined) dbUpdates.capacity = updates.capacity;
+    if (updates.criterias !== undefined) dbUpdates.assessment_criteria = updates.criterias;
+    if (updates.rules !== undefined) dbUpdates.rules = updates.rules;
+    if (updates.judgeInstructions !== undefined) dbUpdates.judge_instructions = updates.judgeInstructions;
+    if (updates.abstractDeadline !== undefined) dbUpdates.abstract_deadline = updates.abstractDeadline;
+    if (updates.presentationDeadline !== undefined) dbUpdates.presentation_deadline = updates.presentationDeadline;
+
+    const { error } = await supabase.from('event_master').update(dbUpdates).eq('id', id);
+    if (error) throw error;
+};
+
+export const deleteEvent = async (id: string) => {
+    const { error } = await supabase.from('event_master').delete().eq('id', id);
+    if (error) throw error;
+};
+
 // --- DEADLINES ---
 export const getDeadlines = async (): Promise<Deadline[]> => {
     const { data, error } = await supabase.from('deadlines').select('*');
@@ -391,41 +512,46 @@ export const updateRegistrationStatus = async (id: string, status: "approved" | 
 
 // --- ABSTRACTS ---
 export const getAbstracts = async (): Promise<Abstract[]> => {
-    const { data, error } = await supabase.from('abstracts').select('*');
+    const { data, error } = await supabase.from('submissions').select('*');
     if (error) throw error;
-    return data.map((a: any) => ({
-        ...a,
-        studentId: a.student_id,
-        submittedAt: a.submitted_at,
-        fileUrl: a.file_url,
-        presentationUrl: a.presentation_url,
-        mentorName: a.mentor_name,
-        coAuthors: a.co_authors,
-        // map other snake_case to camelCase
+    return data.map((s: any) => ({
+        id: s.id,
+        studentId: s.eventStudentId || s.studentId, // Support both column names initially
+        title: s.title,
+        subject: s.subject,
+        college: "Unknown", // the backend schema doesn't embed college in submissions directly, fetching event_students handles this UI-side
+        type: s.eventType === "PAPER" ? "Paper Presentation" : "Poster Presentation",
+        mode: s.eventMode,
+        status: s.status === "DRAFT" ? "pending" : s.status === "APPROVED" ? "approved" : s.status === "REJECTED" ? "rejected" : s.status === "revision_requested" ? "revision_requested" : s.status,
+        fileUrl: s.abstractFileUrl,
+        presentationUrl: s.presentationUrl,
+        feedback: s.remarks,
+        mentorName: "N/A", // Deprecated field
+        coAuthors: [], // Deprecated field
+        submittedAt: s.submissionDate
     })) as Abstract[];
 };
 
 export const addAbstract = async (abstract: Omit<Abstract, 'id' | 'submittedAt' | 'status'>) => {
-    // Map camelCase to snake_case for DB
-    const dbAbstract = {
-        student_id: abstract.studentId,
+    const dbData = {
+        eventStudentId: abstract.studentId,
         title: abstract.title,
         subject: abstract.subject,
-        college: abstract.college,
-        type: abstract.type,
-        mode: abstract.mode,
-        file_url: abstract.fileUrl,
-        presentation_url: abstract.presentationUrl,
-        mentor_name: abstract.mentorName,
-        co_authors: abstract.coAuthors,
-        feedback: abstract.feedback
+        eventType: abstract.type.includes("Paper") ? "PAPER" : "POSTER",
+        eventMode: abstract.mode.toUpperCase(),
+        abstractFileUrl: abstract.fileUrl,
+        presentationUrl: abstract.presentationUrl,
+        remarks: abstract.feedback,
+        status: "DRAFT"
     };
-    const { error } = await supabase.from('abstracts').insert(dbAbstract);
+    const { error } = await supabase.from('submissions').insert(dbData);
     if (error) throw error;
 };
 
 export const updateAbstractStatus = async (id: string, status: Abstract["status"], feedback?: string) => {
-    const { error } = await supabase.from('abstracts').update({ status, feedback }).eq('id', id);
+    // Map abstract status back to DB SubmissionStatus enum
+    const dbStatus = status === "pending" ? "DRAFT" : status === "approved" ? "APPROVED" : status === "rejected" ? "REJECTED" : "STAFF_APPROVED";
+    const { error } = await supabase.from('submissions').update({ status: dbStatus, remarks: feedback }).eq('id', id);
     if (error) throw error;
 };
 
@@ -433,34 +559,166 @@ export const updateAbstract = async (id: string, updates: Partial<Abstract>) => 
     const dbUpdates: any = {};
     if (updates.title) dbUpdates.title = updates.title;
     if (updates.subject) dbUpdates.subject = updates.subject;
-    if (updates.type) dbUpdates.type = updates.type;
-    if (updates.mode) dbUpdates.mode = updates.mode;
-    if (updates.fileUrl) dbUpdates.file_url = updates.fileUrl;
-    if (updates.presentationUrl) dbUpdates.presentation_url = updates.presentationUrl;
-    if (updates.mentorName) dbUpdates.mentor_name = updates.mentorName;
-    if (updates.coAuthors) dbUpdates.co_authors = updates.coAuthors;
-    if (updates.status) dbUpdates.status = updates.status;
-    if (updates.feedback) dbUpdates.feedback = updates.feedback;
+    if (updates.type) dbUpdates.eventType = updates.type.includes("Paper") ? "PAPER" : "POSTER";
+    if (updates.mode) dbUpdates.eventMode = updates.mode.toUpperCase();
+    if (updates.fileUrl) dbUpdates.abstractFileUrl = updates.fileUrl;
+    if (updates.presentationUrl) dbUpdates.presentationUrl = updates.presentationUrl;
+    if (updates.status) {
+        dbUpdates.status = updates.status === "pending" ? "DRAFT" : updates.status === "approved" ? "APPROVED" : updates.status === "rejected" ? "REJECTED" : "STAFF_APPROVED";
+    }
+    if (updates.feedback) dbUpdates.remarks = updates.feedback;
 
-    const { error } = await supabase.from('abstracts').update(dbUpdates).eq('id', id);
+    const { error } = await supabase.from('submissions').update(dbUpdates).eq('id', id);
     if (error) throw error;
 };
 
 // --- SESSIONS ---
 export const getSessions = async (): Promise<Session[]> => {
-    const { data, error } = await supabase.from('sessions').select('*');
-    if (error) throw error;
-    return data as any as Session[];
+    // Fetch sessions along with their linked abstractIds (submissionId) and judgeIds
+    const { data, error } = await supabase
+        .from('sessions')
+        .select(`
+            *,
+            session_judges(judgeId),
+            session_participants(submissionId, attended)
+        `);
+
+    if (error) {
+        console.warn("Relational fetch failed for sessions, falling back", error);
+        const { data: fbData } = await supabase.from('sessions').select('*');
+        return (fbData || []).map((d: any) => ({
+            id: d.id,
+            name: d.name,
+            subject: d.subject,
+            type: d.type || 'PAPER',
+            mode: d.mode || 'OFFLINE',
+            date: d.startTime ? d.startTime.split('T')[0] : '',
+            time: d.startTime ? new Date(d.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }) : '',
+            venue: d.venue || d.meetingLink || '',
+            judges: [],
+            abstractIds: [],
+            status: d.status?.toLowerCase() || 'scheduled'
+        })) as Session[];
+    }
+
+    return data.map((d: any) => {
+        let dateStr = "";
+        let timeStr = "";
+        if (d.startTime) {
+            const dateObj = new Date(d.startTime);
+            if (!isNaN(dateObj.getTime())) {
+                dateStr = dateObj.toISOString().split('T')[0];
+                timeStr = dateObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
+            }
+        }
+        return {
+            id: d.id,
+            name: d.name,
+            subject: d.subject,
+            type: d.type || 'PAPER',
+            mode: d.mode || 'OFFLINE',
+            date: dateStr,
+            time: timeStr,
+            venue: d.venue || d.meetingLink || '',
+            judges: d.session_judges?.map((j: any) => j.judgeId) || [],
+            abstractIds: d.session_participants?.map((p: any) => p.submissionId) || [],
+            _attendedSubmissionIds: d.session_participants?.filter((p: any) => p.attended).map((p: any) => p.submissionId) || [],
+            status: d.status?.toLowerCase() || 'scheduled'
+        };
+    }) as Session[];
 };
 
 export const addSession = async (session: Omit<Session, "id">) => {
-    const { error } = await supabase.from('sessions').insert(session);
-    if (error) throw error;
+    let eventType = session.type.split(" ")[0].toUpperCase();
+    if (!["PAPER", "POSTER", "QUIZ", "DEBATE", "WORKSHOP"].includes(eventType)) {
+        eventType = "PAPER";
+    }
+
+    const sessionPayload = {
+        name: session.name,
+        type: eventType,
+        mode: session.mode.toUpperCase(),
+        subject: session.subject,
+        startTime: new Date(`${session.date}T${session.time}:00`).toISOString(),
+        venue: session.venue || null,
+        status: "SCHEDULED"
+    };
+
+    // 1. Insert session
+    const { data: newSession, error: sessionError } = await supabase
+        .from('sessions')
+        .insert(sessionPayload)
+        .select('id')
+        .single();
+
+    if (sessionError) throw sessionError;
+    const sessionId = newSession.id;
+
+    // 2. Insert Judges if any
+    if (session.judges && session.judges.length > 0) {
+        const judgePayloads = session.judges.map(judgeId => ({
+            sessionId,
+            judgeId,
+            isChair: false
+        }));
+        const { error } = await supabase.from('session_judges').insert(judgePayloads);
+        if (error) {
+            console.error("Judge insert error", error);
+            throw error;
+        }
+    }
+
+    // 3. Link Participants (using the abstractIds aka submissions)
+    if (session.abstractIds && session.abstractIds.length > 0) {
+        const { data: subs, error: subsError } = await supabase
+            .from('submissions')
+            .select('id, eventStudentId, eventMode')
+            .in('id', session.abstractIds);
+
+        if (subsError) {
+            console.error("Failed to lookup submissions for participant linker", subsError);
+            throw subsError;
+        }
+
+        if (subs && subs.length > 0) {
+            const participantPayloads = subs.map((sub, index) => ({
+                sessionId,
+                submissionId: sub.id,
+                eventStudentId: sub.eventStudentId || null,
+                presentationOrder: index + 1
+            }));
+            const { error } = await supabase.from('session_participants').insert(participantPayloads);
+            if (error) {
+                console.error("Participant insert error", error);
+                throw error;
+            }
+        }
+    }
 };
 
 export const updateSession = async (id: string, updates: Partial<Session>) => {
     const { error } = await supabase.from('sessions').update(updates).eq('id', id);
     if (error) throw error;
+};
+
+export const updateSessionAttendance = async (sessionId: string, attendedStudentIds: string[]) => {
+    // Map studentIds to submissionIds using the server's abstract table
+    const { data: abstracts } = await supabase.from('submissions').select('id, studentId');
+    if (!abstracts) return;
+
+    const attendedSubmissionIds = abstracts
+        .filter(a => attendedStudentIds.includes(a.studentId))
+        .map(a => a.id);
+
+    // Supabase JS lacks a clean multiple-row conditional update, so we wipe and set.
+    await supabase.from('session_participants').update({ attended: false }).eq('sessionId', sessionId);
+
+    if (attendedSubmissionIds.length > 0) {
+        await supabase.from('session_participants')
+            .update({ attended: true })
+            .eq('sessionId', sessionId)
+            .in('submissionId', attendedSubmissionIds);
+    }
 };
 
 export const deleteSession = async (id: string) => {

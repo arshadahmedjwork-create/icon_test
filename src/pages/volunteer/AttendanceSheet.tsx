@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { getSessions, getUsers, updateSession, getAbstracts } from "@/services/supabaseService";
+import { getSessions, getEventStudents, updateSessionAttendance, getAbstracts } from "@/services/supabaseService";
 import { Session, Student, Abstract } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -30,9 +30,9 @@ export default function AttendanceSheet() {
     useEffect(() => {
         const loadSessionData = async () => {
             if (selectedSessionId) {
-                const [allSessions, allUsers, allAbstracts] = await Promise.all([
+                const [allSessions, allStudents, allAbstracts] = await Promise.all([
                     getSessions(),
-                    getUsers(),
+                    getEventStudents(),
                     getAbstracts()
                 ]);
 
@@ -42,13 +42,25 @@ export default function AttendanceSheet() {
                     const sessionAbstracts = allAbstracts.filter(a => session.abstractIds && session.abstractIds.includes(a.id));
                     const studentIds = sessionAbstracts.map(a => a.studentId);
 
-                    // Also include any other students if specific logic requires, but for now map from abstracts
-                    // @ts-ignore
-                    const sessionStudents = allUsers.filter(u => u.role === "student" && studentIds.includes(u.id)) as Student[];
+                    // Extract matching students and normalize their names
+                    const sessionStudents = allStudents
+                        .filter((u: any) => studentIds.includes(u.id))
+                        .map((u: any) => ({
+                            ...u,
+                            name: u.participantName || u.name || "Unknown Student"
+                        })) as Student[];
+
                     setStudents(sessionStudents);
 
                     // Load existing attendance
-                    if (session.attendanceRecords) {
+                    if ((session as any)._attendedSubmissionIds) {
+                        const attendedSubIds = (session as any)._attendedSubmissionIds as string[];
+                        const attendedStudents = sessionAbstracts
+                            .filter(a => attendedSubIds.includes(a.id))
+                            .map(a => a.studentId);
+                        setAttendance(new Set(attendedStudents));
+                    } else if (session.attendanceRecords) {
+                        // Fallback for legacy data
                         setAttendance(new Set(session.attendanceRecords));
                     } else {
                         setAttendance(new Set());
@@ -73,10 +85,8 @@ export default function AttendanceSheet() {
         if (!selectedSessionId) return;
 
         try {
-            // Update session with new attendance records
-            await updateSession(selectedSessionId, {
-                attendanceRecords: Array.from(attendance)
-            });
+            // Update session_participants table mapping
+            await updateSessionAttendance(selectedSessionId, Array.from(attendance));
 
             toast({ title: "Saved", description: "Attendance records updated successfully." });
         } catch (error) {

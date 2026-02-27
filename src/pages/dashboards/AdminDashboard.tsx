@@ -3,7 +3,7 @@ import { BarChart3, Users, Settings, FileText, Award, Database, Bell } from "luc
 import { Routes, Route, Navigate } from "react-router-dom";
 import AdminOverview from "../admin/Overview";
 import AdminJudges from "../admin/Judges";
-import AdminEventConfig from "../admin/EventConfig";
+import AdminEventMaster from "../admin/EventMaster";
 import AdminUsers from "../admin/Users";
 import AdminRegistrations from "../admin/Registrations";
 import Reports from "../admin/Reports";
@@ -29,7 +29,7 @@ export default function AdminDashboard() {
         <Route path="/registrations" element={<AdminRegistrations />} />
         <Route path="/users" element={<AdminUsers />} />
         <Route path="/judges" element={<AdminJudges />} />
-        <Route path="/events" element={<AdminEventConfig />} />
+        <Route path="/events" element={<AdminEventMaster />} />
         <Route path="/reports" element={<Reports />} />
         <Route path="/results" element={<AdminResults />} />
         <Route path="/audit" element={<AuditLog />} />

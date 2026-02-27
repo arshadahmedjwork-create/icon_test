@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
-import { getUsers, getAbstracts, getDeadlines } from "@/services/supabaseService";
+import { getAbstracts, getDeadlines } from "@/services/supabaseService";
+import { supabase } from "@/lib/supabaseClient";
 import {
     Users, FileText, CheckCircle, XCircle, Clock, ClipboardCheck,
     TrendingUp, AlertTriangle, Calendar, ArrowRight
@@ -14,38 +15,40 @@ export default function StaffOverview() {
     const { user } = useAuth();
     const navigate = useNavigate();
 
-    const [allUsers, setAllUsers] = useState<User[]>([]);
+    const [allStudents, setAllStudents] = useState<any[]>([]);
     const [allAbstracts, setAllAbstracts] = useState<Abstract[]>([]);
     const [deadlines, setDeadlines] = useState<Deadline[]>([]);
 
+    const staffCollege = user?.college || "Your College";
+
     useEffect(() => {
         const loadData = async () => {
-            const [fetchedUsers, fetchedAbstracts, fetchedDeadlines] = await Promise.all([
-                getUsers(),
+            const query = supabase.from('event_students').select('*');
+            if (staffCollege !== "Your College" && staffCollege) {
+                query.eq('college', staffCollege);
+            }
+
+            const [studentsRes, fetchedAbstracts, fetchedDeadlines] = await Promise.all([
+                query,
                 getAbstracts(),
                 getDeadlines()
             ]);
-            setAllUsers(fetchedUsers);
+
+            setAllStudents(studentsRes.data || []);
             setAllAbstracts(fetchedAbstracts);
             setDeadlines(fetchedDeadlines);
         };
         loadData();
-    }, []);
+    }, [staffCollege]);
 
-    const staffCollege = user?.college || "Your College";
 
-    // Filter students by college (or show all if no college set — demo flexibility)
-    const collegeStudents = allUsers.filter(
-        (u) => u.role === "student" && (u.college === staffCollege || !user?.college)
-    );
-
-    const pendingRegistrations = collegeStudents.filter((s) => s.registrationStatus === "pending");
-    const approvedRegistrations = collegeStudents.filter((s) => s.registrationStatus === "approved");
-    const rejectedRegistrations = collegeStudents.filter((s) => s.registrationStatus === "rejected");
-    const completedRegistrations = collegeStudents.filter((s) => s.registrationStatus === "completed");
+    const pendingRegistrations = allStudents.filter((s) => s.approvalStatus === "PENDING");
+    const approvedRegistrations = allStudents.filter((s) => s.approvalStatus === "APPROVED");
+    const rejectedRegistrations = allStudents.filter((s) => s.approvalStatus === "REJECTED");
+    const completedRegistrations = allStudents.filter((s) => s.paymentStatus === "PAID");
 
     // Abstract stats for college students
-    const studentIds = new Set(collegeStudents.map((s) => s.id));
+    const studentIds = new Set(allStudents.map((s) => s.id));
     const collegeAbstracts = allAbstracts.filter((a) => studentIds.has(a.studentId));
     const pendingAbstracts = collegeAbstracts.filter((a) => a.status === "pending");
     const approvedAbstracts = collegeAbstracts.filter((a) => a.status === "approved");
@@ -53,8 +56,8 @@ export default function StaffOverview() {
     const revisionAbstracts = collegeAbstracts.filter((a) => a.status === "revision_requested");
 
     // Payment and MIDAS ID stats
-    const paidStudents = collegeStudents.filter((s) => s.paymentStatus === "completed");
-    const midasIdIssued = collegeStudents.filter((s) => s.midasId);
+    const paidStudents = allStudents.filter((s) => s.paymentStatus === "PAID");
+    const midasIdIssued = allStudents.filter((s) => s.midasId);
 
     // Upcoming deadlines
     const now = new Date();
@@ -66,7 +69,7 @@ export default function StaffOverview() {
     const statCards = [
         {
             label: "Total Students",
-            value: collegeStudents.length,
+            value: allStudents.length,
             icon: <Users className="w-5 h-5" />,
             color: "from-blue-500 to-blue-600",
             bgColor: "bg-blue-50 dark:bg-blue-950/40",
@@ -175,19 +178,19 @@ export default function StaffOverview() {
                     </div>
 
                     {/* Progress bar */}
-                    {collegeStudents.length > 0 && (
+                    {allStudents.length > 0 && (
                         <div>
                             <div className="flex justify-between text-xs text-muted-foreground mb-1.5">
                                 <span>Approval Progress</span>
                                 <span>
-                                    {approvedRegistrations.length + completedRegistrations.length} / {collegeStudents.length}
+                                    {approvedRegistrations.length + completedRegistrations.length} / {allStudents.length}
                                 </span>
                             </div>
                             <div className="h-2 bg-secondary rounded-full overflow-hidden">
                                 <div
                                     className="h-full bg-gradient-to-r from-emerald-500 to-green-400 rounded-full transition-all duration-500"
                                     style={{
-                                        width: `${((approvedRegistrations.length + completedRegistrations.length) / collegeStudents.length) * 100}%`,
+                                        width: `${((approvedRegistrations.length + completedRegistrations.length) / allStudents.length) * 100}%`,
                                     }}
                                 />
                             </div>
@@ -205,7 +208,7 @@ export default function StaffOverview() {
                                         className="flex items-center justify-between py-2 px-3 rounded-lg bg-secondary/50 hover:bg-secondary transition-colors"
                                     >
                                         <div>
-                                            <span className="text-sm font-medium">{student.name}</span>
+                                            <span className="text-sm font-medium">{student.participantName}</span>
                                             <span className="text-xs text-muted-foreground ml-2">{student.email}</span>
                                         </div>
                                         <Badge variant="outline" className="text-xs border-amber-300 text-amber-600 dark:text-amber-400">

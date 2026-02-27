@@ -12,8 +12,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/contexts/AuthContext";
-import { getEventConfig, getEventStudents, updateEventStudent } from "@/services/supabaseService";
-import { Student, EventConfig } from "@/types";
+import { getEvents, getEventStudents, updateEventStudent } from "@/services/supabaseService";
+import { Student, Event } from "@/types";
 
 interface EventOption {
     id: string;
@@ -41,7 +41,7 @@ const modeIcons: Record<string, string> = {
 
 export default function StudentEventsPage() {
     const { user } = useAuth();
-    const [config, setConfig] = useState<EventConfig | null>(null);
+    const [configReady, setConfigReady] = useState(false);
     const [events, setEvents] = useState<EventOption[]>([]);
     const [search, setSearch] = useState("");
     const [enrollDialog, setEnrollDialog] = useState<EventOption | null>(null);
@@ -51,9 +51,8 @@ export default function StudentEventsPage() {
     useEffect(() => {
         const loadData = async () => {
             if (!user) return;
-            const eventConfig = await getEventConfig();
-            if (!eventConfig) return;
-            setConfig(eventConfig);
+            const allEvents = await getEvents();
+            setConfigReady(true);
 
             if ((user as Student)?.selectedEvents && (user as Student).selectedEvents!.length > 0) {
                 setSelectedEvent((user as Student).selectedEvents![0]);
@@ -61,37 +60,22 @@ export default function StudentEventsPage() {
 
             const allStudents = await getEventStudents();
 
-            const options: EventOption[] = [];
-            let i = 1;
-            eventConfig.subjects.forEach(subject => {
-                eventConfig.presentationTypes.forEach(type => {
-                    eventConfig.modes.forEach(mode => {
-                        const capacityKey = `${type.toLowerCase().replace(" ", "")}${mode}` as keyof typeof eventConfig.capacities;
-                        const capacity = eventConfig.capacities[capacityKey] || 12;
+            const options: EventOption[] = allEvents.map((evt: Event) => {
+                const enrolled = allStudents.filter(s =>
+                    s.selectedEvents?.some(e =>
+                        e.type === evt.type && e.mode === evt.mode
+                    )
+                ).length;
 
-                        const enrolled = allStudents.filter(s =>
-                            s.selectedEvents?.some(e =>
-                                e.subject === subject && e.type === type && e.mode === mode
-                            )
-                        ).length;
-
-                        // Create a nicer name based on type and subject
-                        // e.g., Paper Presentation - Prosthodontics
-                        let displayType = type;
-                        if (displayType.toLowerCase().includes("paper")) displayType = "PAPER";
-                        else if (displayType.toLowerCase().includes("poster")) displayType = "POSTER";
-
-                        options.push({
-                            id: `evt-${i++}`,
-                            subject,
-                            type: displayType,
-                            mode: mode.toUpperCase(),
-                            name: `${type} — ${subject}`,
-                            capacity,
-                            enrolled
-                        });
-                    });
-                });
+                return {
+                    id: evt.id,
+                    subject: evt.name, // using name as subject for display compat
+                    type: evt.type,
+                    mode: evt.mode.toUpperCase(),
+                    name: evt.name,
+                    capacity: evt.capacity,
+                    enrolled
+                };
             });
 
             setEvents(options);
@@ -131,7 +115,7 @@ export default function StudentEventsPage() {
         }
     };
 
-    if (!config) return <div className="p-8 text-center text-slate-500">Loading events...</div>;
+    if (!configReady) return <div className="p-8 text-center text-slate-500">Loading events...</div>;
 
     const studentData = user as Student;
     const hasPayment = studentData.paymentStatus === "PAID";

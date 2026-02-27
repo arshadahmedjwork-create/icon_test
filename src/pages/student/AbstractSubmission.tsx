@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { useAuth } from "@/contexts/AuthContext";
-import { addAbstract, getEventConfig } from "@/services/supabaseService";
+import { addAbstract, getEvents } from "@/services/supabaseService";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { Loader2, Upload } from "lucide-react";
-import { Abstract, EventConfig } from "@/types";
+import { Abstract, Event } from "@/types";
 
 interface AbstractData {
     title: string;
@@ -26,12 +26,12 @@ interface AbstractData {
 export default function AbstractSubmission({ onComplete }: { onComplete: () => void }) {
     const { user } = useAuth();
     const [isSubmitting, setIsSubmitting] = useState(false);
-    const [config, setConfig] = useState<EventConfig | null>(null);
+    const [events, setEvents] = useState<Event[]>([]);
 
     useEffect(() => {
         const loadConfig = async () => {
-            const c = await getEventConfig();
-            setConfig(c);
+            const c = await getEvents();
+            setEvents(c);
         };
         loadConfig();
     }, []);
@@ -93,7 +93,7 @@ export default function AbstractSubmission({ onComplete }: { onComplete: () => v
                                     <SelectValue placeholder="Select specialty" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    {config?.subjects.map(subj => (
+                                    {Array.from(new Set(events.map(e => e.name))).map(subj => (
                                         <SelectItem key={subj} value={subj}>{subj}</SelectItem>
                                     ))}
                                 </SelectContent>
@@ -107,7 +107,7 @@ export default function AbstractSubmission({ onComplete }: { onComplete: () => v
                                     <SelectValue placeholder="Select type" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    {config?.presentationTypes.map(t => (
+                                    {Array.from(new Set(events.map(e => e.type))).map(t => (
                                         <SelectItem key={t} value={t}>{t}</SelectItem>
                                     ))}
                                 </SelectContent>
@@ -123,7 +123,7 @@ export default function AbstractSubmission({ onComplete }: { onComplete: () => v
                                     <SelectValue placeholder="Online / Offline" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    {config?.modes.map(m => (
+                                    {Array.from(new Set(events.map(e => e.mode))).map(m => (
                                         <SelectItem key={m} value={m}>{m}</SelectItem>
                                     ))}
                                 </SelectContent>

@@ -29,7 +29,8 @@ import {
     ExternalLink
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
-import { getAbstracts, getUsers, updateAbstractStatus } from "@/services/supabaseService";
+import { getAbstracts, updateAbstractStatus } from "@/services/supabaseService";
+import { supabase } from "@/lib/supabaseClient";
 import { sendProvisionalAcceptanceEmail } from "@/services/emailService";
 import { Abstract, User } from "@/types";
 import { useToast } from "@/hooks/use-toast";
@@ -49,15 +50,28 @@ export default function AbstractScrutiny() {
 
     useEffect(() => {
         const loadData = async () => {
-            const [fetchedAbstracts, fetchedUsers] = await Promise.all([
+            let query = supabase.from('event_students').select('*');
+            if (user?.role === 'staff' && user?.college) {
+                query = query.eq('college', user.college);
+            }
+
+            const [fetchedAbstracts, { data: students }] = await Promise.all([
                 getAbstracts(),
-                getUsers()
+                query
             ]);
-            setAbstracts(fetchedAbstracts);
-            setUsers(fetchedUsers);
+
+            const validStudents = students || [];
+            const studentIds = new Set(validStudents.map((s: any) => s.id));
+
+            // Only show abstracts for students in this college
+            const filteredAbstracts = fetchedAbstracts.filter(a => studentIds.has(a.studentId));
+
+            setAbstracts(filteredAbstracts);
+            // Map student to User type expectation for getStudentName
+            setUsers(validStudents.map((s: any) => ({ ...s, name: s.participantName })));
         };
         loadData();
-    }, []);
+    }, [user]);
 
     const refreshData = async () => {
         const fetchedAbstracts = await getAbstracts();

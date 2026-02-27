@@ -3,7 +3,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { getEventConfig, getUsers, getAbstracts, getSessions } from "@/services/supabaseService";
+import { getEvents, getUsers, getAbstracts, getSessions } from "@/services/supabaseService";
 
 export default function VerifyWorkflows() {
     const { user, login } = useAuth();
@@ -12,11 +12,11 @@ export default function VerifyWorkflows() {
     const log = (msg: string) => setLogs(prev => [...prev, `[${new Date().toLocaleTimeString()}] ${msg}`]);
 
     const runDataCheck = async () => {
-        const [users, abstracts, sessions, config] = await Promise.all([
+        const [users, abstracts, sessions, events] = await Promise.all([
             getUsers(),
             getAbstracts(),
             getSessions(),
-            getEventConfig()
+            getEvents()
         ]);
 
         log(`Total Users: ${users.length}`);
@@ -25,7 +25,12 @@ export default function VerifyWorkflows() {
 
         // Check Capacity
         const paperOnlineEvents = users.filter(u => u.role === "student" && u.selectedEvents?.some((e: any) => e.type === "Paper Presentation" && e.mode === "Online"));
-        log(`Paper Online Enrollment: ${paperOnlineEvents.length} / ${config.capacities.paperOnline}`);
+
+        // Find capacity from an equivalent event config (if multiple match, grab first)
+        const matchedEvent = events.find(e => e.type === "Paper Presentation" && e.mode === "Online");
+        const cap = matchedEvent ? matchedEvent.capacity : "Unknown";
+
+        log(`Paper Online Enrollment: ${paperOnlineEvents.length} / ${cap}`);
 
         // Check Conflicts
         // (Simplified check)
@@ -53,11 +58,11 @@ export default function VerifyWorkflows() {
                 <Card>
                     <CardHeader><CardTitle>Quick Role Switch</CardTitle></CardHeader>
                     <CardContent className="grid gap-2">
-                        <Button variant="outline" onClick={() => login("student@example.com", "password")}>Login as Student</Button>
-                        <Button variant="outline" onClick={() => login("staff@example.com", "password")}>Login as Staff</Button>
-                        <Button variant="outline" onClick={() => login("judge@example.com", "password")}>Login as Judge</Button>
-                        <Button variant="outline" onClick={() => login("volunteer@example.com", "password")}>Login as Volunteer</Button>
-                        <Button variant="outline" onClick={() => login("admin@example.com", "admin123")}>Login as Admin</Button>
+                        <Button variant="outline" onClick={() => login("student@example.com", "password", "student")}>Login as Student</Button>
+                        <Button variant="outline" onClick={() => login("staff@example.com", "password", "staff")}>Login as Staff</Button>
+                        <Button variant="outline" onClick={() => login("judge@example.com", "password", "judge")}>Login as Judge</Button>
+                        <Button variant="outline" onClick={() => login("volunteer@example.com", "password", "volunteer")}>Login as Volunteer</Button>
+                        <Button variant="outline" onClick={() => login("admin@example.com", "admin123", "admin")}>Login as Admin</Button>
                     </CardContent>
                 </Card>
             </div>

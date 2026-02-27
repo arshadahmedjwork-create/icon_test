@@ -12,6 +12,9 @@ import {
 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/lib/supabaseClient";
+import React from "react";
 
 interface SubmissionItem {
     id: string;
@@ -23,61 +26,127 @@ interface SubmissionItem {
     remarks?: string;
 }
 
-const statusConfig = {
+const statusConfig: Record<string, any> = {
+    DRAFT: { label: "Draft", icon: Clock, color: "bg-slate-50 text-slate-700 border-slate-200", dot: "bg-slate-500" },
+    SUBMITTED: { label: "Submitted", icon: Clock, color: "bg-blue-50 text-blue-700 border-blue-200", dot: "bg-blue-500" },
     PENDING: { label: "Pending Review", icon: Clock, color: "bg-amber-50 text-amber-700 border-amber-200", dot: "bg-amber-500" },
     APPROVED: { label: "Approved", icon: CheckCircle2, color: "bg-green-50 text-green-700 border-green-200", dot: "bg-green-500" },
     REJECTED: { label: "Rejected", icon: XCircle, color: "bg-red-50 text-red-700 border-red-200", dot: "bg-red-500" },
 };
 
-const mockSubmissions: SubmissionItem[] = [
-    { id: "sub-1", eventName: "Paper Presentation — Prosthodontics", title: "Advances in CAD/CAM Prosthodontics", fileName: "abstract_cadcam.pdf", status: "PENDING", submittedAt: "2026-02-15T10:30:00Z" },
-    { id: "sub-2", eventName: "Poster Presentation — Endodontics", title: "Regenerative Endodontics: A Systematic Review", fileName: "poster_regen.pdf", status: "APPROVED", submittedAt: "2026-02-10T14:00:00Z" },
-];
-
-const enrolledPaperEvents = [
-    { id: "evt-1", name: "Paper Presentation — Prosthodontics" },
-    { id: "evt-2", name: "Poster Presentation — Endodontics" },
-];
-
 export default function StudentSubmissionsPage() {
-    const [submissions, setSubmissions] = useState(mockSubmissions);
+    const { user } = useAuth();
+    const [submissions, setSubmissions] = useState<SubmissionItem[]>([]);
+    const [enrolledPaperEvents, setEnrolledPaperEvents] = useState<{ id: string, name: string }[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
     const [showNew, setShowNew] = useState(false);
     const [submitting, setSubmitting] = useState(false);
     const [newForm, setNewForm] = useState({ eventId: "", title: "", remarks: "" });
-    const [newFile, setNewFile] = useState("");
+    const [newFile, setNewFile] = useState<File | null>(null);
+
+    React.useEffect(() => {
+        loadData();
+    }, [user?.id]);
+
+    const loadData = async () => {
+        if (!user?.id) return;
+        setIsLoading(true);
+        try {
+            // First logic: get enrolled events (from user.selectedEvents or similar if available, or fetch from event_students)
+            const { data: student } = await supabase.from('event_students').select('selectedEvents').eq('id', user.id).single();
+            if (student?.selectedEvents) {
+                const paperEvents = student.selectedEvents
+                    .filter((e: any) => e.type.toUpperCase().includes("PAPER") || e.type.toUpperCase().includes("POSTER"))
+                    .map((e: any, idx: number) => ({
+                        id: `evt-${idx}`,
+                        name: `${e.type} — ${e.subject}`,
+                        raw: e
+                    }));
+                setEnrolledPaperEvents(paperEvents);
+            }
+
+            // Next logic: get past submissions
+            const { data: subsData } = await supabase.from('submissions').select('*').eq('eventStudentId', user.id).order('submissionDate', { ascending: false });
+            if (subsData) {
+                setSubmissions(subsData.map((s: any) => ({
+                    id: s.id,
+                    eventName: s.eventName || s.subject || "Unknown",
+                    title: s.title,
+                    fileName: s.fileName || "abstract.pdf",
+                    status: s.status as any,
+                    submittedAt: s.submissionDate,
+                    remarks: s.remarks
+                })));
+            }
+        } catch (err) {
+            console.error(err);
+        } finally {
+            setIsLoading(false);
+        }
+    };
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file) return;
         if (file.size > 10 * 1024 * 1024) { toast.error("File must be under 10MB"); return; }
-        setNewFile(file.name);
+        setNewFile(file);
     };
 
-    const handleSubmit = () => {
-        if (!newForm.eventId || !newForm.title || !newFile) {
+    const handleSubmit = async () => {
+        if (!newForm.eventId || !newForm.title || !newFile || !user?.id) {
             toast.error("Event, title, and file are required"); return;
         }
         setSubmitting(true);
-        setTimeout(() => {
+        try {
             const event = enrolledPaperEvents.find(e => e.id === newForm.eventId);
-            setSubmissions(prev => [
-                {
-                    id: `sub-${Date.now()}`,
-                    eventName: event?.name || "Unknown Event",
-                    title: newForm.title,
-                    fileName: newFile,
-                    status: "PENDING",
-                    submittedAt: new Date().toISOString(),
-                    remarks: newForm.remarks,
-                },
-                ...prev
-            ]);
-            setSubmitting(false);
+
+            // 1. Upload File
+            const fileExt = newFile.name.split('.').pop();
+            const filePath = `${user.id}/${Date.now()}_abstract.${fileExt}`;
+            const { error: uploadError } = await supabase.storage.from('abstracts').upload(filePath, newFile);
+
+            if (uploadError && uploadError.message !== 'Bucket not found') {
+                throw uploadError;
+            } else if (uploadError && uploadError.message === 'Bucket not found') {
+                console.warn("Abstracts bucket not found, skipping physical upload for demo");
+                toast.warning("File upload skipped (missing bucket). Using dummy URL.");
+            }
+
+            // Map string values to Supabase Enums safely
+            const rawType = ((event as any)?.raw?.type || "").toUpperCase();
+            const dbType = rawType.includes("PAPER") ? "PAPER" : rawType.includes("POSTER") ? "POSTER" : "PAPER"; // Fallback to PAPER
+
+            const rawMode = ((event as any)?.raw?.mode || "").toUpperCase();
+            const dbMode = rawMode.includes("ONLINE") ? "ONLINE" : "OFFLINE"; // Fallback to OFFLINE
+
+            const dbData = {
+                eventStudentId: user.id,
+                eventName: event?.name,
+                title: newForm.title,
+                fileName: newFile.name,
+                abstractFileUrl: filePath,
+                status: "DRAFT",
+                remarks: newForm.remarks,
+                eventType: dbType,
+                eventMode: dbMode,
+                subject: (event as any)?.raw?.subject
+            };
+
+            const { error: dbError } = await supabase.from('submissions').insert(dbData);
+            if (dbError) throw dbError;
+
+            await loadData(); // refresh
+
             setShowNew(false);
             setNewForm({ eventId: "", title: "", remarks: "" });
-            setNewFile("");
+            setNewFile(null);
             toast.success("Abstract submitted successfully!");
-        }, 1500);
+        } catch (error: any) {
+            console.error("Submission error:", error);
+            toast.error(error.message || "Failed to submit abstract.");
+        } finally {
+            setSubmitting(false);
+        }
     };
 
     return (
@@ -108,7 +177,7 @@ export default function StudentSubmissionsPage() {
             {/* Submissions List */}
             <div className="space-y-3">
                 {submissions.map((sub, i) => {
-                    const cfg = statusConfig[sub.status];
+                    const cfg = statusConfig[sub.status] || { label: sub.status, icon: AlertCircle, color: "bg-gray-50 text-gray-700 border-gray-200", dot: "bg-gray-500" };
                     return (
                         <motion.div
                             key={sub.id}
@@ -172,7 +241,7 @@ export default function StudentSubmissionsPage() {
                             <Label className="font-medium">Upload Abstract (PDF/DOC) <span className="text-red-500">*</span></Label>
                             <label className="flex items-center justify-center gap-3 h-14 border-2 border-dashed border-slate-200 rounded-xl bg-slate-50 cursor-pointer hover:border-[#004d40]/40 transition-colors">
                                 <Upload className="w-4 h-4 text-slate-400" />
-                                <span className="text-sm text-slate-500">{newFile || "Click to upload"}</span>
+                                <span className="text-sm text-slate-500">{newFile ? newFile.name : "Click to upload"}</span>
                                 <input type="file" accept=".pdf,.doc,.docx" onChange={handleFileChange} className="hidden" />
                             </label>
                         </div>

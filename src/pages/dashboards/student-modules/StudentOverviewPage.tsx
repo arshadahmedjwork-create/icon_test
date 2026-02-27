@@ -1,5 +1,6 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,8 +11,10 @@ import { toast } from "sonner";
 import {
     User, Mail, Phone, Building2, GraduationCap, CalendarDays,
     Upload, CheckCircle2, AlertCircle, Loader2, FileText,
-    Calendar, CreditCard, Award
+    Calendar, CreditCard, Award, Lock, UserCircle2
 } from "lucide-react";
+import { supabase } from "@/lib/supabaseClient";
+import { getStudentDashboardStats } from "@/services/supabaseService";
 
 const courses = [
     "BDS", "MDS - Orthodontics", "MDS - Prosthodontics", "MDS - Conservative & Endodontics",
@@ -22,242 +25,281 @@ const courses = [
 
 const yearOptions = ["1st Year", "2nd Year", "3rd Year", "4th Year", "Intern"];
 
-export default function StudentOverviewPage() {
-    const { user } = useAuth();
-    const [profileCompleted, setProfileCompleted] = useState(false);
-    const [loading, setLoading] = useState(false);
-    const [fileName, setFileName] = useState("");
-
-    const [form, setForm] = useState({
-        fullName: user?.name || "",
-        dateOfBirth: "",
-        email: user?.email || "",
-        phone: user?.phone || "",
-        college: user?.college || "",
-        course: "",
-        year: "",
+const loadRazorpayScript = (): Promise<boolean> => {
+    return new Promise((resolve) => {
+        if (window.Razorpay) {
+            resolve(true);
+            return;
+        }
+        const script = document.createElement("script");
+        script.src = "https://checkout.razorpay.com/v1/checkout.js";
+        script.onload = () => resolve(true);
+        script.onerror = () => resolve(false);
+        document.body.appendChild(script);
     });
+};
 
-    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        setForm({ ...form, [e.target.name]: e.target.value });
-    };
+export default function StudentOverviewPage() {
+    const { user, logout, refreshUser } = useAuth(); // Assume we can refetch/reload user after payment or we force a reload
+    const navigate = useNavigate();
+    const [loadingPayment, setLoadingPayment] = useState(false);
+    const [stats, setStats] = useState({ eventsEnrolled: 0, abstractsSubmitted: 0, paymentsMade: 0, certificates: 0 });
 
-    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (!file) return;
-        if (file.size > 5 * 1024 * 1024) { toast.error("File must be under 5MB"); return; }
-        if (!["application/pdf", "image/jpeg", "image/png"].includes(file.type)) {
-            toast.error("Only PDF, JPG, PNG allowed"); return;
+    useEffect(() => {
+        if (user?.id) {
+            getStudentDashboardStats(user.id).then(setStats);
         }
-        setFileName(file.name);
-        toast.success(`File "${file.name}" selected`);
-    };
+    }, [user?.id]);
 
-    const handleSubmit = (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!form.fullName || !form.dateOfBirth || !form.phone || !form.college || !form.course || !form.year) {
-            toast.error("All fields are mandatory"); return;
+    const isApproved = user?.approvalStatus === 'APPROVED';
+    const isPaid = user?.paymentStatus === 'PAID';
+    const isRejected = user?.approvalStatus === 'REJECTED';
+
+    const handlePayment = async (amount: number, isTest: boolean = false) => {
+        setLoadingPayment(true);
+        const res = await loadRazorpayScript();
+        if (!res) {
+            toast.error("Razorpay SDK failed to load.");
+            setLoadingPayment(false);
+            return;
         }
-        if (!/^\d{10}$/.test(form.phone)) { toast.error("Enter a valid 10-digit phone number"); return; }
+        setLoadingPayment(false);
 
-        setLoading(true);
-        setTimeout(() => {
-            setLoading(false);
-            setProfileCompleted(true);
-            toast.success("Registration submitted successfully!");
-        }, 1500);
+        const razorpayKey = import.meta.env.VITE_RAZORPAY_LIVE_KEY;
+        if (!razorpayKey) {
+            toast.error("Payment configuration error.");
+            return;
+        }
+
+        const options = {
+            key: razorpayKey,
+            amount: amount * 100, // Amount is in currency subunits. Default currency is INR. Hence, 50000 refers to 50000 paise
+            currency: "INR",
+            name: isTest ? "MIDAS — Test Payment" : "MIDAS Scientific Event",
+            description: "UG Delegate Registration Fee",
+            handler: async function (response: any) {
+                setLoadingPayment(true);
+                try {
+                    // Update student payment status
+                    const { error: updateErr } = await supabase
+                        .from("event_students")
+                        .update({
+                            paymentStatus: "PAID",
+                            paymentId: response.razorpay_payment_id
+                        })
+                        .eq("email", user?.email);
+
+                    if (updateErr) throw updateErr;
+
+                    // Record payment
+                    // Need to fetch student ID first from event_students because user context might just have email/id of member
+                    const { data: studentRecord } = await supabase.from("event_students").select("id").eq("email", user?.email).single();
+                    if (studentRecord) {
+                        const { error: payError } = await supabase.from("payments").insert({
+                            eventStudentId: studentRecord.id,
+                            amount: amount,
+                            currency: "INR",
+                            status: "PAID",
+                            paymentGatewayId: response.razorpay_payment_id,
+                            transactionId: response.razorpay_payment_id,
+                        });
+                        if (payError) console.error("Payment record error:", payError);
+                    }
+
+                    toast.success("Payment Successful! Refreshing...");
+                    setTimeout(async () => {
+                        await refreshUser(); // Reload to refresh auth context
+                    }, 500);
+
+                } catch (err: any) {
+                    console.error("Payment update Error:", err);
+                    toast.error("Payment received but status update failed. Contact Admin.");
+                    setLoadingPayment(false);
+                }
+            },
+            prefill: {
+                name: user?.name,
+                email: user?.email,
+                contact: user?.phone || "9999999999",
+            },
+            theme: { color: isTest ? "#d97706" : "#004d40" },
+            modal: {
+                ondismiss: function () {
+                    toast.info("Payment cancelled.");
+                }
+            }
+        };
+
+        const rzp = new window.Razorpay(options);
+        rzp.on("payment.failed", function (response: any) {
+            toast.error("Payment failed: " + (response.error?.description || "Unknown error"));
+        });
+        rzp.open();
     };
 
     // ─── COMPLETED DASHBOARD ────────────────────
-    if (profileCompleted) {
-        return (
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
-                <div>
-                    <h1 className="text-2xl font-bold text-slate-900">Welcome, {form.fullName || user?.name}! 👋</h1>
-                    <p className="text-sm text-slate-500 mt-1">Your event participation overview</p>
-                </div>
-
-                {/* Stats Grid */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                    {[
-                        { label: "Events Enrolled", value: "0", icon: Calendar, color: "bg-blue-500", bg: "bg-blue-50" },
-                        { label: "Abstracts Submitted", value: "0", icon: FileText, color: "bg-amber-500", bg: "bg-amber-50" },
-                        { label: "Payments Made", value: "0", icon: CreditCard, color: "bg-green-500", bg: "bg-green-50" },
-                        { label: "Certificates", value: "0", icon: Award, color: "bg-purple-500", bg: "bg-purple-50" },
-                    ].map((stat) => (
-                        <motion.div
-                            key={stat.label}
-                            className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm hover:shadow-md transition-shadow"
-                            whileHover={{ y: -2 }}
-                        >
-                            <div className="flex items-center gap-3 mb-3">
-                                <div className={`w-10 h-10 rounded-xl ${stat.bg} flex items-center justify-center`}>
-                                    <stat.icon className={`w-5 h-5 text-${stat.color.replace('bg-', '')}`} />
-                                </div>
-                                <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">{stat.label}</span>
-                            </div>
-                            <p className="text-3xl font-black text-slate-900">{stat.value}</p>
-                        </motion.div>
-                    ))}
-                </div>
-
-                {/* Profile Card */}
-                <div className="bg-white rounded-2xl border border-slate-100 p-6 shadow-sm">
-                    <div className="flex items-center gap-3 mb-4">
-                        <div className="w-12 h-12 rounded-full bg-gradient-to-br from-[#004d40] to-[#2e7d32] flex items-center justify-center text-white font-bold text-lg">
-                            {form.fullName.charAt(0)}
-                        </div>
-                        <div>
-                            <h3 className="font-bold text-slate-900">{form.fullName}</h3>
-                            <p className="text-sm text-slate-500">{form.course} — {form.year}</p>
-                        </div>
-                        <div className="ml-auto flex items-center gap-2 px-3 py-1.5 bg-green-50 text-green-700 rounded-full text-xs font-bold border border-green-200">
-                            <CheckCircle2 className="w-3.5 h-3.5" /> Profile Completed
-                        </div>
-                    </div>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                        <div><span className="text-slate-400 block text-xs mb-1">Email</span><span className="font-medium">{form.email}</span></div>
-                        <div><span className="text-slate-400 block text-xs mb-1">Phone</span><span className="font-medium">{form.phone}</span></div>
-                        <div><span className="text-slate-400 block text-xs mb-1">College</span><span className="font-medium">{form.college}</span></div>
-                        <div><span className="text-slate-400 block text-xs mb-1">DOB</span><span className="font-medium">{form.dateOfBirth}</span></div>
-                    </div>
-                </div>
-
-                {/* Quick Actions */}
-                <div className="bg-white rounded-2xl border border-slate-100 p-6 shadow-sm">
-                    <h3 className="font-bold text-slate-900 mb-4">Quick Actions</h3>
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                        <Button variant="outline" className="h-12 rounded-xl border-slate-200 justify-start" onClick={() => window.location.href = '/dashboard/student/events'}>
-                            <Calendar className="w-4 h-4 mr-2 text-blue-500" /> Browse Events
-                        </Button>
-                        <Button variant="outline" className="h-12 rounded-xl border-slate-200 justify-start" onClick={() => window.location.href = '/dashboard/student/submissions'}>
-                            <FileText className="w-4 h-4 mr-2 text-amber-500" /> My Submissions
-                        </Button>
-                        <Button variant="outline" className="h-12 rounded-xl border-slate-200 justify-start" onClick={() => window.location.href = '/dashboard/student/certificates'}>
-                            <Award className="w-4 h-4 mr-2 text-purple-500" /> View Certificates
-                        </Button>
-                    </div>
-                </div>
-            </motion.div>
-        );
-    }
-
-    // ─── REGISTRATION FORM ──────────────────────
     return (
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="max-w-2xl mx-auto">
-            <div className="mb-8">
-                <div className="flex items-center gap-3 mb-2">
-                    <div className="w-10 h-10 rounded-xl bg-amber-50 flex items-center justify-center">
-                        <AlertCircle className="w-5 h-5 text-amber-500" />
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
+            <div>
+                <h1 className="text-2xl font-bold text-slate-900">Welcome, {user?.name}! 👋</h1>
+                <p className="text-sm text-slate-500 mt-1">Your event participation overview</p>
+            </div>
+
+
+            {/* Stats Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                {[
+                    { label: "Events Enrolled", value: stats.eventsEnrolled.toString(), icon: Calendar, color: "bg-blue-500", bg: "bg-blue-50" },
+                    { label: "Abstracts Submitted", value: stats.abstractsSubmitted.toString(), icon: FileText, color: "bg-amber-500", bg: "bg-amber-50" },
+                    { label: "Payments Made", value: stats.paymentsMade.toString(), icon: CreditCard, color: "bg-green-500", bg: "bg-green-50" },
+                    { label: "Certificates", value: stats.certificates.toString(), icon: Award, color: "bg-purple-500", bg: "bg-purple-50" },
+                ].map((stat) => (
+                    <motion.div
+                        key={stat.label}
+                        className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm hover:shadow-md transition-shadow"
+                        whileHover={{ y: -2 }}
+                    >
+                        <div className="flex items-center gap-3 mb-3">
+                            <div className={`w-10 h-10 rounded-xl ${stat.bg} flex items-center justify-center`}>
+                                <stat.icon className={`w-5 h-5 text-${stat.color.replace('bg-', '')}`} />
+                            </div>
+                            <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">{stat.label}</span>
+                        </div>
+                        <p className="text-3xl font-black text-slate-900">{stat.value}</p>
+                    </motion.div>
+                ))}
+            </div>
+
+            {/* Status / Payment Banner */}
+            {!isPaid && (
+                <div className="bg-white rounded-2xl border border-amber-200 overflow-hidden shadow-sm">
+                    <div className="bg-amber-50 p-6 flex flex-col md:flex-row items-center justify-between gap-6">
+                        <div className="flex items-start gap-4">
+                            <div className="w-12 h-12 rounded-full bg-amber-100 flex items-center justify-center shrink-0">
+                                <AlertCircle className="w-6 h-6 text-amber-600" />
+                            </div>
+                            <div>
+                                <h3 className="text-lg font-bold text-amber-900">
+                                    {isRejected ? "Registration Rejected" : !isApproved ? "Registration Pending Approval" : "Payment Required"}
+                                </h3>
+                                <p className="text-amber-700 mt-1 text-sm max-w-lg">
+                                    {isRejected
+                                        ? "Your registration has been rejected by the staff coordinator."
+                                        : !isApproved
+                                            ? "Your staff coordinator is reviewing your registration. Please check back later. Event access will remain locked until approved and paid."
+                                            : "Your registration is approved! Please complete the payment of ₹1030 to unlock the event dashboard and abstract submissions."}
+                                </p>
+                            </div>
+                        </div>
+
+                        {isApproved && !isPaid && (
+                            <div className="flex flex-col gap-2 shrink-0 w-full md:w-auto">
+                                <Button
+                                    onClick={() => handlePayment(1030, false)}
+                                    disabled={loadingPayment}
+                                    className="bg-[#004d40] hover:bg-[#003d33] text-white font-bold h-12 px-8 rounded-xl shadow-lg"
+                                >
+                                    {loadingPayment ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <CreditCard className="w-4 h-4 mr-2" />}
+                                    Pay Now — ₹1030
+                                </Button>
+                                <Button
+                                    onClick={() => handlePayment(1, true)}
+                                    disabled={loadingPayment}
+                                    variant="outline"
+                                    className="h-10 rounded-xl border-amber-300 text-amber-700 hover:bg-amber-100 font-bold border-dashed"
+                                >
+                                    Test Payment — ₹1
+                                </Button>
+                            </div>
+                        )}
                     </div>
-                    <div>
-                        <h1 className="text-2xl font-bold text-slate-900">Complete Your Profile</h1>
-                        <p className="text-sm text-slate-500">Fill in all details to unlock event enrollment.</p>
+                </div>
+            )}
+
+            {/* Profile Card */}
+            <div className="bg-white rounded-2xl border border-slate-100 p-6 shadow-sm">
+                <div className="flex items-center gap-3 mb-4 border-b border-slate-100 pb-4">
+                    <div className="w-16 h-16 rounded-full bg-gradient-to-br from-[#004d40] to-[#2e7d32] flex items-center justify-center text-white font-bold text-2xl shadow-inner">
+                        {user?.name?.charAt(0) || "U"}
                     </div>
+                    <div className="flex-1 min-w-0">
+                        <h3 className="text-xl font-black text-slate-900 truncate">{user?.name}</h3>
+                        <p className="text-sm font-medium text-slate-500 truncate flex flex-wrap gap-2 items-center">
+                            <Building2 className="w-3.5 h-3.5" /> {user?.college}
+                        </p>
+                    </div>
+                    {user?.midasId && (
+                        <div className="hidden sm:flex items-center gap-4 text-right">
+                            <div className="flex flex-col items-end justify-center">
+                                <p className="text-xs uppercase tracking-wider text-slate-400 font-bold mb-1">MIDAS ID</p>
+                                <div className="bg-slate-100 border border-slate-200 px-4 py-2 rounded-xl">
+                                    <span className="font-mono font-bold text-lg text-[#004d40] tracking-widest">{user?.midasId}</span>
+                                </div>
+                            </div>
+                            <div className="bg-white p-2 border border-slate-200 rounded-xl shadow-sm">
+                                <img
+                                    src={`https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${encodeURIComponent(`MIDAS|${user.midasId}|${user.name}|${user.college}`)}`}
+                                    alt="MIDAS ID QR Code"
+                                    className="w-16 h-16 rounded cursor-pointer hover:scale-150 transition-transform origin-right"
+                                />
+                            </div>
+                        </div>
+                    )}
+                </div>
+
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-6 text-sm mt-6">
+                    <div className="space-y-1">
+                        <span className="text-slate-400 text-xs font-semibold uppercase tracking-wider flex items-center gap-1.5"><Mail className="w-3.5 h-3.5" /> Email</span>
+                        <span className="font-medium text-slate-800 break-all">{user?.email}</span>
+                    </div>
+                    <div className="space-y-1">
+                        <span className="text-slate-400 text-xs font-semibold uppercase tracking-wider flex items-center gap-1.5"><Phone className="w-3.5 h-3.5" /> Phone</span>
+                        <span className="font-medium text-slate-800">{user?.phone || '—'}</span>
+                    </div>
+                    <div className="space-y-1">
+                        <span className="text-slate-400 text-xs font-semibold uppercase tracking-wider flex items-center gap-1.5"><GraduationCap className="w-3.5 h-3.5" /> Course & Year</span>
+                        <span className="font-medium text-slate-800">{user?.course || '—'} • {user?.year || '—'}</span>
+                    </div>
+                    {user?.midasId && (
+                        <div className="sm:hidden space-y-1">
+                            <span className="text-slate-400 text-xs font-semibold uppercase tracking-wider">MIDAS ID</span>
+                            <span className="font-mono font-bold text-slate-800">{user?.midasId}</span>
+                        </div>
+                    )}
                 </div>
             </div>
 
-            <div className="bg-white rounded-2xl border border-slate-100 p-6 md:p-8 shadow-sm">
-                <form onSubmit={handleSubmit} className="space-y-5">
-                    {/* Full Name */}
-                    <div className="space-y-2">
-                        <Label className="text-slate-700 font-medium flex items-center gap-2">
-                            <User className="w-4 h-4 text-slate-400" /> Full Name <span className="text-red-500">*</span>
-                        </Label>
-                        <Input name="fullName" value={form.fullName} onChange={handleChange} required
-                            placeholder="Dr. John Doe" className="h-12 rounded-xl bg-slate-50 border-slate-200" />
-                    </div>
-
-                    {/* DOB + Phone */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                            <Label className="text-slate-700 font-medium flex items-center gap-2">
-                                <CalendarDays className="w-4 h-4 text-slate-400" /> Date of Birth <span className="text-red-500">*</span>
-                            </Label>
-                            <Input name="dateOfBirth" type="date" value={form.dateOfBirth} onChange={handleChange} required
-                                className="h-12 rounded-xl bg-slate-50 border-slate-200" />
-                        </div>
-                        <div className="space-y-2">
-                            <Label className="text-slate-700 font-medium flex items-center gap-2">
-                                <Phone className="w-4 h-4 text-slate-400" /> Phone Number <span className="text-red-500">*</span>
-                            </Label>
-                            <Input name="phone" type="tel" value={form.phone} onChange={handleChange} required maxLength={10}
-                                placeholder="10-digit number" className="h-12 rounded-xl bg-slate-50 border-slate-200" />
-                        </div>
-                    </div>
-
-                    {/* Email (read only) */}
-                    <div className="space-y-2">
-                        <Label className="text-slate-700 font-medium flex items-center gap-2">
-                            <Mail className="w-4 h-4 text-slate-400" /> Email <span className="text-slate-300 text-xs">(auto-filled)</span>
-                        </Label>
-                        <Input value={form.email} readOnly
-                            className="h-12 rounded-xl bg-slate-100 border-slate-200 text-slate-500 cursor-not-allowed" />
-                    </div>
-
-                    {/* College */}
-                    <div className="space-y-2">
-                        <Label className="text-slate-700 font-medium flex items-center gap-2">
-                            <Building2 className="w-4 h-4 text-slate-400" /> College / Institution <span className="text-red-500">*</span>
-                        </Label>
-                        <Input name="college" value={form.college} onChange={handleChange} required
-                            placeholder="KLE VK Institute of Dental Sciences" className="h-12 rounded-xl bg-slate-50 border-slate-200" />
-                    </div>
-
-                    {/* Course + Year */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                            <Label className="text-slate-700 font-medium flex items-center gap-2">
-                                <GraduationCap className="w-4 h-4 text-slate-400" /> Course <span className="text-red-500">*</span>
-                            </Label>
-                            <Select value={form.course} onValueChange={(v) => setForm({ ...form, course: v })}>
-                                <SelectTrigger className="h-12 rounded-xl bg-slate-50 border-slate-200">
-                                    <SelectValue placeholder="Select Course" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {courses.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-                                </SelectContent>
-                            </Select>
-                        </div>
-                        <div className="space-y-2">
-                            <Label className="text-slate-700 font-medium flex items-center gap-2">
-                                <GraduationCap className="w-4 h-4 text-slate-400" /> Year <span className="text-red-500">*</span>
-                            </Label>
-                            <Select value={form.year} onValueChange={(v) => setForm({ ...form, year: v })}>
-                                <SelectTrigger className="h-12 rounded-xl bg-slate-50 border-slate-200">
-                                    <SelectValue placeholder="Select Year" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {yearOptions.map((y) => <SelectItem key={y} value={y}>{y}</SelectItem>)}
-                                </SelectContent>
-                            </Select>
-                        </div>
-                    </div>
-
-                    {/* ID Proof Upload */}
-                    <div className="space-y-2">
-                        <Label className="text-slate-700 font-medium flex items-center gap-2">
-                            <Upload className="w-4 h-4 text-slate-400" /> ID Proof <span className="text-slate-300 text-xs">(PDF/JPG/PNG — Max 5MB)</span>
-                        </Label>
-                        <label className="flex items-center justify-center gap-3 h-14 border-2 border-dashed border-slate-200 rounded-xl bg-slate-50 cursor-pointer hover:border-[#004d40]/40 hover:bg-[#004d40]/5 transition-colors">
-                            <Upload className="w-4 h-4 text-slate-400" />
-                            <span className="text-sm text-slate-500">{fileName || "Click to upload ID proof"}</span>
-                            <input type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={handleFileChange} className="hidden" />
-                        </label>
-                    </div>
-
-                    {/* Submit */}
-                    <div className="pt-4">
-                        <Button type="submit" disabled={loading}
-                            className="w-full h-14 bg-[#004d40] hover:bg-[#003d33] text-white rounded-xl text-base font-bold shadow-lg shadow-[#004d40]/20">
-                            {loading ? (
-                                <span className="flex items-center gap-2"><Loader2 className="w-5 h-5 animate-spin" /> Submitting...</span>
-                            ) : (
-                                <span className="flex items-center gap-2"><CheckCircle2 className="w-5 h-5" /> Submit Registration</span>
-                            )}
-                        </Button>
-                    </div>
-                </form>
+            {/* Quick Actions */}
+            <div className="bg-white rounded-2xl border border-slate-100 p-6 shadow-sm">
+                <h3 className="font-bold text-slate-900 mb-4 flex items-center gap-2">
+                    Quick Actions {!isPaid && <Lock className="w-4 h-4 text-slate-400" />}
+                </h3>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <Button
+                        variant="outline"
+                        disabled={!isPaid}
+                        className={`h-12 rounded-xl border-slate-200 justify-start ${!isPaid ? 'opacity-50' : ''}`}
+                        onClick={() => navigate('/dashboard/student/events')}
+                    >
+                        <Calendar className={`w-4 h-4 mr-2 ${isPaid ? 'text-blue-500' : 'text-slate-400'}`} /> Browse Events
+                    </Button>
+                    <Button
+                        variant="outline"
+                        disabled={!isPaid}
+                        className={`h-12 rounded-xl border-slate-200 justify-start ${!isPaid ? 'opacity-50' : ''}`}
+                        onClick={() => navigate('/dashboard/student/submissions')}
+                    >
+                        <FileText className={`w-4 h-4 mr-2 ${isPaid ? 'text-amber-500' : 'text-slate-400'}`} /> My Submissions
+                    </Button>
+                    <Button
+                        variant="outline"
+                        disabled={!isPaid}
+                        className={`h-12 rounded-xl border-slate-200 justify-start ${!isPaid ? 'opacity-50' : ''}`}
+                        onClick={() => navigate('/dashboard/student/certificates')}
+                    >
+                        <Award className={`w-4 h-4 mr-2 ${isPaid ? 'text-purple-500' : 'text-slate-400'}`} /> View Certificates
+                    </Button>
+                </div>
             </div>
         </motion.div>
     );

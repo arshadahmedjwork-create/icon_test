@@ -34,6 +34,9 @@ export interface AuthUser {
     // Student-specific
     participantName?: string;
     mobile?: string;
+    phone?: string;
+    course?: string;
+    year?: string;
     profileStatus?: string;
     paymentStatus?: string;
     approvalStatus?: string;
@@ -102,6 +105,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             email: member.email,
             name: member.name,
             role: actualFrontendRole,
+            college: member.staffCoordinatorCollege,
             mustChangePassword: member.mustChangePassword ?? false,
         };
         persistSession(sessionToken, authUser);
@@ -132,10 +136,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         const authUser: AuthUser = {
             id: student.id,
+            name: student.participantName, // using standard name prop
             email: student.email,
             role: 'student',
             participantName: student.participantName,
             mobile: student.mobile,
+            phone: student.mobile, // mapping mobile to phone for compatibility
+            college: student.college,
+            course: student.course,
+            year: student.year,
             midasId: student.midasId,
             profileStatus: student.profileStatus,
             paymentStatus: student.paymentStatus,
@@ -220,7 +229,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 if (student) {
                     const updated: AuthUser = {
                         ...currentUser,
+                        name: student.participantName,
                         participantName: student.participantName,
+                        mobile: student.mobile,
+                        phone: student.mobile,
+                        college: student.college,
+                        course: student.course,
+                        year: student.year,
                         midasId: student.midasId,
                         profileStatus: student.profileStatus,
                         paymentStatus: student.paymentStatus,
@@ -230,21 +245,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                     localStorage.setItem("midas_user", JSON.stringify(updated));
                 }
             } else {
-                const { data: member } = await supabase
-                    .from('members')
-                    .select('*')
-                    .eq('id', currentUser.id)
-                    .single();
+                const member = await getMemberByEmail(currentUser.email);
                 if (member) {
+                    const actualFrontendRole = roleMap[member.role as BackendRole] || currentUser.role;
                     const updated: AuthUser = {
                         ...currentUser,
                         name: member.name,
-                        email: member.email,
-                        role: roleMap[member.role as BackendRole] || currentUser.role,
+                        role: actualFrontendRole,
+                        college: member.staffCoordinatorCollege,
                         mustChangePassword: member.mustChangePassword ?? false,
                     };
-                    setUser(updated);
-                    localStorage.setItem("midas_user", JSON.stringify(updated));
+                    persistSession(token, updated);
                 }
             }
         } catch {

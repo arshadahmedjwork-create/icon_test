@@ -1,4 +1,3 @@
-
 import {
     Session,
     Abstract,
@@ -12,7 +11,7 @@ interface SchedulerConfig {
     config: EventConfig;
 }
 
-interface ScheduleResult {
+export interface ScheduleResult {
     sessions: Session[];
     unassignedAbstracts: Abstract[];
     warnings: string[];
@@ -22,9 +21,10 @@ interface ScheduleResult {
  * MIDAS Auto-Scheduler Service
  * Automates session creation based on abstract grouping and judge availability.
  * Enforces:
- * 1. SRS Capacity Rules (10-12 Online, 8 Offline)
- * 2. Judge Composition (1 Academic + 2 Non-Academic)
- * 3. Conflict of Interest (Academic Judge College !== Student College)
+ * 1. SRS Capacity Rules (varies by Mode/Type)
+ * 2. Max 2 students per college per session
+ * 3. Judge Composition (1 Academic + 2 Non-Academic)
+ * 4. Conflict of Interest (Judge College !== ANY Student College in the session)
  */
 export class AutoScheduler {
     private abstracts: Abstract[];
@@ -33,60 +33,81 @@ export class AutoScheduler {
     private warnings: string[] = [];
 
     constructor({ abstracts, judges, config }: SchedulerConfig) {
+        // Only accept approved abstracts
         this.abstracts = abstracts.filter(a => a.status === "approved" || a.status === "completed" as any);
         this.judges = judges.filter(j => j.status === "Available");
         this.config = config;
     }
 
-    public generateSchedule(): ScheduleResult {
-        const sessions: Session[] = [];
+    public generateSchedule(targetMode: "Online" | "Offline"): ScheduleResult {
+        const generatedSessions: Session[] = [];
         const unassigned: Abstract[] = [];
 
-        // 1. Group by Subject + Mode + Type
-        const groups = this.groupAbstracts();
+        // 1. Filter by Target Mode
+        const modeAbstracts = this.abstracts.filter(a => a.mode.toLowerCase() === targetMode.toLowerCase());
 
-        // 2. Process each group
-        for (const [groupKey, groupAbstracts] of Object.entries(groups)) {
-            const { subject, mode, type } = this.parseGroupKey(groupKey);
-            const capacity = this.getCapacity(mode, type);
-
-            // 3. Chunk into sessions
-            for (let i = 0; i < groupAbstracts.length; i += capacity) {
-                const chunk = groupAbstracts.slice(i, i + capacity);
-
-                // 4. Assign Judges
-                try {
-                    const assignedJudges = this.assignJudges(subject, chunk);
-
-                    // 5. Create Session
-                    const session: Session = {
-                        id: crypto.randomUUID(),
-                        name: `${subject} - ${type} (${mode}) - Session ${Math.floor(i / capacity) + 1}`,
-                        subject,
-                        type,
-                        mode,
-                        date: new Date().toISOString().split('T')[0], // Default to today, user edits later
-                        time: "09:00",
-                        venue: mode === "Online" ? "Zoom Link TBD" : "Hall TBD",
-                        judges: assignedJudges.map(j => j.id),
-                        abstractIds: chunk.map(a => a.id),
-                        status: "scheduled"
-                    };
-                    sessions.push(session);
-                } catch (error: any) {
-                    this.warnings.push(`Could not schedule ${chunk.length} abstracts for ${subject} (${type}): ${error.message}`);
-                    unassigned.push(...chunk);
-                }
-            }
+        if (modeAbstracts.length === 0) {
+            this.warnings.push(`No approved ${targetMode} abstracts found to schedule.`);
+            return { sessions: [], unassignedAbstracts: [], warnings: this.warnings };
         }
 
-        return { sessions, unassignedAbstracts: unassigned, warnings: this.warnings };
+        // 2. Group by Subject + Type (Mode is already filtered)
+        const groups = this.groupAbstracts(modeAbstracts);
+
+        // 3. Process each group (Subject + Type)
+        for (const [groupKey, groupAbstracts] of Object.entries(groups)) {
+            const { subject, type } = this.parseGroupKey(groupKey);
+            const capacity = this.getCapacity(targetMode, type);
+
+            // 4. Distribute into session buckets enforcing College limits
+            const buckets = this.createBuckets(groupAbstracts, capacity);
+
+            // 5. Assign Judges & Create Sessions
+            buckets.forEach((bucket, index) => {
+                try {
+                    const assignedJudges = this.assignJudges(subject, bucket);
+
+                    const session: Session = {
+                        id: crypto.randomUUID(),
+                        name: `${subject} - ${type} (${targetMode}) - Session ${index + 1}`,
+                        subject,
+                        type,
+                        mode: targetMode,
+                        date: new Date().toISOString().split('T')[0], // Default to today
+                        time: "09:00",
+                        venue: targetMode === "Online" ? "Zoom Link TBD" : "Hall TBD",
+                        judges: assignedJudges.map(j => j.id),
+                        abstractIds: bucket.map(a => a.id),
+                        status: "scheduled"
+                    };
+
+                    // Attach names for the preview UI (we will strip this before saving)
+                    (session as any)._previewJudges = assignedJudges;
+                    // Provide the full student name instead of just the college
+                    (session as any)._previewStudentNames = bucket.map(a => {
+                        const s = this.abstracts.find(abs => abs.id === a.id);
+                        return {
+                            id: a.studentId,
+                            name: (s as any)?._studentName || 'Unknown',
+                            college: a.college || 'Unknown'
+                        };
+                    });
+
+                    generatedSessions.push(session);
+                } catch (error: any) {
+                    this.warnings.push(`Session ${index + 1} for ${subject} (${type}): ${error.message}`);
+                    unassigned.push(...bucket);
+                }
+            });
+        }
+
+        return { sessions: generatedSessions, unassignedAbstracts: unassigned, warnings: this.warnings };
     }
 
-    private groupAbstracts(): Record<string, Abstract[]> {
+    private groupAbstracts(abstracts: Abstract[]): Record<string, Abstract[]> {
         const groups: Record<string, Abstract[]> = {};
-        for (const abs of this.abstracts) {
-            const key = `${abs.subject}|${abs.mode}|${abs.type}`;
+        for (const abs of abstracts) {
+            const key = `${abs.subject}|${abs.type}`; // Mode is uniform for the run
             if (!groups[key]) groups[key] = [];
             groups[key].push(abs);
         }
@@ -94,59 +115,102 @@ export class AutoScheduler {
     }
 
     private parseGroupKey(key: string) {
-        const [subject, mode, type] = key.split('|');
-        return { subject, mode, type };
+        const [subject, type] = key.split('|');
+        return { subject, type };
     }
 
     private getCapacity(mode: string, type: string): number {
-        // Map loose SRS strings to config keys
-        if (type.includes("Paper")) {
-            return mode === "Online" ? this.config.capacities.paperOnline : this.config.capacities.paperOffline;
+        // Mappings based on MIDAS requirements
+        // Type: Paper -> online: 12, offline: 8
+        // Type: Poster -> online: 15, offline: 12
+        const isPaper = type.toLowerCase().includes("paper");
+        const isOnline = mode.toLowerCase() === "online";
+
+        if (isPaper) {
+            return isOnline ? (this.config.capacities?.paperOnline || 12) : (this.config.capacities?.paperOffline || 8);
+        } else {
+            return isOnline ? (this.config.capacities?.posterOnline || 15) : (this.config.capacities?.posterOffline || 12);
         }
-        if (type.includes("Poster")) {
-            return mode === "Online" ? this.config.capacities.posterOnline : this.config.capacities.posterOffline;
-        }
-        return 10; // Default fallback
     }
 
-    private assignJudges(subject: string, abstracts: Abstract[]): Judge[] {
-        // Filter by Subject
-        const eligibleJudges = this.judges.filter(j => j.specialization === subject);
+    /**
+     * Distributes abstracts into buckets.
+     * Enforces MAX 2 students from the same college in a single bucket.
+     */
+    private createBuckets(abstracts: Abstract[], capacity: number): Abstract[][] {
+        const buckets: Abstract[][] = [];
 
-        const academicJudges = eligibleJudges.filter(j => j.type === "Academic");
-        const nonAcademicJudges = eligibleJudges.filter(j => j.type === "Non-Academic");
+        for (const abstract of abstracts) {
+            let placed = false;
 
-        // Requirement: 1 Academic
-        let selectedAcademic: Judge | null = null;
+            for (const bucket of buckets) {
+                if (bucket.length >= capacity) continue; // Bucket is full
 
-        // Conflict Check: Academic Judge College != ANY Student College in chunk
-        const studentColleges = new Set(abstracts.map(a => a.college));
+                // Count how many from this college are already in the bucket
+                const collegeQuery = abstract.college || 'Unknown';
+                const collegeCount = bucket.filter(a => (a.college || 'Unknown') === collegeQuery).length;
 
-        for (const judge of academicJudges) {
-            // If judge has no college (e.g. private practice/standalone), they are safe.
-            // If judge has college, check if it's in student set.
-            // also ensure judge has college field if it is Academic
-            const judgeCollege = judge.college || "";
-            if (!judgeCollege || !studentColleges.has(judgeCollege)) {
-                selectedAcademic = judge;
-                break;
+                if (collegeCount < 2) {
+                    bucket.push(abstract);
+                    placed = true;
+                    break;
+                }
+            }
+
+            // If it couldn't be placed in any existing bucket, create a new one
+            if (!placed) {
+                buckets.push([abstract]);
             }
         }
 
-        if (!selectedAcademic) {
-            throw new Error(`No non-conflicting Academic Judge available for ${subject}. Needs to avoid: ${Array.from(studentColleges).join(', ')}`);
+        return buckets;
+    }
+
+    /**
+     * Assigns exactly 1 Academic Judge and 2 Non-Academic judges.
+     * Enforces Conflict of Interest: Judge college != ANY student college in the bucket.
+     */
+    private assignJudges(subject: string, bucket: Abstract[]): Judge[] {
+        // Collect all student colleges in the bucket to check for conflicts
+        const studentColleges = new Set(bucket.map(a => a.college || 'Unknown').filter(c => c !== 'Unknown'));
+
+        // Filter by Subject/Specialization first for academic
+        const eligibleJudges = this.judges.filter(j => j.specialization === subject);
+
+        // Helper to check conflict
+        const hasConflict = (judge: Judge) => {
+            if (!judge.affiliation && !judge.college) return false; // Independent/private judge
+            return studentColleges.has(judge.college || judge.affiliation || '');
+        };
+
+        const academicCandidates = eligibleJudges.filter(j => j.type === "Academic" && !hasConflict(j));
+
+        // Find Non-Academic: prefer specialization match, but fallback to any without conflict
+        let nonAcademicCandidates = eligibleJudges.filter(j => j.type === "Non-Academic" && !hasConflict(j));
+        if (nonAcademicCandidates.length < 2) {
+            const fallbackNonAcademic = this.judges.filter(j =>
+                j.type === "Non-Academic" &&
+                !hasConflict(j) &&
+                !nonAcademicCandidates.some(c => c.id === j.id)
+            );
+            nonAcademicCandidates = [...nonAcademicCandidates, ...fallbackNonAcademic];
         }
 
-        // Requirement: 2 Non-Academic
-        if (nonAcademicJudges.length < 2) {
-            // For prototype, if we run out of mock judges, we might want to warn instead of fail to show the UI working.
-            // But SRS is strict.
-            throw new Error("Insufficient Non-Academic Judges.");
+        const assigned: Judge[] = [];
+
+        if (academicCandidates.length < 1) {
+            this.warnings.push(`Insufficient Academic Judges for ${subject} without college conflicts (${Array.from(studentColleges).join(', ')}). Session created without one.`);
+        } else {
+            assigned.push(academicCandidates[0]);
         }
 
-        // Simple pick first 2 for now (could add randomization later)
-        const selectedNonAcademic = nonAcademicJudges.slice(0, 2);
+        if (nonAcademicCandidates.length < 2) {
+            this.warnings.push(`Insufficient Non-Academic Judges for ${subject} without college conflicts. Found: ${nonAcademicCandidates.length}, Needed: 2.`);
+            assigned.push(...nonAcademicCandidates);
+        } else {
+            assigned.push(nonAcademicCandidates[0], nonAcademicCandidates[1]);
+        }
 
-        return [selectedAcademic, ...selectedNonAcademic];
+        return assigned;
     }
 }

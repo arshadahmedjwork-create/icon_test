@@ -5,12 +5,12 @@ import {
     deleteSession,
     getJudges,
     getAbstracts,
-    getEventConfig,
+    getEvents,
     getEventStudents
 } from "@/services/supabaseService";
 import { sendAllocationEmail } from "@/services/emailService";
 import { AutoScheduler } from "@/services/autoScheduler";
-import { Session, Judge, Abstract, Student } from "@/types";
+import { Session, Judge, Abstract, Student, Event } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -35,7 +35,7 @@ export default function SessionManagement() {
     const [judges, setJudges] = useState<Judge[]>([]);
     const [abstracts, setAbstracts] = useState<Abstract[]>([]);
     const [students, setStudents] = useState<Student[]>([]);
-    const [config, setConfig] = useState<any>(null); // Load async
+    const [events, setEvents] = useState<Event[]>([]);
     const { toast } = useToast();
 
     const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -52,6 +52,8 @@ export default function SessionManagement() {
     });
 
     // Auto-Schedule State
+    const [isAutoScheduleDialogOpen, setIsAutoScheduleDialogOpen] = useState(false);
+    const [autoScheduleMode, setAutoScheduleMode] = useState<"Online" | "Offline">("Online");
     const [previewSessions, setPreviewSessions] = useState<Session[]>([]);
     const [schedulerWarnings, setSchedulerWarnings] = useState<string[]>([]);
     const [isPreviewOpen, setIsPreviewOpen] = useState(false);
@@ -61,19 +63,18 @@ export default function SessionManagement() {
     }, []);
 
     const refreshData = async () => {
-        const [fetchedSessions, fetchedJudges, fetchedAbstracts, fetchedConfig, fetchedStudents] = await Promise.all([
+        const [fetchedSessions, fetchedJudges, fetchedAbstracts, fetchedEvents, fetchedStudents] = await Promise.all([
             getSessions(),
             getJudges(),
             getAbstracts(),
-            getEventConfig(),
+            getEvents(),
             getEventStudents()
         ]);
         setSessions(fetchedSessions);
         setJudges(fetchedJudges);
         setAbstracts(fetchedAbstracts.filter(a => a.status === "approved"));
         setStudents(fetchedStudents);
-        // @ts-ignore
-        setConfig(fetchedConfig);
+        setEvents(fetchedEvents);
     };
 
     const handleDelete = async (id: string) => {
@@ -182,18 +183,37 @@ export default function SessionManagement() {
         }
     };
 
-    const handleAutoSchedule = () => {
-        if (!config) return;
+    const handleAutoScheduleClick = () => {
+        if (events.length === 0) {
+            toast({ title: "No Events", description: "Please create event configurations first.", variant: "destructive" });
+            return;
+        }
+        setIsAutoScheduleDialogOpen(true);
+    };
 
+    const runAutoScheduler = () => {
+        setIsAutoScheduleDialogOpen(false);
         const scheduler = new AutoScheduler({
             // @ts-ignore
-            abstracts: abstracts.filter(a => a.status === "approved"),
+            abstracts: abstracts.filter(a => a.status === "approved" || a.status === "completed").map(a => {
+                const student = students.find(s => s.id === a.studentId);
+                return {
+                    ...a,
+                    _studentName: student?.participantName || student?.name || 'Unknown',
+                    college: student?.college || 'Unknown'
+                };
+            }),
             judges,
             // @ts-ignore
-            config
+            config: {
+                subjects: Array.from(new Set(events.map(e => e.name))),
+                presentationTypes: Array.from(new Set(events.map(e => e.type))),
+                modes: Array.from(new Set(events.map(e => e.mode))),
+                capacities: events.reduce((acc, e) => ({ ...acc, [`${e.type.toLowerCase().replace(" ", "")}${e.mode}`]: e.capacity }), {} as any)
+            }
         });
 
-        const result = scheduler.generateSchedule();
+        const result = scheduler.generateSchedule(autoScheduleMode);
         setPreviewSessions(result.sessions);
         setSchedulerWarnings(result.warnings);
         setIsPreviewOpen(true);
@@ -203,7 +223,7 @@ export default function SessionManagement() {
         try {
             // Sequential to avoid overwhelming DB or race conditions? Parallel is faster.
             await Promise.all(previewSessions.map(async session => {
-                const { id, ...sessionData } = session;
+                const { id, _previewJudges, _previewStudentColleges, _previewStudentNames, ...sessionData } = session as any;
                 const newSession = await addSession(sessionData);
 
                 // Send allocation emails for each auto-scheduled session
@@ -264,7 +284,7 @@ export default function SessionManagement() {
                     <p className="text-muted-foreground">Create and manage scientific sessions.</p>
                 </div>
                 <div className="flex gap-2">
-                    <Button variant="outline" onClick={handleAutoSchedule}>
+                    <Button variant="outline" onClick={handleAutoScheduleClick}>
                         <Users className="w-4 h-4 mr-2" /> Auto-Schedule
                     </Button>
                     <Button onClick={() => setIsDialogOpen(true)}>
@@ -272,6 +292,36 @@ export default function SessionManagement() {
                     </Button>
                 </div>
             </div>
+
+            {/* Auto-Schedule Mode Selection Dialog */}
+            <Dialog open={isAutoScheduleDialogOpen} onOpenChange={setIsAutoScheduleDialogOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Auto-Schedule Sessions</DialogTitle>
+                        <DialogDescription>
+                            Select the mode (Online/Offline) to schedule approved abstracts.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="py-4 space-y-4">
+                        <div className="space-y-2">
+                            <Label>Presentation Mode</Label>
+                            <Select value={autoScheduleMode} onValueChange={(val: "Online" | "Offline") => setAutoScheduleMode(val)}>
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Select Mode" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="Online">Online</SelectItem>
+                                    <SelectItem value="Offline">Offline</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setIsAutoScheduleDialogOpen(false)}>Cancel</Button>
+                        <Button onClick={runAutoScheduler}>Generate Schedule</Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
 
             {/* Auto-Schedule Preview Dialog */}
             <Dialog open={isPreviewOpen} onOpenChange={setIsPreviewOpen}>
@@ -301,13 +351,33 @@ export default function SessionManagement() {
                                         <Badge>Session {i + 1}</Badge>
                                     </div>
                                     <CardDescription>
-                                        {session.subject} • {session.type} • {session.mode} • {session.abstractIds.length} Papers
+                                        {session.subject} • {session.type} • {session.mode}
                                     </CardDescription>
                                 </CardHeader>
-                                <CardContent className="py-2 text-xs text-muted-foreground">
-                                    <div className="flex gap-4">
-                                        <span>Judges: {session.judges.length} Assigned</span>
-                                        <span className="text-green-600">✓ Conflict Free</span>
+                                <CardContent className="py-2 text-sm text-foreground space-y-3">
+                                    <div>
+                                        <p className="font-semibold text-xs text-muted-foreground uppercase tracking-wider mb-1">Students ({session.abstractIds.length})</p>
+                                        <div className="flex flex-wrap gap-1">
+                                            {/* @ts-ignore preview field */}
+                                            {session._previewStudentNames?.map((student: any, idx: number) => (
+                                                <Badge key={idx} variant="secondary" className="text-[10px]">
+                                                    {student.name} ({student.college})
+                                                </Badge>
+                                            ))}
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <p className="font-semibold text-xs text-muted-foreground uppercase tracking-wider mb-1">Assigned Judges</p>
+                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                                            {/* @ts-ignore preview field */}
+                                            {session._previewJudges?.map((judge: Judge, idx: number) => (
+                                                <div key={idx} className="bg-slate-50 border rounded-md p-2 text-xs">
+                                                    <p className="font-medium text-slate-900">{judge.name}</p>
+                                                    <p className="text-slate-500">{judge.type}</p>
+                                                    {judge.college && <p className="text-slate-400 text-[10px] truncate">{judge.college}</p>}
+                                                </div>
+                                            ))}
+                                        </div>
                                     </div>
                                 </CardContent>
                             </Card>
@@ -378,7 +448,7 @@ export default function SessionManagement() {
                                         <SelectValue placeholder="Select Subject" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        {(config?.subjects || []).map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                                        {Array.from(new Set(events.map(e => e.name))).map((s: string) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
                                     </SelectContent>
                                 </Select>
                             </div>
@@ -389,7 +459,7 @@ export default function SessionManagement() {
                                         <SelectValue placeholder="Type" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        {(config?.presentationTypes || ["Paper", "Poster"]).map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                                        {Array.from(new Set(events.map(e => e.type))).map((t: string) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
                                     </SelectContent>
                                 </Select>
                             </div>
@@ -400,7 +470,7 @@ export default function SessionManagement() {
                                         <SelectValue placeholder="Mode" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        {(config?.modes || ["Online", "Offline"]).map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}
+                                        {Array.from(new Set(events.map(e => e.mode))).map((m: string) => <SelectItem key={m} value={m}>{m}</SelectItem>)}
                                     </SelectContent>
                                 </Select>
                             </div>

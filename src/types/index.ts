@@ -61,6 +61,19 @@ export interface EvaluationCriteria {
     weightage: number; // Percentage
 }
 
+export interface Event {
+    id: string;
+    name: string;
+    type: string;
+    mode: string;
+    capacity: number;
+    criterias: EvaluationCriteria[];
+    rules: string;
+    judgeInstructions: string;
+    abstractDeadline: string;
+    presentationDeadline: string;
+}
+
 export interface Deadline {
     id: string;
     name: string;
@@ -73,6 +86,8 @@ export interface Student extends User {
     year?: string;
     course?: string;
     college: string; // Mandatory for students
+    participantName?: string; // DB field for event_students
+    mobile?: string; // DB field for event_students
     registrationStatus: string | "pending" | "approved" | "rejected" | "completed";
     paymentStatus: string | "pending" | "completed" | "PAID";
     approvalStatus?: string | "PENDING" | "APPROVED" | "REJECTED";

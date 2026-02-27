@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Mail, Loader2, CheckCircle2 } from "lucide-react";
-import { resetUserPassword } from "@/services/supabaseService";
+import { resetUserPassword, resetStudentPassword } from "@/services/supabaseService";
 import emailjs from "@emailjs/browser";
 import { useToast } from "@/hooks/use-toast";
 
@@ -29,8 +29,20 @@ export default function ForgotPasswordModal({ isOpen, onClose }: ForgotPasswordM
         setIsLoading(true);
 
         try {
-            // 1. Reset password in Supabase and get the new temporary plain-text password
-            const tempPassword = await resetUserPassword(email);
+            // 1. Try resetting member password, if not found try student password
+            let tempPassword = "";
+            let userType = "Member";
+
+            try {
+                tempPassword = await resetUserPassword(email);
+            } catch (memberErr: any) {
+                if (memberErr.message.includes("No account found")) {
+                    tempPassword = await resetStudentPassword(email);
+                    userType = "Student";
+                } else {
+                    throw memberErr;
+                }
+            }
 
             // 2. Send email via EmailJS using the same welcome template
             try {
@@ -39,8 +51,8 @@ export default function ForgotPasswordModal({ isOpen, onClose }: ForgotPasswordM
                     import.meta.env.VITE_EMAILJS_TEMPLATE_ID,
                     {
                         to_email: email,
-                        to_name: "MIDAS Member", // We don't fetch name here to save an extra query, but we could
-                        role: "Member (Password Reset)",
+                        to_name: `${userType} (Password Reset)`,
+                        role: `${userType} Password Reset`,
                         temp_password: tempPassword,
                     },
                     import.meta.env.VITE_EMAILJS_PUBLIC_KEY

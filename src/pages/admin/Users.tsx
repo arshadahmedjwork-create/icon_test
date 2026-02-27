@@ -47,6 +47,15 @@ const reverseRoleMap: Record<string, string> = {
     volunteer: 'VOLUNTEER',
 };
 
+const colleges = [
+    "KLE VK Institute of Dental Sciences, Belagavi",
+    "SDM College of Dental Sciences, Dharwad",
+    "Government Dental College, Bangalore",
+    "Bapuji Dental College, Davangere",
+    "Manipal College of Dental Sciences",
+    "Other"
+];
+
 // Generate a random temp password
 const generateTempPassword = () => {
     const chars = 'ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
@@ -207,11 +216,19 @@ export default function AdminUsers() {
                             {formData.role === "staff" && (
                                 <div className="grid gap-2">
                                     <Label>College Name</Label>
-                                    <Input
+                                    <Select
                                         value={formData.college}
-                                        onChange={(e) => setFormData({ ...formData, college: e.target.value })}
-                                        placeholder="e.g. City Dental College"
-                                    />
+                                        onValueChange={(val: string) => setFormData({ ...formData, college: val })}
+                                    >
+                                        <SelectTrigger>
+                                            <SelectValue placeholder="Select College" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {colleges.map((college) => (
+                                                <SelectItem key={college} value={college}>{college}</SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
                                 </div>
                             )}
                             <Button type="submit" className="w-full" disabled={isCreating}>

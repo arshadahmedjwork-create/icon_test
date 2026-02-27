@@ -31,26 +31,6 @@ const years = [
     "Intern"
 ];
 
-declare global {
-    interface Window {
-        Razorpay: any;
-    }
-}
-
-const loadRazorpayScript = (): Promise<boolean> => {
-    return new Promise((resolve) => {
-        if (window.Razorpay) {
-            resolve(true);
-            return;
-        }
-        const script = document.createElement("script");
-        script.src = "https://checkout.razorpay.com/v1/checkout.js";
-        script.onload = () => resolve(true);
-        script.onerror = () => resolve(false);
-        document.body.appendChild(script);
-    });
-};
-
 export default function StudentRegistrationPage() {
     const navigate = useNavigate();
     const [loading, setLoading] = useState(false);
@@ -76,7 +56,7 @@ export default function StudentRegistrationPage() {
         setFormData({ ...formData, [field]: value });
     };
 
-    const initRazorpay = async () => {
+    const handleSubmitRegistration = async () => {
         if (!formData.participantName.trim()) { toast.error("Please enter your name"); return; }
         if (!formData.email.trim()) { toast.error("Please enter your email"); return; }
         if (!formData.mobile.trim() || formData.mobile.length !== 10) { toast.error("Please enter valid 10-digit mobile number"); return; }
@@ -86,141 +66,90 @@ export default function StudentRegistrationPage() {
         if (!bonafideFile) { toast.error("Please select a bonafide or ID proof to upload"); return; }
 
         setLoading(true);
-        const res = await loadRazorpayScript();
-        if (!res) {
-            toast.error("Razorpay SDK failed to load. Are you offline?");
-            setLoading(false);
-            return;
-        }
-        setLoading(false);
 
-        const razorpayKey = import.meta.env.VITE_RAZORPAY_LIVE_KEY;
-        if (!razorpayKey) {
-            toast.error("Payment configuration error. Please contact admin.");
-            return;
-        }
+        try {
+            const collegeName = formData.college === "Other" ? formData.otherCollege : formData.college;
+            console.log("Registering student (without payment upfront)...");
 
-        const options = {
-            key: razorpayKey,
-            amount: 103000,
-            currency: "INR",
-            name: "MIDAS Scientific Event",
-            description: "UG Delegate Registration Fee",
-            handler: async function (response: any) {
-                setLoading(true);
-                try {
-                    const collegeName = formData.college === "Other" ? formData.otherCollege : formData.college;
-                    console.log("Razorpay payment success, registering student...", response.razorpay_payment_id);
+            // 1. Get current student count for MIDAS ID sequence
+            const currentCount = await getEventStudentCount();
+            const midasId = generateMidasId(currentCount + 1);
+            const qrCodeUrl = generateQRCodeUrl(midasId, formData.participantName, collegeName);
 
-                    // 1. Get current student count for MIDAS ID sequence
-                    const currentCount = await getEventStudentCount();
-                    const midasId = generateMidasId(currentCount + 1);
-                    const qrCodeUrl = generateQRCodeUrl(midasId, formData.participantName, collegeName);
+            console.log("Generated MIDAS ID:", midasId, "QR:", qrCodeUrl);
 
-                    console.log("Generated MIDAS ID:", midasId, "QR:", qrCodeUrl);
-
-                    // 1.5. Upload Bonafide using dummy user ID for now since auth user may not exist yet
-                    // or we could use the midasId as a unique folder/file name identifier. Let's use midasId.
-                    let idProofUrl = undefined;
-                    if (bonafideFile) {
-                        const url = await uploadBonafide(midasId, bonafideFile);
-                        if (url) {
-                            idProofUrl = url;
-                        } else {
-                            console.warn("Failed to upload bonafide during registration.");
-                            toast.error("Warning: ID Proof could not be uploaded. You may need to provide it later.");
-                        }
-                    }
-
-                    // 2. Register student in Supabase with MIDAS ID
-                    const { data: student, error } = await supabase.from("event_students").insert({
-                        participantName: formData.participantName,
-                        email: formData.email,
-                        mobile: formData.mobile,
-                        college: collegeName,
-                        year: formData.year,
-                        paymentStatus: "PAID",
-                        paymentId: response.razorpay_payment_id,
-                        approvalStatus: "PENDING",
-                        midasId: midasId,
-                        qrCodeUrl: qrCodeUrl,
-                        idProofUrl: idProofUrl, // store the uploaded bonafide URL
-                    }).select().single();
-
-                    if (error) {
-                        console.error("Supabase insert error:", error);
-                        throw error;
-                    }
-
-                    console.log("Student registered:", student);
-
-                    // 3. Record payment
-                    const { error: payError } = await supabase.from("payments").insert({
-                        eventStudentId: student.id,
-                        amount: 1030,
-                        currency: "INR",
-                        status: "PAID",
-                        paymentGatewayId: response.razorpay_payment_id,
-                        transactionId: response.razorpay_payment_id,
-                    });
-
-                    if (payError) console.error("Payment record error (non-blocking):", payError);
-
-                    // 4. Send registration confirmation email
-                    try {
-                        const emailResult = await sendRegistrationEmail({
-                            student_name: formData.participantName,
-                            student_email: formData.email,
-                            midas_id: midasId,
-                            college_name: collegeName,
-                            event_type: "UG Delegate",
-                            mode: "Offline",
-                            qr_code_url: qrCodeUrl,
-                            registration_date: new Date().toLocaleDateString("en-IN"),
-                        });
-                        if (emailResult.success) {
-                            console.log("Registration email sent successfully");
-                        } else {
-                            console.warn("Email send failed:", emailResult.error);
-                        }
-                    } catch (emailErr) {
-                        console.warn("Email sending error (non-blocking):", emailErr);
-                    }
-
-                    // 5. Store MIDAS ID for success dialog
-                    setGeneratedMidasId(midasId);
-                    setLoading(false);
-                    setShowSuccess(true);
-                } catch (err: any) {
-                    console.error("Registration Error:", err);
-                    if (err?.code === "23505") {
-                        toast.error("An account with this email or mobile number is already registered.");
-                    } else {
-                        const msg = err?.message || err?.details || JSON.stringify(err);
-                        toast.error("Registration failed: " + msg);
-                        alert("Payment received but registration failed.\n\nError: " + msg + "\n\nPayment ID: " + response.razorpay_payment_id);
-                    }
-                    setLoading(false);
-                }
-            },
-            prefill: {
-                name: formData.participantName,
-                email: formData.email,
-                contact: formData.mobile,
-            },
-            theme: { color: "#004d40" },
-            modal: {
-                ondismiss: function () {
-                    toast.info("Payment cancelled.");
+            // 1.5. Upload Bonafide using midasId
+            let idProofUrl = undefined;
+            if (bonafideFile) {
+                const url = await uploadBonafide(midasId, bonafideFile);
+                if (url) {
+                    idProofUrl = url;
+                } else {
+                    console.warn("Failed to upload bonafide during registration.");
+                    toast.error("Warning: ID Proof could not be uploaded. You may need to provide it later.");
                 }
             }
-        };
 
-        const rzp = new window.Razorpay(options);
-        rzp.on("payment.failed", function (response: any) {
-            toast.error("Payment failed: " + (response.error?.description || "Unknown error"));
-        });
-        rzp.open();
+            // 3. Insert student record as PENDING
+            const studentInsertPayload: any = {
+                participantName: formData.participantName,
+                email: formData.email,
+                mobile: formData.mobile, // Changed from formData.phone to formData.mobile to match state
+                college: collegeName,
+                year: formData.year,
+                paymentStatus: "PENDING", // PENDING to wait for staff approval -> then payment
+                paymentId: null,
+                approvalStatus: "PENDING",
+                midasId: midasId,
+                qrCodeUrl: qrCodeUrl,
+                idProofUrl: idProofUrl, // store the uploaded bonafide URL
+                password: await (await import('bcryptjs')).default.hash(formData.mobile, 10),
+            };
+
+            const { data: student, error } = await supabase.from("event_students").insert(studentInsertPayload).select().single();
+
+            if (error) {
+                console.error("Supabase insert error:", error);
+                throw error;
+            }
+
+            console.log("Student registered:", student);
+
+            // 4. Send registration (pending approval) email
+            try {
+                const emailResult = await sendRegistrationEmail({
+                    student_name: formData.participantName,
+                    student_email: formData.email,
+                    midas_id: midasId,
+                    college_name: collegeName,
+                    event_type: "UG Delegate",
+                    mode: "Offline",
+                    qr_code_url: qrCodeUrl,
+                    registration_date: new Date().toLocaleDateString("en-IN"),
+                });
+                if (emailResult.success) {
+                    console.log("Registration email sent successfully");
+                } else {
+                    console.warn("Email send failed:", emailResult.error);
+                }
+            } catch (emailErr) {
+                console.warn("Email sending error (non-blocking):", emailErr);
+            }
+
+            // 5. Store MIDAS ID for success dialog
+            setGeneratedMidasId(midasId);
+            setLoading(false);
+            setShowSuccess(true);
+        } catch (err: any) {
+            console.error("Registration Error:", err);
+            if (err?.code === "23505") {
+                toast.error("An account with this email or mobile number is already registered.");
+            } else {
+                const msg = err?.message || err?.details || JSON.stringify(err);
+                toast.error("Registration failed: " + msg);
+            }
+            setLoading(false);
+        }
     };
 
     return (
@@ -264,13 +193,19 @@ export default function StudentRegistrationPage() {
                             <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center shrink-0">
                                 <span className="text-sm font-bold text-white">2</span>
                             </div>
-                            <span className="text-sm">Pay ₹1030 registration fee online</span>
+                            <span className="text-sm">Wait for Staff Coordinator approval</span>
                         </div>
                         <div className="flex items-center gap-3 text-white/70">
                             <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center shrink-0">
                                 <span className="text-sm font-bold text-white">3</span>
                             </div>
-                            <span className="text-sm">Wait for approval and get your MIDAS ID</span>
+                            <span className="text-sm">Pay ₹1030 registration fee from the dashboard</span>
+                        </div>
+                        <div className="flex items-center gap-3 text-white/70">
+                            <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center shrink-0">
+                                <span className="text-sm font-bold text-white">4</span>
+                            </div>
+                            <span className="text-sm">Get your events open!</span>
                         </div>
                     </div>
 
@@ -298,11 +233,11 @@ export default function StudentRegistrationPage() {
 
                     <div className="mb-6">
                         <h3 className="text-2xl font-bold text-slate-900">UG DELEGATE REGISTRATION</h3>
-                        <p className="text-slate-500 mt-1 text-sm">Fill in your details and pay the registration fee.</p>
+                        <p className="text-slate-500 mt-1 text-sm">Fill in your details to begin your registration.</p>
                     </div>
 
                     <form
-                        onSubmit={(e) => { e.preventDefault(); initRazorpay(); }}
+                        onSubmit={(e) => { e.preventDefault(); handleSubmitRegistration(); }}
                         className="space-y-5"
                     >
                         {/* Participant Name */}
@@ -417,7 +352,7 @@ export default function StudentRegistrationPage() {
                             <p className="text-xs text-slate-500">Max size 5MB. PDF or Image.</p>
                         </div>
 
-                        {/* Fee & Payment section */}
+                        {/* Fee Notice */}
                         <div className="mt-2 p-5 bg-slate-50 rounded-2xl border border-slate-100 space-y-4">
                             <div>
                                 <Label className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Registration Fee</Label>
@@ -426,19 +361,13 @@ export default function StudentRegistrationPage() {
                                     <span className="text-slate-800 font-semibold">Charges for UG:</span>
                                     <span className="ml-auto text-lg font-black text-[#004d40]">₹1030/-</span>
                                 </div>
-                            </div>
-
-                            <div>
-                                <Label className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Payment Mode</Label>
-                                <div className="mt-2 flex items-center gap-3 p-3 bg-white rounded-xl border border-slate-200">
-                                    <CreditCard className="w-4 h-4 text-[#004d40]" />
-                                    <span className="text-slate-700 font-medium text-sm">Online Payment (Razorpay)</span>
-                                    <div className="ml-auto w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-                                </div>
+                                <p className="text-xs text-slate-500 mt-3 flex items-center gap-1">
+                                    <CreditCard className="w-3.5 h-3.5" /> Note: Payment will be collected after the Staff Coordinator approves your registration.
+                                </p>
                             </div>
                         </div>
 
-                        {/* Pay Now */}
+                        {/* Submit */}
                         <Button
                             type="submit"
                             className="w-full h-14 bg-[#004d40] hover:bg-[#003d33] text-white rounded-xl shadow-lg transition-all active:scale-[0.98] text-base font-bold"
@@ -450,152 +379,8 @@ export default function StudentRegistrationPage() {
                                     <span>Processing...</span>
                                 </div>
                             ) : (
-                                "Pay Now — ₹1030"
+                                "Register Now"
                             )}
-                        </Button>
-
-                        {/* Test Payment Button — ₹1 */}
-                        <Button
-                            type="button"
-                            variant="outline"
-                            className="w-full h-12 rounded-xl border-dashed border-2 border-amber-400 text-amber-700 hover:bg-amber-50 font-bold"
-                            disabled={loading}
-                            onClick={() => {
-                                // Validate form before test payment too
-                                if (!formData.participantName.trim()) { toast.error("Please enter your name"); return; }
-                                if (!formData.email.trim()) { toast.error("Please enter your email"); return; }
-                                if (!formData.mobile.trim() || formData.mobile.length !== 10) { toast.error("Please enter valid 10-digit mobile number"); return; }
-                                if (!formData.college) { toast.error("Please select your college"); return; }
-                                if (!formData.year) { toast.error("Please select your year"); return; }
-                                if (formData.college === "Other" && !formData.otherCollege.trim()) { toast.error("Please specify your college name"); return; }
-                                if (!bonafideFile) { toast.error("Please select a bonafide or ID proof to upload"); return; }
-
-                                setLoading(true);
-                                loadRazorpayScript().then((res) => {
-                                    setLoading(false);
-                                    if (!res) {
-                                        toast.error("Razorpay SDK failed to load");
-                                        return;
-                                    }
-
-                                    const razorpayKey = import.meta.env.VITE_RAZORPAY_LIVE_KEY;
-                                    if (!razorpayKey) { toast.error("Razorpay key not found"); return; }
-                                    const rzp = new window.Razorpay({
-                                        key: razorpayKey,
-                                        amount: 100,
-                                        currency: "INR",
-                                        name: "MIDAS — Test Payment",
-                                        description: "Test charge of ₹1",
-                                        handler: async function (response: any) {
-                                            setLoading(true);
-                                            try {
-                                                const collegeName = formData.college === "Other" ? formData.otherCollege : formData.college;
-                                                console.log("Test payment success, registering student...", response.razorpay_payment_id);
-
-                                                const currentCount = await getEventStudentCount();
-                                                const midasId = generateMidasId(currentCount + 1);
-                                                const qrCodeUrl = generateQRCodeUrl(midasId, formData.participantName, collegeName);
-
-                                                let idProofUrl = undefined;
-                                                if (bonafideFile) {
-                                                    const url = await uploadBonafide(midasId, bonafideFile);
-                                                    if (url) {
-                                                        idProofUrl = url;
-                                                    } else {
-                                                        console.warn("Failed to upload bonafide during registration.");
-                                                        toast.error("Warning: ID Proof could not be uploaded. You may need to provide it later.");
-                                                    }
-                                                }
-
-                                                // Register student in Supabase
-                                                const { data: student, error } = await supabase.from("event_students").insert({
-                                                    participantName: formData.participantName,
-                                                    email: formData.email,
-                                                    mobile: formData.mobile,
-                                                    college: collegeName,
-                                                    year: formData.year,
-                                                    paymentStatus: "PAID",
-                                                    paymentId: response.razorpay_payment_id,
-                                                    approvalStatus: "PENDING",
-                                                    midasId: midasId,
-                                                    qrCodeUrl: qrCodeUrl,
-                                                    idProofUrl: idProofUrl, // store the uploaded bonafide URL
-                                                }).select().single();
-
-                                                if (error) {
-                                                    console.error("Supabase insert error:", error);
-                                                    throw error;
-                                                }
-
-                                                console.log("Student registered:", student);
-
-                                                // Record payment
-                                                const { error: payError } = await supabase.from("payments").insert({
-                                                    eventStudentId: student.id,
-                                                    amount: 1,
-                                                    currency: "INR",
-                                                    status: "PAID",
-                                                    paymentGatewayId: response.razorpay_payment_id,
-                                                    transactionId: response.razorpay_payment_id,
-                                                });
-
-                                                if (payError) console.error("Payment record error (non-blocking):", payError);
-
-                                                // 4. Send registration confirmation email
-                                                try {
-                                                    const emailResult = await sendRegistrationEmail({
-                                                        student_name: formData.participantName,
-                                                        student_email: formData.email,
-                                                        midas_id: midasId,
-                                                        college_name: collegeName,
-                                                        event_type: "UG Delegate",
-                                                        mode: "Offline",
-                                                        qr_code_url: qrCodeUrl,
-                                                        registration_date: new Date().toLocaleDateString("en-IN"),
-                                                    });
-                                                    if (emailResult.success) {
-                                                        console.log("Registration email sent successfully");
-                                                    } else {
-                                                        console.warn("Email send failed:", emailResult.error);
-                                                    }
-                                                } catch (emailErr) {
-                                                    console.warn("Email sending error (non-blocking):", emailErr);
-                                                }
-
-                                                setGeneratedMidasId(midasId);
-                                                setLoading(false);
-                                                setShowSuccess(true);
-                                                toast.success("✅ Test payment successful! ID: " + response.razorpay_payment_id);
-                                            } catch (err: any) {
-                                                console.error("Registration Error:", err);
-                                                if (err?.code === "23505") {
-                                                    toast.error("An account with this email or mobile number is already registered.");
-                                                } else {
-                                                    const msg = err?.message || err?.details || JSON.stringify(err);
-                                                    toast.error("Registration failed: " + msg);
-                                                    alert("Payment received but registration failed.\n\nError: " + msg + "\n\nPayment ID: " + response.razorpay_payment_id);
-                                                }
-                                                setLoading(false);
-                                            }
-                                        },
-                                        prefill: {
-                                            name: formData.participantName || "Test User",
-                                            email: formData.email || "test@test.com",
-                                            contact: formData.mobile || "9999999999",
-                                        },
-                                        theme: { color: "#d97706" },
-                                        modal: {
-                                            ondismiss: function () {
-                                                toast.info("Payment cancelled.");
-                                            }
-                                        }
-                                    });
-                                    rzp.on("payment.failed", (r: any) => toast.error("Test payment failed: " + r.error?.description));
-                                    rzp.open();
-                                });
-                            }}
-                        >
-                            Test Payment — ₹1
                         </Button>
                     </form>
 
@@ -637,12 +422,8 @@ export default function StudentRegistrationPage() {
                                 <span className="font-bold text-slate-800">{formData.participantName}</span>
                             </div>
                             <div className="flex justify-between text-sm">
-                                <span className="text-slate-500">Amount Paid:</span>
-                                <span className="font-bold text-slate-800">₹1030</span>
-                            </div>
-                            <div className="flex justify-between text-sm">
                                 <span className="text-slate-500">Payment Status:</span>
-                                <span className="text-green-600 font-bold">Paid ✓</span>
+                                <span className="text-amber-600 font-bold">Pending Approval</span>
                             </div>
                             <div className="flex justify-between text-sm">
                                 <span className="text-slate-500">Approval Status:</span>

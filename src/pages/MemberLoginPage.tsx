@@ -173,15 +173,13 @@ export default function MemberLoginPage() {
                         <div className="space-y-2">
                             <div className="flex justify-between items-center">
                                 <Label htmlFor="password" className="text-slate-700 font-medium">Password</Label>
-                                {loginType === "staff" && (
-                                    <button
-                                        type="button"
-                                        onClick={() => setIsForgotModalOpen(true)}
-                                        className="text-sm text-[#004d40] font-semibold hover:underline"
-                                    >
-                                        Forgot Password?
-                                    </button>
-                                )}
+                                <button
+                                    type="button"
+                                    onClick={() => setIsForgotModalOpen(true)}
+                                    className="text-sm text-[#004d40] font-semibold hover:underline"
+                                >
+                                    Forgot Password?
+                                </button>
                             </div>
                             <div className="relative">
                                 <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />

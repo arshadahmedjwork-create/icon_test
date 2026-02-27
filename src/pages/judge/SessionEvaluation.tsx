@@ -3,13 +3,13 @@ import { useParams, Link } from "react-router-dom";
 import {
     getSessions,
     getAbstracts,
-    getEventConfig,
+    getEvents,
     addEvaluation,
     getEvaluations,
     getJudges,
     getUsers
 } from "@/services/supabaseService";
-import { Session, Abstract, Evaluation, EventConfig, User } from "@/types";
+import { Session, Abstract, Evaluation, Event, User } from "@/types";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -35,7 +35,7 @@ export default function SessionEvaluation() {
     const [session, setSession] = useState<Session | null>(null);
     const [abstracts, setAbstracts] = useState<Abstract[]>([]);
     const [evaluations, setEvaluations] = useState<Evaluation[]>([]);
-    const [eventConfig, setEventConfig] = useState<EventConfig | null>(null);
+    const [events, setEvents] = useState<Event[]>([]);
     const [judgeId, setJudgeId] = useState<string | null>(null);
     const [users, setUsers] = useState<User[]>([]);
 
@@ -47,11 +47,11 @@ export default function SessionEvaluation() {
     useEffect(() => {
         const loadData = async () => {
             if (sessionId && user) {
-                const [allSessions, allAbstracts, fetchedUsers, fetchedConfig, allJudges, allEvaluations] = await Promise.all([
+                const [allSessions, allAbstracts, fetchedUsers, fetchedEvents, allJudges, allEvaluations] = await Promise.all([
                     getSessions(),
                     getAbstracts(),
                     getUsers(),
-                    getEventConfig(),
+                    getEvents(),
                     getJudges(),
                     getEvaluations()
                 ]);
@@ -63,7 +63,7 @@ export default function SessionEvaluation() {
                     const sessionAbstracts = allAbstracts.filter(a => foundSession.abstractIds && foundSession.abstractIds.includes(a.id));
                     setAbstracts(sessionAbstracts);
                     setUsers(fetchedUsers);
-                    setEventConfig(fetchedConfig);
+                    setEvents(fetchedEvents);
 
                     // Find Judge ID
                     const me = allJudges.find(j => j.email === user.email);
@@ -97,15 +97,17 @@ export default function SessionEvaluation() {
             setFeedback(existing.feedback || "");
         } else {
             const initialScores: Record<string, number> = {};
-            eventConfig?.criterias.forEach(c => initialScores[c.id] = 0);
+            const activeEvent = events.find(e => session && e.name === session.subject && e.type === session.type && e.mode === session.mode);
+            (activeEvent?.criterias || []).forEach(c => initialScores[c.id] = 0);
             setScores(initialScores);
             setFeedback("");
         }
     };
 
     const calculateTotal = () => {
-        if (!eventConfig) return 0;
-        return eventConfig.criterias.reduce((total, criteria) => {
+        const activeEvent = events.find(e => session && e.name === session.subject && e.type === session.type && e.mode === session.mode);
+        if (!activeEvent || !activeEvent.criterias) return 0;
+        return activeEvent.criterias.reduce((total, criteria) => {
             const rawScore = scores[criteria.id] || 0;
             // Weighted calculation: (Score / MaxScore) * Weightage
             const weighted = (rawScore / criteria.maxScore) * criteria.weightage;
@@ -118,10 +120,11 @@ export default function SessionEvaluation() {
     };
 
     const handleSubmitEvaluation = async () => {
-        if (!evaluating || !judgeId || !eventConfig) return;
+        const activeEvent = events.find(e => session && e.name === session.subject && e.type === session.type && e.mode === session.mode);
+        if (!evaluating || !judgeId || !activeEvent) return;
 
         // Validation: All criteria must be scored > 0
-        const missingCriteria = eventConfig.criterias.some(c => (scores[c.id] || 0) === 0);
+        const missingCriteria = (activeEvent.criterias || []).some(c => (scores[c.id] || 0) === 0);
         if (missingCriteria) {
             toast({ title: "Incomplete Evaluation", description: "Please score all criteria before submitting.", variant: "destructive" });
             return;
@@ -246,7 +249,7 @@ export default function SessionEvaluation() {
                     </DialogHeader>
 
                     <div className="space-y-6 py-4">
-                        {eventConfig?.criterias.map(criteria => (
+                        {(events.find(e => session && e.name === session.subject && e.type === session.type && e.mode === session.mode)?.criterias || []).map(criteria => (
                             <div key={criteria.id} className="space-y-3">
                                 <div className="flex justify-between">
                                     <Label className="font-medium text-base">{criteria.name}</Label>

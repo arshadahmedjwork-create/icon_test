@@ -42,19 +42,32 @@ export default function RegistrationApprovals() {
     const [rejectDialog, setRejectDialog] = useState(false);
     const [selectedStudent, setSelectedStudent] = useState<any | null>(null);
     const [rejectionReason, setRejectionReason] = useState("");
-    const [users, setUsers] = useState<any[]>([]);
+    const [students, setStudents] = useState<Student[]>([]); // Renamed from 'users' to 'students'
+    const [isRejecting, setIsRejecting] = useState(false); // New state variable
 
     useEffect(() => {
-        const loadStudents = async () => {
-            const fetchedStudents = await getEventStudents();
-            setUsers(fetchedStudents);
-        };
         loadStudents();
-    }, []);
+    }, [user]); // Dependency array changed to [user]
+
+    const loadStudents = async () => {
+        try {
+            const data = await getEventStudents();
+            // If the user is a staff coordinator, only show students from their college
+            if (user?.role === 'staff' && user.college) {
+                setStudents(data.filter((s: Student) => s.college === user.college));
+            } else {
+                setStudents(data);
+            }
+        } catch (error) {
+            console.error("Failed to load students", error);
+            toast({ title: "Error", description: "Failed to load student registrations.", variant: "destructive" });
+        }
+    };
 
     // Filter registrations linked to this staff's college
+    // This filter is now applied on the already potentially filtered 'students' state
     const staffCollege = user?.college;
-    const pendingStudents = users.filter(s =>
+    const pendingStudents = students.filter(s =>
         (s.college === staffCollege || !staffCollege) && // !staffCollege allows admin to see all
         s.approvalStatus === "PENDING"
     );
@@ -86,7 +99,7 @@ export default function RegistrationApprovals() {
             }
 
             // Update local state
-            setUsers(prev => prev.map(u => u.id === student.id ? { ...u, approvalStatus: "APPROVED" } : u));
+            setStudents(prev => prev.map(u => u.id === student.id ? { ...u, approvalStatus: "APPROVED" } : u));
         } catch (error) {
             console.error(error);
             toast({ title: "Error", description: "Failed to approve student.", variant: "destructive" });
@@ -107,7 +120,7 @@ export default function RegistrationApprovals() {
                 toast({ title: "Rejected", description: `${selectedStudent.participantName} registration rejected.` });
 
                 // Update local state
-                setUsers(prev => prev.map(u => u.id === selectedStudent.id ? { ...u, approvalStatus: "REJECTED" } : u));
+                setStudents(prev => prev.map(u => u.id === selectedStudent.id ? { ...u, approvalStatus: "REJECTED" } : u));
 
                 setRejectDialog(false);
                 setRejectionReason("");

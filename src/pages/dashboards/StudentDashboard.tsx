@@ -6,7 +6,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import {
   Stethoscope, LogOut, Menu, X, LayoutDashboard,
-  Calendar, FileText, CreditCard, Award, ChevronLeft
+  Calendar, FileText, CreditCard, Award, ChevronLeft, Lock
 } from "lucide-react";
 
 // Sub-pages
@@ -31,6 +31,11 @@ export default function StudentDashboard() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   if (!user) return <Navigate to="/member-login" />;
+
+  // Determine if student has full access (Approved by staff AND Paid)
+  const isApproved = user.approvalStatus === 'APPROVED';
+  const isPaid = user.paymentStatus === 'PAID';
+  const hasFullAccess = isApproved && isPaid;
 
   const handleSignOut = () => {
     logout();
@@ -67,6 +72,24 @@ export default function StudentDashboard() {
           {navItems.map((item) => {
             const isActive = location.pathname === item.href ||
               (item.href !== "/dashboard/student" && location.pathname.startsWith(item.href));
+
+            // Overview and Payments are always accessible. Others need full access.
+            const isLocked = !hasFullAccess && item.href !== "/dashboard/student" && item.href !== "/dashboard/student/payments";
+
+            if (isLocked) {
+              return (
+                <div
+                  key={item.href}
+                  className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-white/30 cursor-not-allowed"
+                  title="Complete registration & payment to unlock"
+                >
+                  {item.icon}
+                  {item.label}
+                  <Lock className="w-3.5 h-3.5 ml-auto opacity-50" />
+                </div>
+              );
+            }
+
             return (
               <Link
                 key={item.href}
@@ -135,10 +158,22 @@ export default function StudentDashboard() {
         <main className="p-4 md:p-6 lg:p-8">
           <Routes>
             <Route path="/" element={<StudentOverviewPage />} />
-            <Route path="/events" element={<StudentEventsPage />} />
-            <Route path="/submissions" element={<StudentSubmissionsPage />} />
             <Route path="/payments" element={<StudentPaymentsPage />} />
-            <Route path="/certificates" element={<StudentCertificatesPage />} />
+
+            {/* Protected routes */}
+            <Route
+              path="/events"
+              element={hasFullAccess ? <StudentEventsPage /> : <Navigate to="/dashboard/student" replace />}
+            />
+            <Route
+              path="/submissions"
+              element={hasFullAccess ? <StudentSubmissionsPage /> : <Navigate to="/dashboard/student" replace />}
+            />
+            <Route
+              path="/certificates"
+              element={hasFullAccess ? <StudentCertificatesPage /> : <Navigate to="/dashboard/student" replace />}
+            />
+
             <Route path="*" element={<Navigate to="/dashboard/student" replace />} />
           </Routes>
         </main>
