@@ -19,6 +19,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { getAbstracts } from "@/services/supabaseService";
 import { supabase } from "@/lib/supabaseClient";
 import { Abstract, User } from "@/types";
+import { useProgram } from "@/contexts/ProgramContext";
 
 export default function ApprovedAbstracts() {
     const { user } = useAuth();
@@ -26,16 +27,17 @@ export default function ApprovedAbstracts() {
     const [users, setUsers] = useState<User[]>([]);
     const [searchQuery, setSearchQuery] = useState("");
     const [selectedSubject, setSelectedSubject] = useState<string>("all");
+    const { currentProgram } = useProgram();
 
     useEffect(() => {
         const loadData = async () => {
-            let query = supabase.from('event_students').select('*');
+            let query = supabase.from('event_students').select('*').eq('program', currentProgram);
             if (user?.role === 'staff' && user?.college) {
                 query = query.eq('college', user.college);
             }
 
             const [fetchedAbstracts, { data: students }] = await Promise.all([
-                getAbstracts(),
+                getAbstracts(currentProgram),
                 query
             ]);
 
@@ -50,7 +52,7 @@ export default function ApprovedAbstracts() {
             setUsers(validStudents.map((s: any) => ({ ...s, name: s.participantName })));
         };
         loadData();
-    }, [user]);
+    }, [user, currentProgram]);
 
     const getStudentName = (studentId: string) => {
         return users.find(u => u.id === studentId)?.name || "Unknown Student";

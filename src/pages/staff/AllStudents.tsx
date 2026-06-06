@@ -19,21 +19,25 @@ import { Button } from "@/components/ui/button";
 import { Search, Mail, Phone, MapPin, ExternalLink, GraduationCap, Calendar, CreditCard } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/lib/supabaseClient";
+import { useProgram } from "@/contexts/ProgramContext";
 
 export default function AllStudents() {
     const { user } = useAuth();
+    const { currentProgram } = useProgram();
     const [students, setStudents] = useState<any[]>([]);
     const [searchQuery, setSearchQuery] = useState("");
     const [selectedStudent, setSelectedStudent] = useState<any | null>(null);
+    
+    const isIcon = currentProgram === 'ICON';
 
     useEffect(() => {
         loadStudents();
-    }, [user]);
+    }, [user, currentProgram]);
 
     const loadStudents = async () => {
         if (!user) return;
         try {
-            let query = supabase.from('event_students').select('*').order('registeredAt', { ascending: false });
+            let query = supabase.from('event_students').select('*').eq('program', currentProgram).order('registeredAt', { ascending: false });
             if (user.role === 'staff' && user.college) {
                 query = query.eq('college', user.college);
             }
@@ -64,7 +68,7 @@ export default function AllStudents() {
                 <div className="relative flex-1">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                     <Input
-                        placeholder="Search by name, email, or MIDAS ID..."
+                        placeholder={`Search by name, email, or ${isIcon ? 'ICON' : 'MIDAS'} ID...`}
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
                         className="pl-9"
@@ -98,7 +102,7 @@ export default function AllStudents() {
                                         {student.midasId ? (
                                             <div className="text-xs font-mono text-primary font-semibold mt-0.5">{student.midasId}</div>
                                         ) : (
-                                            <div className="text-xs text-muted-foreground mt-0.5">No MIDAS ID</div>
+                                            <div className="text-xs text-muted-foreground mt-0.5">No {isIcon ? 'ICON' : 'MIDAS'} ID</div>
                                         )}
                                     </TableCell>
                                     <TableCell>

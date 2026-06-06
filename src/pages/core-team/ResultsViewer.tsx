@@ -18,6 +18,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Trophy, Download } from "lucide-react";
+import { useProgram } from "@/contexts/ProgramContext";
 
 interface ResultRow {
     rank: number;
@@ -38,13 +39,14 @@ export default function ResultsViewer() {
     const [users, setUsers] = useState<User[]>([]);
     const [abstracts, setAbstracts] = useState<Abstract[]>([]);
     const [evaluations, setEvaluations] = useState<Evaluation[]>([]);
+    const { currentProgram } = useProgram();
 
     useEffect(() => {
         const loadData = async () => {
             const [fetchedSessions, fetchedUsers, fetchedAbstracts, fetchedEvaluations] = await Promise.all([
-                getSessions(),
-                getUsers(),
-                getAbstracts(),
+                getSessions(currentProgram),
+                getUsers(currentProgram),
+                getAbstracts(currentProgram),
                 getEvaluations()
             ]);
             setSessions(fetchedSessions);
@@ -53,7 +55,7 @@ export default function ResultsViewer() {
             setEvaluations(fetchedEvaluations);
         };
         loadData();
-    }, []);
+    }, [currentProgram]);
 
     useEffect(() => {
         if (!selectedSessionId) return;

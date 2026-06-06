@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { Download, PieChart, BarChart, Users, FileText } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { useProgram } from "@/contexts/ProgramContext";
 
 export default function Reports() {
     const [stats, setStats] = useState({
@@ -19,14 +20,16 @@ export default function Reports() {
         abstracts: 0,
         sessions: 0
     });
+    const { currentProgram } = useProgram();
+    const isIcon = currentProgram === 'ICON';
 
     useEffect(() => {
         const loadStats = async () => {
             try {
                 const [users, abstracts, sessions] = await Promise.all([
-                    getUsers(),
-                    getAbstracts(),
-                    getSessions()
+                    getUsers(currentProgram),
+                    getAbstracts(currentProgram),
+                    getSessions(currentProgram)
                 ]);
 
                 const students = users.filter(u => u.role === "student") as Student[];
@@ -45,14 +48,14 @@ export default function Reports() {
         };
 
         loadStats();
-    }, []);
+    }, [currentProgram]);
 
     return (
         <div className="space-y-6">
             <div className="flex justify-between items-center">
                 <div>
-                    <h2 className="text-xl font-bold font-display">System Reports</h2>
-                    <p className="text-muted-foreground">Overview of event participation and status.</p>
+                    <h2 className="text-xl font-bold font-display">{isIcon ? 'Madras ICON' : 'MIDAS'} System Reports</h2>
+                    <p className="text-muted-foreground">Overview of {isIcon ? 'ICON' : 'MIDAS'} event participation and status.</p>
                 </div>
                 <Button variant="outline">
                     <Download className="w-4 h-4 mr-2" /> Download Full Report

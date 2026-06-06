@@ -180,9 +180,16 @@ export default function StudentPaymentsPage() {
 
     return (
         <div className="space-y-6">
-            <div>
-                <h1 className="text-2xl font-bold text-slate-900">Payments</h1>
-                <p className="text-sm text-slate-500 mt-1">Track all your registration and event payments.</p>
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div>
+                    <h1 className="text-2xl font-bold text-slate-900">Payments</h1>
+                    <p className="text-sm text-slate-500 mt-1">Track all your registration and event payments.</p>
+                </div>
+
+                {/* Header Ad Box */}
+                <div className="flex-grow bg-white border border-slate-150 rounded-2xl overflow-hidden shadow-sm flex items-center justify-center h-[110px]">
+                    <img src="/gold.png" alt="Gold Sponsor" className="w-full h-full object-contain p-1" />
+                </div>
             </div>
 
             {isLoading ? (

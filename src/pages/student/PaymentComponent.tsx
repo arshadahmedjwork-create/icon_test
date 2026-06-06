@@ -6,6 +6,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { toast } from "sonner";
 import { CheckCircle, CreditCard, Loader2 } from "lucide-react";
 import { Student } from "@/types";
+import { generateMidasId, generateQRCodeUrl, sendRegistrationEmail } from "@/services/emailService";
+import { getLatestMidasId } from "@/services/supabaseService";
+import { useProgram } from "@/contexts/ProgramContext";
+
 
 declare global {
     interface Window {
@@ -15,7 +19,10 @@ declare global {
 
 export function PaymentComponent({ onPaymentComplete }: { onPaymentComplete: (user: Student) => void }) {
     const { user } = useAuth();
+    const { currentProgram } = useProgram();
     const [isProcessing, setIsProcessing] = useState(false);
+    
+    const isIcon = currentProgram === 'ICON';
 
     const handlePayment = async () => {
         if (!user) return;
@@ -30,19 +37,33 @@ export function PaymentComponent({ onPaymentComplete }: { onPaymentComplete: (us
             key: razorpayKey,
             amount: 103000, // ₹1030 in paise
             currency: "INR",
-            name: "MIDAS Scientific Event",
-            description: "Registration Fee — Conference Kit, Lunch, Certificate",
+            name: isIcon ? "Madras ICON" : "MIDAS Scientific Event",
+            description: isIcon ? "Professional Registration Fee" : "Registration Fee — Conference Kit, Lunch, Certificate",
             handler: async function (response: any) {
                 setIsProcessing(true);
                 try {
-                    // Update student payment status in Supabase
-                    const { error: studentError } = await supabase
+                    // 1. Generate Program ID and QR Code now that payment is successful
+                    const latestId = await getLatestMidasId(currentProgram);
+                    const midasId = generateMidasId(latestId || 0, currentProgram);
+                    const collegeName = user.college || "Dental College";
+                    const participantName = user.name || user.participantName || "Delegate";
+                    const qrCodeUrl = generateQRCodeUrl(midasId, participantName, collegeName, 300, currentProgram);
+
+                    console.log(`Payment successful. Assigning ${isIcon ? 'ICON' : 'MIDAS'} ID:`, midasId);
+
+                    // 2. Update student payment status AND assign MIDAS ID in Supabase
+                    const { error: studentError, data: updatedStudent } = await supabase
                         .from("event_students")
                         .update({
                             paymentStatus: "PAID",
                             paymentId: response.razorpay_payment_id,
+                            midasId: midasId,
+                            qrCodeUrl: qrCodeUrl,
                         })
-                        .eq("id", user.id);
+                        .eq("id", user.id)
+                        .select()
+                        .single();
+
 
                     if (studentError) throw studentError;
 
@@ -56,12 +77,29 @@ export function PaymentComponent({ onPaymentComplete }: { onPaymentComplete: (us
                         transactionId: response.razorpay_payment_id,
                     });
 
-                    toast.success("Payment Successful! Registration Confirmed.");
+                    // 4. Send official registration confirmation email with MIDAS ID and QR
+                    try {
+                        await sendRegistrationEmail({
+                            student_name: participantName,
+                            student_email: user.email,
+                            midas_id: midasId,
+                            college_name: collegeName,
+                            event_type: isIcon ? "Professional Delegate" : "UG Delegate",
+                            mode: "Offline",
+                            qr_code_url: qrCodeUrl,
+                            registration_date: new Date().toLocaleDateString("en-IN"),
+                        });
+                    } catch (emailErr) {
+                        console.warn("Email sending error after payment:", emailErr);
+                    }
+
+                    toast.success(`Payment Successful! Your ${isIcon ? 'ICON' : 'MIDAS'} ID is ` + midasId);
                     onPaymentComplete({
-                        ...(user as Student),
+                        ...(updatedStudent || user as Student),
                         registrationStatus: "completed",
                         paymentStatus: "completed",
                     });
+
                 } catch (error) {
                     console.error("Payment Error:", error);
                     toast.error("Payment received but update failed. Contact admin with payment ID: " + response.razorpay_payment_id);
@@ -74,7 +112,7 @@ export function PaymentComponent({ onPaymentComplete }: { onPaymentComplete: (us
                 email: user.email,
                 contact: user.mobile || "",
             },
-            theme: { color: "#004d40" },
+            theme: { color: isIcon ? "#b91c1c" : "#004d40" },
             modal: {
                 ondismiss: function () {
                     toast.info("Payment cancelled.");

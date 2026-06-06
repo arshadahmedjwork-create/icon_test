@@ -21,14 +21,19 @@ const roleDashboardPaths: Record<string, string> = {
 
 type LoginType = "student" | "staff";
 
+import { useProgram } from "@/contexts/ProgramContext";
+
 export default function MemberLoginPage() {
     const navigate = useNavigate();
     const { login, studentLogin } = useAuth();
+    const { currentProgram } = useProgram();
 
     const [loginType, setLoginType] = useState<LoginType>("student");
     const [showPassword, setShowPassword] = useState(false);
     const [loading, setLoading] = useState(false);
     const [isForgotModalOpen, setIsForgotModalOpen] = useState(false);
+
+    const isIcon = currentProgram === 'ICON';
 
     // Form states
     const [email, setEmail] = useState("");
@@ -52,13 +57,11 @@ export default function MemberLoginPage() {
 
         try {
             if (loginType === "student") {
-                await studentLogin(email, password);
+                await studentLogin(email, password, currentProgram);
                 toast.success("Login successful! Welcome back.");
                 navigate("/dashboard/student");
             } else {
-                // Determine user's true role from database implicitly by passing 'staff' as placeholder
-                // The actual mapping happens inside AuthContext based on database lookup
-                const actualRole = await login(email, password, "staff");
+                const actualRole = await login(email, password, "staff", currentProgram);
                 toast.success("Login successful! Welcome back.");
                 navigate(roleDashboardPaths[actualRole] || "/");
             }
@@ -77,7 +80,7 @@ export default function MemberLoginPage() {
                 onClose={() => setIsForgotModalOpen(false)}
             />
             {/* LEFT PANEL */}
-            <div className="w-full lg:w-1/2 bg-gradient-to-br from-[#004d40] to-[#2e7d32] flex items-center justify-center p-8 lg:p-12 text-white">
+            <div className="w-full lg:w-1/2 bg-gradient-primary flex items-center justify-center p-8 lg:p-12 text-white">
                 <motion.div
                     className="max-w-md space-y-6"
                     initial={{ opacity: 0, x: -50 }}
@@ -85,18 +88,29 @@ export default function MemberLoginPage() {
                     transition={{ duration: 0.8 }}
                 >
                     <div className="flex items-center gap-4">
-                        <div className="bg-white/10 p-3 rounded-2xl backdrop-blur-sm border border-white/20">
-                            <Stethoscope className="w-10 h-10 text-white" />
-                        </div>
-                        <h1 className="text-5xl font-bold tracking-tight">MIDAS</h1>
+                        {isIcon ? (
+                            <div className="bg-white/10 p-1.5 rounded-2xl backdrop-blur-sm border border-white/20 w-16 h-16 flex items-center justify-center">
+                                <img src="/icon_logo.png" alt="Madras ICON Logo" className="w-full h-full object-contain" />
+                            </div>
+                        ) : (
+                            <div className="bg-white/10 p-3 rounded-2xl backdrop-blur-sm border border-white/20">
+                                <Stethoscope className="w-10 h-10 text-white" />
+                            </div>
+                        )}
+                        <h1 className="text-4xl lg:text-5xl font-bold tracking-tight">
+                            {isIcon ? "Madras ICON" : "MIDAS"}
+                        </h1>
                     </div>
 
                     <div className="space-y-4">
-                        <h2 className="text-3xl font-semibold leading-tight">
+                        <h2 className="text-2xl lg:text-3xl font-semibold leading-tight">
                             Scientific Event Management & Evaluation System
                         </h2>
                         <p className="text-white/80 text-lg leading-relaxed font-light">
-                            Manage inter-college dental symposiums end-to-end — registrations, evaluations, certificates, and everything in between.
+                            {isIcon 
+                                ? "Empowering postgraduates and clinicians with a world-class platform for scientific exchange and professional evaluation."
+                                : "Manage inter-college dental symposiums end-to-end — registrations, evaluations, certificates, and everything in between."
+                            }
                         </p>
                     </div>
 
@@ -117,7 +131,7 @@ export default function MemberLoginPage() {
                 >
                     <div className="mb-8 text-center sm:text-left">
                         <div className="flex items-center gap-3 justify-center sm:justify-start mb-2">
-                            <div className="bg-[#004d40]/10 p-2 rounded-xl text-[#004d40]">
+                            <div className="bg-primary/10 p-2 rounded-xl text-primary">
                                 <LogIn className="w-6 h-6" />
                             </div>
                             <h3 className="text-2xl font-bold text-slate-900">SIGN IN</h3>
@@ -145,7 +159,7 @@ export default function MemberLoginPage() {
                             className={cn(
                                 "flex-1 py-3 text-sm font-semibold rounded-lg transition-all",
                                 loginType === "staff"
-                                    ? "bg-[#004d40] text-white shadow-sm"
+                                    ? "bg-primary text-primary-foreground shadow-sm"
                                     : "text-slate-500 hover:text-slate-700 hover:bg-slate-200/50"
                             )}
                         >
@@ -162,7 +176,7 @@ export default function MemberLoginPage() {
                                     id="email"
                                     type="email"
                                     placeholder="your@email.com"
-                                    className="pl-12 h-12 rounded-xl focus:ring-2 focus:ring-[#004d40]/20 bg-slate-50/50"
+                                    className="pl-12 h-12 rounded-xl focus:ring-2 focus:ring-primary/20 bg-slate-50/50"
                                     value={email}
                                     onChange={(e) => setEmail(e.target.value)}
                                     required
@@ -176,7 +190,7 @@ export default function MemberLoginPage() {
                                 <button
                                     type="button"
                                     onClick={() => setIsForgotModalOpen(true)}
-                                    className="text-sm text-[#004d40] font-semibold hover:underline"
+                                    className="text-sm text-primary font-semibold hover:underline"
                                 >
                                     Forgot Password?
                                 </button>
@@ -187,7 +201,7 @@ export default function MemberLoginPage() {
                                     id="password"
                                     type={showPassword ? "text" : "password"}
                                     placeholder="••••••••"
-                                    className="pl-12 pr-12 h-12 rounded-xl focus:ring-2 focus:ring-[#004d40]/20 bg-slate-50/50"
+                                    className="pl-12 pr-12 h-12 rounded-xl focus:ring-2 focus:ring-primary/20 bg-slate-50/50"
                                     value={password}
                                     onChange={(e) => setPassword(e.target.value)}
                                     required
@@ -205,12 +219,12 @@ export default function MemberLoginPage() {
                         <div className="pt-2">
                             <Button
                                 type="submit"
-                                className="w-full h-12 bg-[#004d40] hover:bg-[#003d33] text-white rounded-xl shadow-lg transition-all active:scale-[0.98]"
+                                className="w-full h-12 bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl shadow-lg transition-all active:scale-[0.98]"
                                 disabled={loading}
                             >
                                 {loading ? (
                                     <div className="flex items-center gap-2">
-                                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                        <div className="w-4 h-4 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" />
                                         <span>Signing in...</span>
                                     </div>
                                 ) : (
@@ -225,7 +239,7 @@ export default function MemberLoginPage() {
                             New delegate?{" "}
                             <button
                                 onClick={() => navigate("/student-registration")}
-                                className="text-[#004d40] font-bold hover:underline"
+                                className="text-primary font-bold hover:underline"
                             >
                                 Register Here
                             </button>

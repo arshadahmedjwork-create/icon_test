@@ -29,7 +29,8 @@ import { Plus, Search, Trash2, Mail } from "lucide-react";
 import { getUsers, createMember, deleteUser } from "@/services/supabaseService";
 import { User, UserRole } from "@/types";
 import { useToast } from "@/hooks/use-toast";
-import emailjs from "@emailjs/browser";
+import { sendAccountCreationEmail } from "@/services/emailService";
+import { useProgram } from "@/contexts/ProgramContext";
 
 // Role display mapping
 const roleDisplayMap: Record<string, string> = {
@@ -70,6 +71,8 @@ export default function AdminUsers() {
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const [isCreating, setIsCreating] = useState(false);
     const { toast } = useToast();
+    const { currentProgram } = useProgram();
+    const isIcon = currentProgram === 'ICON';
 
     const [formData, setFormData] = useState({
         name: "",
@@ -80,11 +83,11 @@ export default function AdminUsers() {
 
     useEffect(() => {
         loadUsers();
-    }, []);
+    }, [currentProgram]);
 
     const loadUsers = async () => {
         try {
-            const data = await getUsers();
+            const data = await getUsers(currentProgram);
             setUsers(data);
         } catch (error) {
             console.error("Failed to load users", error);
@@ -107,21 +110,18 @@ export default function AdminUsers() {
                 password: tempPassword,
                 role: backendRole,
                 staffCoordinatorCollege: formData.role === 'staff' ? formData.college : undefined,
+                program: currentProgram,
             });
 
             // Send email via EmailJS with temp password
             try {
-                await emailjs.send(
-                    import.meta.env.VITE_EMAILJS_SERVICE_ID,
-                    import.meta.env.VITE_EMAILJS_TEMPLATE_ID,
-                    {
-                        to_email: formData.email,
-                        to_name: formData.name,
-                        role: formData.role.replace('_', ' '),
-                        temp_password: tempPassword,
-                    },
-                    import.meta.env.VITE_EMAILJS_PUBLIC_KEY,
-                );
+                await sendAccountCreationEmail({
+                    user_name: formData.name,
+                    user_email: formData.email,
+                    temp_password: tempPassword,
+                    login_url: window.location.origin + "/member-login",
+                    role: formData.role
+                });
                 toast({ title: "User Created", description: `Credentials sent to ${formData.email}` });
             } catch (emailError) {
                 console.error("Email send failed:", emailError);
@@ -164,8 +164,8 @@ export default function AdminUsers() {
         <div className="space-y-6">
             <div className="flex justify-between items-center">
                 <div>
-                    <h2 className="text-2xl font-bold font-display">User Management</h2>
-                    <p className="text-muted-foreground">Manage system access and roles.</p>
+                    <h2 className="text-2xl font-bold font-display">{isIcon ? 'ICON' : 'MIDAS'} User Management</h2>
+                    <p className="text-muted-foreground">Manage {isIcon ? 'Madras ICON' : 'MIDAS'} system access and roles.</p>
                 </div>
                 <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
                     <DialogTrigger asChild>

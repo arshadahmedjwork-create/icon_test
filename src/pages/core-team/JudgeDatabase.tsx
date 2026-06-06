@@ -21,20 +21,22 @@ import { getJudges } from "@/services/supabaseService";
 import { Judge } from "@/types";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { useProgram } from "@/contexts/ProgramContext";
 
 export default function JudgeDatabase() {
     const [judges, setJudges] = useState<Judge[]>([]);
     const [searchQuery, setSearchQuery] = useState("");
     const [typeFilter, setTypeFilter] = useState<string>("all");
     const { toast } = useToast();
+    const { currentProgram } = useProgram();
 
     useEffect(() => {
         const loadJudges = async () => {
-            const data = await getJudges();
+            const data = await getJudges(currentProgram);
             setJudges(data);
         };
         loadJudges();
-    }, []);
+    }, [currentProgram]);
 
     const handleExport = () => {
         const headers = ["Name", "Specialization", "Type", "Affiliation", "Email", "Contact", "Status"];

@@ -4,19 +4,22 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { getEvents, getUsers, getAbstracts, getSessions } from "@/services/supabaseService";
+import { useProgram } from "@/contexts/ProgramContext";
 
 export default function VerifyWorkflows() {
     const { user, login } = useAuth();
+    const { currentProgram } = useProgram();
     const [logs, setLogs] = useState<string[]>([]);
 
     const log = (msg: string) => setLogs(prev => [...prev, `[${new Date().toLocaleTimeString()}] ${msg}`]);
 
     const runDataCheck = async () => {
+        log(`Running integrity check for: ${currentProgram}`);
         const [users, abstracts, sessions, events] = await Promise.all([
-            getUsers(),
-            getAbstracts(),
-            getSessions(),
-            getEvents()
+            getUsers(currentProgram),
+            getAbstracts(currentProgram),
+            getSessions(currentProgram),
+            getEvents(currentProgram)
         ]);
 
         log(`Total Users: ${users.length}`);

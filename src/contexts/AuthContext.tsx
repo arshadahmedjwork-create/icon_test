@@ -40,17 +40,19 @@ export interface AuthUser {
     profileStatus?: string;
     paymentStatus?: string;
     approvalStatus?: string;
+    delegateType?: string;
     // Password change flag
     mustChangePassword?: boolean;
+    selectedEvents?: any[];
 }
 
 interface AuthContextType {
     user: AuthUser | null;
     token: string | null;
     isLoading: boolean;
-    login: (email: string, password: string, role: FrontendRole) => Promise<string>;
-    studentLogin: (email: string, mobile: string) => Promise<void>;
-    studentRegister: (data: { participantName: string; email: string; mobile: string; college: string; year: string }) => Promise<void>;
+    login: (email: string, password: string, role: FrontendRole, program: string) => Promise<string>;
+    studentLogin: (email: string, password: string, program: string) => Promise<void>;
+    studentRegister: (data: { participantName: string; email: string; mobile: string; college: string; year: string; program: string }) => Promise<void>;
     memberRegister: (email: string, password: string, role: FrontendRole) => Promise<void>;
     logout: () => void;
     refreshUser: () => Promise<void>;
@@ -83,10 +85,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
 
     // Member login — queries 'members' table directly + bcryptjs comparison
-    const login = async (email: string, password: string, role: FrontendRole) => {
-        const member = await getMemberByEmail(email);
-        if (!member) {
+    const login = async (email: string, password: string, role: FrontendRole, program: string) => {
+        // Fetch the member first to check role and program
+        const { data: member, error: fetchError } = await supabase
+            .from('members')
+            .select('*')
+            .eq('email', email)
+            .limit(1)
+            .maybeSingle();
+
+        if (fetchError || !member) {
             throw new Error("Invalid email or password");
+        }
+
+        // Admins can log in to any program. 
+        // Other roles must match the current program.
+        if (member.role !== 'ADMIN' && member.program !== program) {
+            throw new Error(`This account is registered for ${member.program}. Please switch to that portal to login.`);
         }
 
         const isValid = await comparePassword(password, member.password);
@@ -115,7 +130,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
 
     // Student login — queries 'event_students' table
-    const studentLogin = async (email: string, password: string) => {
+    const studentLogin = async (email: string, password: string, program: string) => {
         const { data: student, error } = await supabase
             .from('event_students')
             .select('*')
@@ -123,8 +138,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             .limit(1)
             .maybeSingle();
 
-        if (error || !student || !student.password) {
+        if (error || !student) {
             throw new Error("Invalid email or password");
+        }
+
+        if (student.program !== program) {
+            throw new Error(`This account is registered for ${student.program}. Please login through the ${student.program} portal.`);
+        }
+
+        if (!student.password) {
+            throw new Error("Account found but no password set. Please contact support.");
         }
 
         const isValid = await comparePassword(password, student.password);
@@ -149,12 +172,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             profileStatus: student.profileStatus,
             paymentStatus: student.paymentStatus,
             approvalStatus: student.approvalStatus,
+            delegateType: student.delegateType,
+            mustChangePassword: student.mustChangePassword ?? false,
+            selectedEvents: student.selectedEvents || [],
         };
         persistSession(sessionToken, authUser);
     };
 
     // Student registration
-    const studentRegister = async (data: { participantName: string; email: string; mobile: string; college: string; year: string }) => {
+    const studentRegister = async (data: { participantName: string; email: string; mobile: string; college: string; year: string; program: string }) => {
         const { data: student, error } = await supabase
             .from('event_students')
             .insert({
@@ -163,6 +189,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 mobile: data.mobile,
                 college: data.college,
                 year: data.year,
+                program: data.program,
             })
             .select()
             .single();
@@ -178,12 +205,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             role: 'student',
             participantName: student.participantName,
             mobile: student.mobile,
+            delegateType: student.delegateType,
         };
         persistSession(sessionToken, authUser);
     };
 
     // Member registration (self-signup)
-    const memberRegister = async (email: string, password: string, role: FrontendRole) => {
+    const memberRegister = async (email: string, password: string, role: FrontendRole, program: string = 'MIDAS') => {
         const bcrypt = (await import('bcryptjs')).default;
         const hashedPassword = await bcrypt.hash(password, 10);
         const backendRole = reverseRoleMap[role];
@@ -196,6 +224,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 role: backendRole,
                 isActive: true,
                 mustChangePassword: false,
+                program: program,
             })
             .select()
             .single();
@@ -240,6 +269,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                         profileStatus: student.profileStatus,
                         paymentStatus: student.paymentStatus,
                         approvalStatus: student.approvalStatus,
+                        delegateType: student.delegateType,
+                        mustChangePassword: student.mustChangePassword ?? false,
+                        selectedEvents: student.selectedEvents || [],
                     };
                     setUser(updated);
                     localStorage.setItem("midas_user", JSON.stringify(updated));

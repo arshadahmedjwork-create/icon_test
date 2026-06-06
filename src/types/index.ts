@@ -1,3 +1,4 @@
+export type Program = "MIDAS" | "ICON";
 
 export type UserRole = "admin" | "core_team" | "staff" | "student" | "judge" | "volunteer";
 
@@ -13,10 +14,12 @@ export interface User {
     createdAt: string;
     course?: string; // Added for Supabase profile mapping
     year?: string; // Added for Supabase profile mapping
+    program?: Program;
     // Student specific fields (lifted to User for ease of access in mock)
     registrationStatus?: string | "pending" | "approved" | "rejected" | "completed";
     paymentStatus?: string | "pending" | "completed" | "PAID";
     midasId?: string;
+    iconId?: string; // Added for ICON
     idProofUrl?: string;
     selectedEvents?: {
         subject: string;
@@ -39,6 +42,7 @@ export interface Judge {
     college?: string; // For conflict checking (Academic judges)
     status: JudgeStatus;
     timeSlots?: string[]; // Preferred time slots
+    program?: Program;
 }
 
 export interface EventConfig {
@@ -72,6 +76,7 @@ export interface Event {
     judgeInstructions: string;
     abstractDeadline: string;
     presentationDeadline: string;
+    program?: Program;
 }
 
 export interface Deadline {
@@ -79,6 +84,7 @@ export interface Deadline {
     name: string;
     date: string; // ISO deadline
     description?: string;
+    program?: Program;
 }
 
 export interface Student extends User {
@@ -92,12 +98,27 @@ export interface Student extends User {
     paymentStatus: string | "pending" | "completed" | "PAID";
     approvalStatus?: string | "PENDING" | "APPROVED" | "REJECTED";
     midasId?: string;
+    iconId?: string; // Added for ICON
     idProofUrl?: string;
+    mustChangePassword?: boolean;
     selectedEvents?: {
         subject: string;
         type: string;
         mode: string;
     }[]; // Events selected by student after payment
+    program?: Program;
+    
+    // ICON Specific Fields
+    dciNumber?: string;
+    state?: string;
+    speciality?: string;
+    yearsOfPractice?: number;
+    teachingExperience?: string;
+    academicPosition?: string;
+    qualification?: string;
+    delegateType?: 'PG' | 'Clinician' | 'Guest' | 'Faculty';
+    bonafideUrl?: string;
+    dciCertificateUrl?: string;
 }
 
 export interface Registration {
@@ -108,6 +129,7 @@ export interface Registration {
     status: "pending" | "approved" | "rejected";
     approvalDate?: string;
     rejectionReason?: string;
+    program?: Program;
 }
 
 export interface Abstract {
@@ -125,6 +147,9 @@ export interface Abstract {
     mentorName?: string;
     coAuthors?: string[];
     submittedAt: string;
+    program?: Program;
+    keywords?: string[]; // Added for ICON
+    hodName?: string; // Added for ICON (PG)
 }
 
 export interface Session {
@@ -138,6 +163,8 @@ export interface Session {
     venue: string; // Zoom link or Hall name
     judges: string[]; // Judge IDs
     abstractIds: string[]; // IDs of abstracts scheduled in this session
+    eventId?: string; // ID of the linked event configuration (criterias, rules)
+    criterias?: EvaluationCriteria[]; // Optional override for this specific session
     attendanceRecords?: string[]; // Student IDs who attended (for certificate eligibility)
     winners?: {
         rank: number;
@@ -145,6 +172,8 @@ export interface Session {
         score: number;
     }[];
     status: "scheduled" | "in_progress" | "evaluation_pending" | "completed";
+    currentPresenterId?: string;
+    program?: Program;
 }
 
 export interface Evaluation {
@@ -156,6 +185,8 @@ export interface Evaluation {
     totalScore: number;
     feedback?: string;
     submittedAt: string;
+    program?: Program;
+    isAbsent?: boolean;
 }
 
 export interface Certificate {
@@ -167,4 +198,5 @@ export interface Certificate {
     generatedAt: string;
     emailSent: boolean;
     downloadUrl: string;
+    program?: Program;
 }

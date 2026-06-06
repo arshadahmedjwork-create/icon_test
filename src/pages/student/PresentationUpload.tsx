@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
-import { getAbstracts, getDeadlines, updateAbstract } from "@/services/supabaseService";
+import { getAbstracts, getDeadlines, updateAbstract, uploadPresentationFile } from "@/services/supabaseService";
 import { Abstract, Deadline, Student } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -53,17 +53,25 @@ export default function PresentationUpload() {
             return;
         }
 
+        const fileInput = document.getElementById(`file-${abstractId}`) as HTMLInputElement;
+        const file = fileInput?.files?.[0];
+
+        if (!file) {
+            toast({ title: "No file selected", description: "Please choose a file to upload.", variant: "destructive" });
+            return;
+        }
+
         setUploading(abstractId);
 
-        // Simulate file upload logic (in real app, use Storage API)
-        const mockUrl = `https://mock-cdn/presentation-${abstractId}.pptx`;
-
         try {
-            await updateAbstract(abstractId, { presentationUrl: mockUrl });
+            const uploadedUrl = await uploadPresentationFile(abstractId, file);
+            if (!uploadedUrl) throw new Error("Upload failed");
+
+            await updateAbstract(abstractId, { presentationUrl: uploadedUrl });
 
             // Refresh list (or update locally preferably)
             const updatedAbstracts = abstracts.map(a =>
-                a.id === abstractId ? { ...a, presentationUrl: mockUrl } : a
+                a.id === abstractId ? { ...a, presentationUrl: uploadedUrl } : a
             );
             setAbstracts(updatedAbstracts);
 
@@ -168,7 +176,7 @@ export default function PresentationUpload() {
                                         <div className="border-2 border-dashed rounded-lg p-8 flex flex-col items-center justify-center text-center">
                                             <Upload className="h-10 w-10 text-muted-foreground mb-3" />
                                             <Label className="text-base font-medium mb-1">
-                                                {abstract.type === "Paper Presentation" ? "Upload PowerPoint (PPT/PPTX)" : "Upload Poster (PDF)"}
+                                                {abstract.type.includes("Paper") ? "Upload PowerPoint (PPT/PPTX)" : "Upload Poster (PDF)"}
                                             </Label>
                                             <p className="text-xs text-muted-foreground mb-4">
                                                 Max file size: 50MB
@@ -177,7 +185,7 @@ export default function PresentationUpload() {
                                                 type="file"
                                                 className="hidden"
                                                 id={`file-${abstract.id}`}
-                                                accept={abstract.type === "Paper Presentation" ? ".ppt,.pptx" : ".pdf"}
+                                                accept={abstract.type.includes("Paper") ? ".ppt,.pptx" : ".pdf"}
                                                 onChange={() => handleFileUpload(abstract.id)}
                                                 disabled={isPastDeadline}
                                             />

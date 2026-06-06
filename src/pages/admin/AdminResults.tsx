@@ -6,11 +6,14 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Download, Trophy, Medal } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useProgram } from "@/contexts/ProgramContext";
 
 export default function AdminResults() {
     const [toppers, setToppers] = useState<{ subject: string, studentId: string, score: number, sessionName: string }[]>([]);
     const [sessions, setSessions] = useState<Session[]>([]);
     const [users, setUsers] = useState<User[]>([]);
+    const { currentProgram } = useProgram();
+    const isIcon = currentProgram === 'ICON';
 
     useEffect(() => {
         const loadData = async () => {
@@ -19,8 +22,8 @@ export default function AdminResults() {
                 // Subject toppers might take time.
                 const [toppersData, sessionsData, usersData] = await Promise.all([
                     getSubjectToppers(),
-                    getSessions(),
-                    getUsers()
+                    getSessions(currentProgram),
+                    getUsers(currentProgram)
                 ]);
 
                 setToppers(toppersData);
@@ -31,7 +34,7 @@ export default function AdminResults() {
             }
         };
         loadData();
-    }, []);
+    }, [currentProgram]);
 
     const getStudentName = (id: string) => users.find(u => u.id === id)?.name || "Unknown";
     const getStudentCollege = (id: string) => users.find(u => u.id === id)?.college || "Unknown Analysis";
@@ -40,7 +43,7 @@ export default function AdminResults() {
         <div className="space-y-6">
             <div className="flex justify-between items-center">
                 <div>
-                    <h1 className="font-display text-2xl font-bold mb-1">Results & Reports</h1>
+                    <h1 className="font-display text-2xl font-bold mb-1">{isIcon ? 'ICON' : 'MIDAS'} Results & Reports</h1>
                     <p className="text-sm text-muted-foreground">
                         View subject toppers and detailed winner lists.
                     </p>

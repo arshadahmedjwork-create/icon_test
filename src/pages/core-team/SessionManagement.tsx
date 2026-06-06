@@ -1,8 +1,10 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import {
     getSessions,
     addSession,
     deleteSession,
+    updateSession,
     getJudges,
     getAbstracts,
     getEvents,
@@ -27,10 +29,13 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Trash2, Calendar, MapPin, Users, FileText } from "lucide-react";
+import { Plus, Trash2, Calendar, MapPin, Users, FileText, Trophy, Edit, Loader2 } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
+import { useProgram } from "@/contexts/ProgramContext";
 
 export default function SessionManagement() {
+    const navigate = useNavigate();
+    const { currentProgram } = useProgram();
     const [sessions, setSessions] = useState<Session[]>([]);
     const [judges, setJudges] = useState<Judge[]>([]);
     const [abstracts, setAbstracts] = useState<Abstract[]>([]);
@@ -39,6 +44,8 @@ export default function SessionManagement() {
     const { toast } = useToast();
 
     const [isDialogOpen, setIsDialogOpen] = useState(false);
+    const [editingSession, setEditingSession] = useState<Session | null>(null);
+    const [isSubmitting, setIsSubmitting] = useState(false);
     const [formData, setFormData] = useState<Partial<Session>>({
         name: "",
         subject: "",
@@ -53,23 +60,30 @@ export default function SessionManagement() {
 
     // Auto-Schedule State
     const [isAutoScheduleDialogOpen, setIsAutoScheduleDialogOpen] = useState(false);
-    const [autoScheduleMode, setAutoScheduleMode] = useState<"Online" | "Offline">("Online");
+    const [autoScheduleMode, setAutoScheduleMode] = useState<"Online" | "Offline">("Offline");
+    const [customCapacity, setCustomCapacity] = useState<number>(4);
     const [previewSessions, setPreviewSessions] = useState<Session[]>([]);
     const [schedulerWarnings, setSchedulerWarnings] = useState<string[]>([]);
     const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+    
+    // Criteria Editing State
+    const [editingCriteriaSession, setEditingCriteriaSession] = useState<Session | null>(null);
+    const [tempCriterias, setTempCriterias] = useState<any[]>([]);
+    const [viewingStatusSession, setViewingStatusSession] = useState<Session | null>(null);
 
     useEffect(() => {
         refreshData();
-    }, []);
+    }, [currentProgram]);
 
     const refreshData = async () => {
         const [fetchedSessions, fetchedJudges, fetchedAbstracts, fetchedEvents, fetchedStudents] = await Promise.all([
-            getSessions(),
-            getJudges(),
-            getAbstracts(),
-            getEvents(),
-            getEventStudents()
+            getSessions(currentProgram),
+            getJudges(currentProgram),
+            getAbstracts(currentProgram),
+            getEvents(currentProgram),
+            getEventStudents(currentProgram)
         ]);
+        
         setSessions(fetchedSessions);
         setJudges(fetchedJudges);
         setAbstracts(fetchedAbstracts.filter(a => a.status === "approved"));
@@ -90,13 +104,14 @@ export default function SessionManagement() {
         }
     };
 
-    const handleCreate = async () => {
+    const handleSaveSession = async () => {
         if (!formData.name || !formData.subject || !formData.date) {
             toast({ title: "Error", description: "Please fill all required fields.", variant: "destructive" });
             return;
         }
 
-        const newSessionData = {
+        setIsSubmitting(true);
+        const sessionPayload = {
             name: formData.name!,
             subject: formData.subject!,
             type: formData.type || "Paper Presentation",
@@ -106,43 +121,24 @@ export default function SessionManagement() {
             venue: formData.venue || "TBD",
             judges: formData.judges || [],
             abstractIds: formData.abstractIds || [],
-            attendanceRecords: [],
-            status: "scheduled" as "scheduled"
+            eventId: formData.eventId,
+            program: currentProgram
         };
 
         try {
-            await addSession(newSessionData);
+            if (editingSession) {
+                await updateSession(editingSession.id, sessionPayload);
+                toast({ title: "Session Updated", description: `${formData.name} updated successfully.` });
+            } else {
+                await addSession({
+                    ...sessionPayload,
+                    status: "scheduled" as "scheduled"
+                });
+                toast({ title: "Session Created", description: `${formData.name} scheduled successfully.` });
+            }
             setIsDialogOpen(false);
+            setEditingSession(null);
             refreshData();
-            toast({ title: "Session Created", description: `${formData.name} scheduled successfully.` });
-
-            // Send allocation emails
-            newSessionData.abstractIds.forEach(abstractId => {
-                const abstract = abstracts.find(a => a.id === abstractId);
-                if (!abstract) return;
-                const student = students.find(s => s.id === abstract.studentId);
-                if (!student) return;
-
-                sendAllocationEmail({
-                    student_name: student.name,
-                    student_email: student.email,
-                    midas_id: student.midasId || "N/A",
-                    college_name: student.college || "N/A",
-                    event_type: abstract.type,
-                    mode: newSessionData.mode,
-                    subject_category: newSessionData.subject,
-                    session_date: newSessionData.date,
-                    session_time: newSessionData.time,
-                    reporting_time: newSessionData.time,
-                    presentation_duration: "5-7 Mins",
-                    // @ts-ignore fallback if custom DB columns aren't in type definition
-                    qr_code_url: student.qr_code_url || student.idProofUrl || "",
-                    gmeet_link: newSessionData.mode === "Online" ? newSessionData.venue : undefined,
-                    venue_name: newSessionData.mode !== "Online" ? newSessionData.venue : undefined,
-                    hall_number: newSessionData.mode !== "Online" ? newSessionData.venue : undefined
-                }).catch(err => console.error("Email err", err));
-            });
-
             // Reset form
             setFormData({
                 name: "",
@@ -157,8 +153,27 @@ export default function SessionManagement() {
             });
         } catch (error) {
             console.error(error);
-            toast({ title: "Error", description: "Failed to create session.", variant: "destructive" });
+            toast({ title: "Error", description: "Failed to save session.", variant: "destructive" });
+        } finally {
+            setIsSubmitting(false);
         }
+    };
+
+    const handleEdit = (session: Session) => {
+        setEditingSession(session);
+        setFormData({
+            name: session.name,
+            subject: session.subject,
+            type: session.type,
+            mode: session.mode,
+            date: session.date,
+            time: session.time,
+            venue: session.venue,
+            judges: session.judges,
+            abstractIds: session.abstractIds,
+            eventId: session.eventId
+        });
+        setIsDialogOpen(true);
     };
 
     const updateForm = (key: keyof Session, value: any) => {
@@ -194,22 +209,26 @@ export default function SessionManagement() {
     const runAutoScheduler = () => {
         setIsAutoScheduleDialogOpen(false);
         const scheduler = new AutoScheduler({
-            // @ts-ignore
             abstracts: abstracts.filter(a => a.status === "approved" || a.status === "completed").map(a => {
                 const student = students.find(s => s.id === a.studentId);
                 return {
                     ...a,
                     _studentName: student?.participantName || student?.name || 'Unknown',
-                    college: student?.college || 'Unknown'
+                    college: student?.college || 'Unknown',
+                    delegateType: student?.delegateType || 'UG'
                 };
             }),
             judges,
+            events,
+            program: currentProgram,
+            customCapacity,
             // @ts-ignore
             config: {
                 subjects: Array.from(new Set(events.map(e => e.name))),
                 presentationTypes: Array.from(new Set(events.map(e => e.type))),
                 modes: Array.from(new Set(events.map(e => e.mode))),
-                capacities: events.reduce((acc, e) => ({ ...acc, [`${e.type.toLowerCase().replace(" ", "")}${e.mode}`]: e.capacity }), {} as any)
+                capacities: events.reduce((acc, e) => ({ ...acc, [`${e.type.toLowerCase().replace(" ", "")}${e.mode}`]: e.capacity }), {} as any),
+                program: currentProgram
             }
         });
 
@@ -265,15 +284,67 @@ export default function SessionManagement() {
         }
     };
 
-    // Filter available abstracts based on selected criteria
+    const handleOpenCriteriaEditor = (session: Session) => {
+        setEditingCriteriaSession(session);
+        // Inherit from session, or if empty, try to inherit from event, or if empty, show standard
+        let initialCriterias = session.criterias || [];
+        if (initialCriterias.length === 0) {
+            const event = events.find(e => e.id === session.eventId);
+            initialCriterias = event?.criterias || [
+                { id: crypto.randomUUID(), name: 'Scientific Content', maxScore: 10, weightage: 40 },
+                { id: crypto.randomUUID(), name: 'Presentation / Delivery', maxScore: 10, weightage: 30 },
+                { id: crypto.randomUUID(), name: 'Innovation & Impact', maxScore: 10, weightage: 30 }
+            ];
+        }
+        setTempCriterias([...initialCriterias]);
+    };
+
+    const handleAddCriteria = () => {
+        setTempCriterias([...tempCriterias, { id: crypto.randomUUID(), name: "", maxScore: 10, weightage: 0 }]);
+    };
+
+    const handleRemoveCriteria = (id: string) => {
+        setTempCriterias(tempCriterias.filter(c => c.id !== id));
+    };
+
+    const updateCriteriaField = (id: string, field: string, value: any) => {
+        setTempCriterias(tempCriterias.map(c => c.id === id ? { ...c, [field]: value } : c));
+    };
+
+    const handleSaveCriteria = async () => {
+        if (!editingCriteriaSession) return;
+
+        const totalWeightage = tempCriterias.reduce((sum, c) => sum + Number(c.weightage), 0);
+        if (totalWeightage !== 100) {
+            toast({ 
+                title: "Invalid Weightage", 
+                description: `Total weightage must be 100%. Current total: ${totalWeightage}%`, 
+                variant: "destructive" 
+            });
+            return;
+        }
+
+        try {
+            await updateSession(editingCriteriaSession.id, { 
+                criterias: tempCriterias 
+            });
+            
+            toast({ title: "Criteria Updated", description: "Judging rubric saved for this session." });
+            setEditingCriteriaSession(null);
+            refreshData();
+        } catch (error) {
+            console.error(error);
+            toast({ title: "Error", description: "Failed to save criteria.", variant: "destructive" });
+        }
+    };
+
+    // Filter available abstracts based on selected criteria and check for duplicate scheduling
     const availableAbstracts = abstracts.filter(a =>
         (!formData.subject || a.subject === formData.subject) &&
         (!formData.type || a.type === formData.type) &&
         (!formData.mode || a.mode === formData.mode) &&
-        // Show if not already assigned to another session? In mock, we don't track assignment state explicitly on abstract, 
-        // but we could filter out abstracts that are in 'sessions' list.
-        // For now, let's just show all matching ones.
-        true
+        // Exclude if scheduled in a different session
+        !sessions.some(s => s.id !== editingSession?.id && s.abstractIds?.includes(a.id))
     );
 
     return (
@@ -287,7 +358,7 @@ export default function SessionManagement() {
                     <Button variant="outline" onClick={handleAutoScheduleClick}>
                         <Users className="w-4 h-4 mr-2" /> Auto-Schedule
                     </Button>
-                    <Button onClick={() => setIsDialogOpen(true)}>
+                    <Button onClick={() => { setEditingSession(null); setFormData({ name: "", subject: "", type: "", mode: "", date: "", time: "", venue: "", judges: [], abstractIds: [] }); setIsDialogOpen(true); }}>
                         <Plus className="w-4 h-4 mr-2" /> Schedule Session
                     </Button>
                 </div>
@@ -310,10 +381,23 @@ export default function SessionManagement() {
                                     <SelectValue placeholder="Select Mode" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="Online">Online</SelectItem>
+                                    <SelectItem value="Online" disabled={localStorage.getItem("enable_online_scheduling") !== "true"}>
+                                        Online {localStorage.getItem("enable_online_scheduling") !== "true" && "(Disabled by Admin)"}
+                                    </SelectItem>
                                     <SelectItem value="Offline">Offline</SelectItem>
                                 </SelectContent>
                             </Select>
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="customCapacity">Delegates / Students Per Session</Label>
+                            <Input
+                                id="customCapacity"
+                                type="number"
+                                min={1}
+                                max={50}
+                                value={customCapacity}
+                                onChange={(e) => setCustomCapacity(Math.max(1, parseInt(e.target.value) || 1))}
+                            />
                         </div>
                     </div>
                     <DialogFooter>
@@ -422,9 +506,35 @@ export default function SessionManagement() {
                                 <FileText className="w-4 h-4 text-muted-foreground" />
                                 <span>{session.abstractIds.length} Presentations</span>
                             </div>
-                            <Button variant="destructive" size="sm" className="w-full mt-2" onClick={() => handleDelete(session.id)}>
-                                <Trash2 className="w-4 h-4 mr-2" /> Cancel Session
-                            </Button>
+                            <div className="flex flex-col gap-2 mt-3">
+                                <div className="flex gap-2">
+                                    {session.status === "completed" ? (
+                                        <Button 
+                                            variant="default" 
+                                            size="sm" 
+                                            className="w-full bg-green-600 hover:bg-green-700" 
+                                            onClick={() => navigate("/dashboard/core-team/results")}
+                                        >
+                                            <Trophy className="w-4 h-4 mr-2" /> View Result
+                                        </Button>
+                                    ) : (
+                                        <>
+                                            <Button variant="outline" size="sm" className="flex-1 text-xs px-2.5" onClick={() => handleEdit(session)}>
+                                                <Edit className="w-3.5 h-3.5 mr-1 shrink-0" /> Edit
+                                            </Button>
+                                            <Button variant="outline" size="sm" className="flex-1 text-xs px-2.5" onClick={() => handleOpenCriteriaEditor(session)}>
+                                                <FileText className="w-3.5 h-3.5 mr-1 shrink-0" /> Criteria
+                                            </Button>
+                                            <Button variant="outline" size="sm" className="flex-1 text-xs px-2.5" onClick={() => setViewingStatusSession(session)}>
+                                                <Users className="w-3.5 h-3.5 mr-1 shrink-0" /> Status
+                                            </Button>
+                                        </>
+                                    )}
+                                </div>
+                                <Button variant="destructive" size="sm" className="w-full" onClick={() => handleDelete(session.id)}>
+                                    <Trash2 className="w-4 h-4 mr-2" /> {session.status === "completed" ? "Delete Record" : "Cancel"}
+                                </Button>
+                            </div>
                         </CardContent>
                     </Card>
                 ))}
@@ -433,17 +543,22 @@ export default function SessionManagement() {
             <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
                 <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
                     <DialogHeader>
-                        <DialogTitle>Schedule New Session</DialogTitle>
+                        <DialogTitle>{editingSession ? "Edit Session" : "Schedule New Session"}</DialogTitle>
                     </DialogHeader>
                     <div className="grid gap-6 py-4">
                         <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-2">
                                 <Label>Session Name</Label>
-                                <Input placeholder="e.g. Oral Path Session A" value={formData.name} onChange={e => updateForm("name", e.target.value)} />
+                                <Input placeholder="e.g. Oral Path Session A" value={formData.name || ""} onChange={e => updateForm("name", e.target.value)} />
                             </div>
                             <div className="space-y-2">
                                 <Label>Subject</Label>
-                                <Select onValueChange={(val) => updateForm("subject", val)}>
+                                <Select value={formData.subject || ""} onValueChange={(val) => {
+                                    updateForm("subject", val);
+                                    // Also try to find the event configuration to auto-link
+                                    const event = events.find(e => e.name === val && e.type === formData.type && e.mode === formData.mode);
+                                    if (event) updateForm("eventId", event.id);
+                                }}>
                                     <SelectTrigger>
                                         <SelectValue placeholder="Select Subject" />
                                     </SelectTrigger>
@@ -454,7 +569,11 @@ export default function SessionManagement() {
                             </div>
                             <div className="space-y-2">
                                 <Label>Type</Label>
-                                <Select onValueChange={(val) => updateForm("type", val)}>
+                                <Select value={formData.type || ""} onValueChange={(val) => {
+                                    updateForm("type", val);
+                                    const event = events.find(e => e.name === formData.subject && e.type === val && e.mode === formData.mode);
+                                    if (event) updateForm("eventId", event.id);
+                                }}>
                                     <SelectTrigger>
                                         <SelectValue placeholder="Type" />
                                     </SelectTrigger>
@@ -465,7 +584,11 @@ export default function SessionManagement() {
                             </div>
                             <div className="space-y-2">
                                 <Label>Mode</Label>
-                                <Select onValueChange={(val) => updateForm("mode", val)}>
+                                <Select value={formData.mode || ""} onValueChange={(val) => {
+                                    updateForm("mode", val);
+                                    const event = events.find(e => e.name === formData.subject && e.type === formData.type && e.mode === val);
+                                    if (event) updateForm("eventId", event.id);
+                                }}>
                                     <SelectTrigger>
                                         <SelectValue placeholder="Mode" />
                                     </SelectTrigger>
@@ -476,15 +599,15 @@ export default function SessionManagement() {
                             </div>
                             <div className="space-y-2">
                                 <Label>Date</Label>
-                                <Input type="date" onChange={e => updateForm("date", e.target.value)} />
+                                <Input type="date" value={formData.date || ""} onChange={e => updateForm("date", e.target.value)} />
                             </div>
                             <div className="space-y-2">
                                 <Label>Time</Label>
-                                <Input type="time" onChange={e => updateForm("time", e.target.value)} />
+                                <Input type="time" value={formData.time || ""} onChange={e => updateForm("time", e.target.value)} />
                             </div>
                             <div className="space-y-2 col-span-2">
                                 <Label>Venue / Link</Label>
-                                <Input placeholder="e.g. Hall 1 or Zoom Link" onChange={e => updateForm("venue", e.target.value)} />
+                                <Input placeholder="e.g. Hall 1 or Zoom Link" value={formData.venue || ""} onChange={e => updateForm("venue", e.target.value)} />
                             </div>
                         </div>
 
@@ -535,7 +658,157 @@ export default function SessionManagement() {
                         </div>
                     </div>
                     <DialogFooter>
-                        <Button onClick={handleCreate}>Create Session</Button>
+                        <Button onClick={handleSaveSession} disabled={isSubmitting}>
+                            {isSubmitting ? (editingSession ? "Saving..." : "Creating...") : (editingSession ? "Save Changes" : "Create Session")}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* Criteria Editor Dialog */}
+            <Dialog open={!!editingCriteriaSession} onOpenChange={(val) => !val && setEditingCriteriaSession(null)}>
+                <DialogContent className="max-w-2xl">
+                    <DialogHeader>
+                        <DialogTitle>Edit Judging Criteria</DialogTitle>
+                        <DialogDescription>
+                            Define the scoring rubric for "{editingCriteriaSession?.name}".
+                        </DialogDescription>
+                    </DialogHeader>
+                    
+                    <div className="space-y-4 py-4">
+                        <div className="grid grid-cols-12 gap-4 font-semibold text-sm text-muted-foreground px-2">
+                            <div className="col-span-6">Criteria Name</div>
+                            <div className="col-span-3">Max Score</div>
+                            <div className="col-span-2">Weight %</div>
+                            <div className="col-span-1"></div>
+                        </div>
+                        
+                        <div className="space-y-3 max-h-[40vh] overflow-y-auto px-1">
+                            {tempCriterias.map((c) => (
+                                <div key={c.id} className="grid grid-cols-12 gap-4 items-center">
+                                    <div className="col-span-6">
+                                        <Input 
+                                            placeholder="Criteria Name" 
+                                            value={c.name} 
+                                            onChange={(e) => updateCriteriaField(c.id, "name", e.target.value)} 
+                                        />
+                                    </div>
+                                    <div className="col-span-3">
+                                        <Input 
+                                            type="number" 
+                                            value={c.maxScore} 
+                                            onChange={(e) => updateCriteriaField(c.id, "maxScore", Number(e.target.value))} 
+                                        />
+                                    </div>
+                                    <div className="col-span-2">
+                                        <Input 
+                                            type="number" 
+                                            value={c.weightage} 
+                                            onChange={(e) => updateCriteriaField(c.id, "weightage", Number(e.target.value))} 
+                                        />
+                                    </div>
+                                    <div className="col-span-1">
+                                        <Button variant="ghost" size="icon" onClick={() => handleRemoveCriteria(c.id)}>
+                                            <Trash2 className="w-4 h-4 text-destructive" />
+                                        </Button>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+
+                        <Button variant="outline" className="w-full border-dashed" onClick={handleAddCriteria}>
+                            <Plus className="w-4 h-4 mr-2" /> Add Criteria Item
+                        </Button>
+
+                        <div className="flex justify-between items-center p-3 bg-slate-50 rounded-lg border">
+                            <span className="font-bold">Total Weightage</span>
+                            <Badge variant={tempCriterias.reduce((s, c) => s + Number(c.weightage), 0) === 100 ? "default" : "destructive"}>
+                                {tempCriterias.reduce((s, c) => s + Number(c.weightage), 0)}%
+                            </Badge>
+                        </div>
+                    </div>
+
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setEditingCriteriaSession(null)}>Cancel</Button>
+                        <Button onClick={handleSaveCriteria}>Save Criteria</Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* Session Status Detail Dialog */}
+            <Dialog open={!!viewingStatusSession} onOpenChange={(val) => !val && setViewingStatusSession(null)}>
+                <DialogContent className="max-w-md rounded-2xl">
+                    <DialogHeader>
+                        <DialogTitle>Session Real-time Status</DialogTitle>
+                        <DialogDescription>
+                            {viewingStatusSession?.name} • {viewingStatusSession?.subject}
+                        </DialogDescription>
+                    </DialogHeader>
+                    {viewingStatusSession && (() => {
+                        // Find session participants and map them
+                        const sessionAbstracts = abstracts.filter(a => viewingStatusSession.abstractIds && viewingStatusSession.abstractIds.includes(a.id));
+                        const attendedSubIds = (viewingStatusSession as any)._attendedSubmissionIds || [];
+                        const presentAbstracts = sessionAbstracts.filter(a => attendedSubIds.includes(a.id));
+                        const absentAbstracts = sessionAbstracts.filter(a => !attendedSubIds.includes(a.id));
+
+                        return (
+                            <div className="space-y-4 py-4">
+                                <div className="grid grid-cols-3 gap-2 text-center">
+                                    <div className="bg-slate-50 border rounded-xl p-3">
+                                        <p className="text-2xl font-black text-slate-900">{sessionAbstracts.length}</p>
+                                        <p className="text-xs font-semibold text-slate-500">Total</p>
+                                    </div>
+                                    <div className="bg-green-50 border border-green-100 rounded-xl p-3">
+                                        <p className="text-2xl font-black text-green-700">{presentAbstracts.length}</p>
+                                        <p className="text-xs font-semibold text-green-600">Present</p>
+                                    </div>
+                                    <div className="bg-red-50 border border-red-100 rounded-xl p-3">
+                                        <p className="text-2xl font-black text-red-700">{absentAbstracts.length}</p>
+                                        <p className="text-xs font-semibold text-red-600">Absent</p>
+                                    </div>
+                                </div>
+
+                                <div className="flex flex-col gap-1 bg-primary/5 p-3 rounded-xl border border-primary/10">
+                                    <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Currently Presenting</span>
+                                    <span className="font-bold text-primary flex items-center gap-2">
+                                        {viewingStatusSession.currentPresenterId ? (
+                                            <>
+                                                <span className="w-2.5 h-2.5 bg-red-600 rounded-full animate-ping" />
+                                                {students.find(s => s.id === viewingStatusSession.currentPresenterId)?.participantName || "Active Presenter"}
+                                            </>
+                                        ) : (
+                                            "No active presenter"
+                                        )}
+                                    </span>
+                                </div>
+
+                                <div className="space-y-2 border rounded-xl p-3 bg-slate-50 max-h-[250px] overflow-y-auto">
+                                    <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Participant List</p>
+                                    {sessionAbstracts.map(a => {
+                                        const isPresent = attendedSubIds.includes(a.id);
+                                        const isPres = viewingStatusSession.currentPresenterId === a.studentId;
+                                        const studentObj = students.find(s => s.id === a.studentId);
+                                        return (
+                                            <div key={a.id} className="flex justify-between items-center text-sm p-2 rounded-lg bg-white border">
+                                                <div className="flex flex-col">
+                                                    <span className="font-semibold text-slate-800">{studentObj?.participantName || studentObj?.name || "Unknown"}</span>
+                                                    <span className="text-[10px] text-slate-400 truncate max-w-[200px]">{studentObj?.college}</span>
+                                                </div>
+                                                <div className="flex gap-1">
+                                                    {isPres && <Badge className="bg-accent text-accent-foreground text-[10px]">Live</Badge>}
+                                                    <Badge className={isPresent ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}>
+                                                        {isPresent ? "Present" : "Absent"}
+                                                    </Badge>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        );
+                    })()}
+                    <DialogFooter>
+                        <Button onClick={() => setViewingStatusSession(null)}>Close</Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>

@@ -3,6 +3,7 @@ import { useState } from "react";
 import { Link, useLocation, useNavigate, Routes, Route, Navigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
+import { useProgram } from "@/contexts/ProgramContext";
 import { Button } from "@/components/ui/button";
 import {
   Stethoscope, LogOut, Menu, X, LayoutDashboard,
@@ -26,12 +27,16 @@ const navItems = [
 
 export default function StudentDashboard() {
   const { user, logout } = useAuth();
+  const { currentProgram } = useProgram();
   const location = useLocation();
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   if (!user) return <Navigate to="/member-login" />;
 
+  const isIcon = currentProgram === 'ICON';
+  const delegateType = (user as any).delegateType;
+  
   // Determine if student has full access (Approved by staff AND Paid)
   const isApproved = user.approvalStatus === 'APPROVED';
   const isPaid = user.paymentStatus === 'PAID';
@@ -41,6 +46,20 @@ export default function StudentDashboard() {
     logout();
     navigate("/");
   };
+
+  const getDashboardBadgeLabel = () => {
+    if (!isIcon) return "Student Dashboard";
+    if (delegateType === 'PG') return "Postgraduate Dashboard";
+    if (delegateType === 'Faculty') return "Faculty Dashboard";
+    if (delegateType === 'Clinician') return "Clinician Dashboard";
+    return "ICON Portal";
+  };
+
+  const activeColor = isIcon ? "bg-[#b91c1c]" : "bg-[#004d40]";
+  const shadowColor = isIcon ? "shadow-[#b91c1c]/25" : "shadow-[#004d40]/25";
+  const badgeColor = isIcon 
+    ? "bg-red-950/40 border-red-800/40 text-red-300" 
+    : "bg-[#004d40]/30 border-[#004d40]/40 text-emerald-300";
 
   return (
     <div className="min-h-screen flex bg-slate-50">
@@ -53,17 +72,25 @@ export default function StudentDashboard() {
       >
         {/* Brand */}
         <div className="flex items-center gap-3 h-16 px-5 border-b border-white/10 shrink-0">
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#004d40] to-[#2e7d32] flex items-center justify-center">
-            <Stethoscope className="w-4 h-4 text-white" />
-          </div>
-          <span className="text-lg font-bold tracking-tight">MIDAS</span>
+          {isIcon ? (
+            <div className="w-8 h-8 rounded-lg overflow-hidden flex items-center justify-center bg-white/10 p-0.5">
+              <img src="/icon_logo.png" alt="Madras ICON Logo" className="w-full h-full object-contain" />
+            </div>
+          ) : (
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-red-600 to-red-800 flex items-center justify-center">
+              <Stethoscope className="w-4 h-4 text-white" />
+            </div>
+          )}
+          <span className="text-lg font-bold tracking-tight">
+            {isIcon ? 'Madras ICON' : 'MIDAS'}
+          </span>
         </div>
 
         {/* Role badge */}
         <div className="px-5 py-3">
-          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[#004d40]/30 border border-[#004d40]/40 text-xs font-semibold text-emerald-300 uppercase tracking-wider">
+          <div className={cn("inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border text-xs font-semibold uppercase tracking-wider", badgeColor)}>
             <LayoutDashboard className="w-3 h-3" />
-            Student Dashboard
+            {getDashboardBadgeLabel()}
           </div>
         </div>
 
@@ -98,22 +125,27 @@ export default function StudentDashboard() {
                 className={cn(
                   "flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200",
                   isActive
-                    ? "bg-[#004d40] text-white shadow-lg shadow-[#004d40]/25"
+                    ? `${activeColor} text-white shadow-lg ${shadowColor}`
                     : "text-white/60 hover:bg-white/5 hover:text-white"
                 )}
               >
                 {item.icon}
                 {item.label}
-                {isActive && <div className="ml-auto w-1.5 h-1.5 rounded-full bg-emerald-400" />}
+                {isActive && <div className={cn("ml-auto w-1.5 h-1.5 rounded-full", isIcon ? "bg-red-400" : "bg-emerald-400")} />}
               </Link>
             );
           })}
         </nav>
 
+        {/* Ad Box */}
+        <div className="px-3 py-2 mx-3 my-4 rounded-xl border border-white/10 overflow-hidden bg-slate-950/40 flex items-center justify-center">
+          <img src="/silver.png" alt="Advertisement" className="w-full h-auto rounded-lg object-contain" />
+        </div>
+
         {/* User + Sign Out */}
         <div className="p-4 border-t border-white/10 space-y-3">
           <div className="flex items-center gap-3 px-2">
-            <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#004d40] to-[#2e7d32] flex items-center justify-center text-xs font-bold">
+            <div className={cn("w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold bg-gradient-to-br", isIcon ? "from-red-700 to-red-500" : "from-[#004d40] to-[#2e7d32]")}>
               {user.name?.charAt(0)?.toUpperCase() || "S"}
             </div>
             <div className="flex-1 min-w-0">
@@ -143,15 +175,21 @@ export default function StudentDashboard() {
       {/* ─── MAIN CONTENT ─── */}
       <div className="flex-1 lg:pl-64">
         {/* Top bar */}
-        <header className="sticky top-0 z-20 h-14 flex items-center gap-3 px-4 border-b border-slate-200 bg-white/80 backdrop-blur-md">
-          <button className="lg:hidden text-slate-600" onClick={() => setSidebarOpen(true)}>
-            <Menu className="w-5 h-5" />
-          </button>
-          <Button variant="ghost" size="sm" className="hidden lg:inline-flex text-slate-500" onClick={() => navigate("/")}>
-            <ChevronLeft className="w-4 h-4 mr-1" /> Home
-          </Button>
-          <div className="flex-1" />
-          <span className="text-xs text-slate-400 font-medium">MIDAS Student Portal</span>
+        <header className="sticky top-0 z-20 h-14 flex items-center justify-between px-4 border-b border-slate-200 bg-white/80 backdrop-blur-md">
+          <div className="flex items-center gap-3">
+            <button className="lg:hidden text-slate-600" onClick={() => setSidebarOpen(true)}>
+              <Menu className="w-5 h-5" />
+            </button>
+            <Button variant="ghost" size="sm" className="hidden lg:inline-flex text-slate-500" onClick={() => navigate("/")}>
+              <ChevronLeft className="w-4 h-4 mr-1" /> Home
+            </Button>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <span className="text-xs text-slate-400 font-medium hidden sm:inline">
+              {currentProgram === 'ICON' ? 'Madras ICON Professional Portal' : 'MIDAS Student Portal'}
+            </span>
+          </div>
         </header>
 
         {/* Page content */}

@@ -35,23 +35,26 @@ import { Student } from "@/types";
 import { useToast } from "@/hooks/use-toast";
 import { Textarea } from "@/components/ui/textarea";
 
+import { useProgram } from "@/contexts/ProgramContext";
+
 export default function RegistrationApprovals() {
     const { user } = useAuth();
+    const { currentProgram } = useProgram();
     const { toast } = useToast();
     const [searchQuery, setSearchQuery] = useState("");
     const [rejectDialog, setRejectDialog] = useState(false);
     const [selectedStudent, setSelectedStudent] = useState<any | null>(null);
     const [rejectionReason, setRejectionReason] = useState("");
-    const [students, setStudents] = useState<Student[]>([]); // Renamed from 'users' to 'students'
-    const [isRejecting, setIsRejecting] = useState(false); // New state variable
+    const [students, setStudents] = useState<Student[]>([]); 
+    const [isRejecting, setIsRejecting] = useState(false); 
 
     useEffect(() => {
         loadStudents();
-    }, [user]); // Dependency array changed to [user]
+    }, [user, currentProgram]); 
 
     const loadStudents = async () => {
         try {
-            const data = await getEventStudents();
+            const data = await getEventStudents(currentProgram);
             // If the user is a staff coordinator, only show students from their college
             if (user?.role === 'staff' && user.college) {
                 setStudents(data.filter((s: Student) => s.college === user.college));
@@ -65,11 +68,11 @@ export default function RegistrationApprovals() {
     };
 
     // Filter registrations linked to this staff's college
-    // This filter is now applied on the already potentially filtered 'students' state
     const staffCollege = user?.college;
     const pendingStudents = students.filter(s =>
-        (s.college === staffCollege || !staffCollege) && // !staffCollege allows admin to see all
-        s.approvalStatus === "PENDING"
+        (s.college === staffCollege || !staffCollege) && 
+        s.approvalStatus === "PENDING" &&
+        s.program === currentProgram
     );
 
     const handleApprove = async (student: any) => {
@@ -187,7 +190,10 @@ export default function RegistrationApprovals() {
                                     </TableCell>
                                     <TableCell>
                                         <div className="text-sm">{student.year || "3rd Year"}</div>
-                                        <div className="text-xs text-muted-foreground">UG Delegate</div>
+                                        <div className="text-xs text-muted-foreground">
+                                            {student.program === 'ICON' ? (student as any).delegateType : 'UG Delegate'}
+                                            {(student as any).dciNumber && ` • DCI: ${(student as any).dciNumber}`}
+                                        </div>
                                     </TableCell>
                                     <TableCell>{student.mobile}</TableCell>
                                     <TableCell>

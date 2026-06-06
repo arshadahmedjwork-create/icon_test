@@ -23,16 +23,18 @@ import { getEvents, addEvent, updateEvent, deleteEvent } from "@/services/supaba
 import { Event, EvaluationCriteria } from "@/types";
 import { useToast } from "@/hooks/use-toast";
 import { Plus, Trash2, Edit, Calendar, Users, Settings, PlusCircle } from "lucide-react";
+import { useProgram } from "@/contexts/ProgramContext";
 
 export default function AdminEventMaster() {
     const [events, setEvents] = useState<Event[]>([]);
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const [editingEvent, setEditingEvent] = useState<Event | null>(null);
     const { toast } = useToast();
+    const { currentProgram } = useProgram();
 
     // Form State
     const [name, setName] = useState("");
-    const [type, setType] = useState("Paper Presentation");
+    const [type, setType] = useState("Paper");
     const [mode, setMode] = useState("Online");
     const [capacity, setCapacity] = useState<number>(20);
     const [rules, setRules] = useState("");
@@ -46,11 +48,11 @@ export default function AdminEventMaster() {
 
     useEffect(() => {
         loadEvents();
-    }, []);
+    }, [currentProgram]);
 
     const loadEvents = async () => {
         try {
-            const data = await getEvents();
+            const data = await getEvents(currentProgram);
             setEvents(data);
         } catch (error) {
             console.error("Failed to load events", error);
@@ -71,9 +73,9 @@ export default function AdminEventMaster() {
             setCriterias(event.criterias || []);
         } else {
             setEditingEvent(null);
-            setName("");
-            setType("Paper Presentation");
-            setMode("Online");
+            setName(currentProgram === 'ICON' ? "Postgraduate Presentation" : "");
+            setType("Paper");
+            setMode(currentProgram === 'ICON' ? "Offline" : "Online");
             setCapacity(20);
             setRules("");
             setJudgeInstructions("");
@@ -94,10 +96,14 @@ export default function AdminEventMaster() {
         }
 
         const eventData = {
-            name, type, mode, capacity, rules, judgeInstructions,
+            name,
+            type: type,
+            mode: currentProgram === 'ICON' ? "OFFLINE" : mode.toUpperCase(),
+            capacity, rules, judgeInstructions,
             abstractDeadline: abstractDeadline ? new Date(abstractDeadline).toISOString() : null as any,
             presentationDeadline: presentationDeadline ? new Date(presentationDeadline).toISOString() : null as any,
-            criterias
+            criterias,
+            program: currentProgram
         };
 
         try {
@@ -145,8 +151,8 @@ export default function AdminEventMaster() {
         <div className="space-y-6">
             <div className="flex justify-between items-center border-b pb-4">
                 <div>
-                    <h2 className="text-2xl font-bold font-display">Event Master</h2>
-                    <p className="text-muted-foreground">Create and manage dynamic conference events, capacities, and rules.</p>
+                    <h2 className="text-2xl font-bold font-display">{currentProgram === 'ICON' ? 'ICON' : 'MIDAS'} Event Master</h2>
+                    <p className="text-muted-foreground">Create and manage {currentProgram === 'ICON' ? 'Madras ICON' : 'MIDAS'} conference events, capacities, and rules.</p>
                 </div>
                 <Button onClick={() => handleOpenDialog()} className="gap-2">
                     <Plus className="w-4 h-4" /> Create New Event
@@ -220,30 +226,55 @@ export default function AdminEventMaster() {
 
                             <div className="space-y-2">
                                 <Label>Event Name</Label>
-                                <Input placeholder="e.g. Undergrad Poster Presentation" value={name} onChange={e => setName(e.target.value)} />
+                                {currentProgram === 'ICON' ? (
+                                    <select
+                                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                                        value={name}
+                                        onChange={e => setName(e.target.value)}
+                                    >
+                                        <option value="">Select Event Category</option>
+                                        <option value="Postgraduate Presentation">Postgraduate Presentation</option>
+                                        <option value="Faculty Presentation">Faculty Presentation</option>
+                                        <option value="Clinician Presentation">Clinician Presentation</option>
+                                    </select>
+                                ) : (
+                                    <Input placeholder="e.g. Undergrad Poster Presentation" value={name} onChange={e => setName(e.target.value)} />
+                                )}
                             </div>
 
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="space-y-2">
                                     <Label>Presentation Type</Label>
                                     <select className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" value={type} onChange={e => setType(e.target.value)}>
-                                        <option value="Paper Presentation">Paper</option>
-                                        <option value="Poster Presentation">Poster</option>
-                                        <option value="Table Clinic">Table Clinic</option>
+                                        <option value="Paper">Paper</option>
+                                        <option value="Poster">Poster</option>
                                     </select>
                                 </div>
                                 <div className="space-y-2">
                                     <Label>Execution Mode</Label>
-                                    <select className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" value={mode} onChange={e => setMode(e.target.value)}>
-                                        <option value="Online">Online</option>
-                                        <option value="Offline">Offline</option>
-                                        <option value="Hybrid">Hybrid</option>
+                                    <select
+                                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm disabled:opacity-60"
+                                        value={currentProgram === 'ICON' ? 'Offline' : mode}
+                                        onChange={e => setMode(e.target.value)}
+                                        disabled={currentProgram === 'ICON'}
+                                    >
+                                        {currentProgram === 'ICON' ? (
+                                            <>
+                                                <option value="Offline">Offline</option>
+                                                <option value="Online" disabled>Online (Coming Soon)</option>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <option value="Online">Online</option>
+                                                <option value="Offline">Offline</option>
+                                            </>
+                                        )}
                                     </select>
                                 </div>
                             </div>
 
                             <div className="space-y-2">
-                                <Label>Capacity (Students per session block)</Label>
+                                <Label>Capacity (Participant per session)</Label>
                                 <Input type="number" value={capacity} onChange={e => setCapacity(parseInt(e.target.value) || 0)} />
                             </div>
 

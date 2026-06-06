@@ -5,7 +5,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Lock, Eye, EyeOff, ShieldCheck } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
-import { comparePassword, updateMemberPassword } from "@/services/supabaseService";
+import { comparePassword, updateMemberPassword, updateStudentPassword } from "@/services/supabaseService";
 import { useToast } from "@/hooks/use-toast";
 
 export default function ChangePasswordModal() {
@@ -36,27 +36,34 @@ export default function ChangePasswordModal() {
 
         setIsSubmitting(true);
         try {
-            // Verify old password by fetching member and comparing
+            const isStudent = user.role === 'student';
+            const table = isStudent ? 'event_students' : 'members';
+
+            // Verify old password by fetching record and comparing
             const { supabase } = await import("@/lib/supabaseClient");
-            const { data: member } = await supabase
-                .from('members')
+            const { data: record } = await supabase
+                .from(table)
                 .select('password')
                 .eq('id', user.id)
                 .single();
 
-            if (!member) {
-                setError("User not found");
+            if (!record) {
+                setError("User account not found");
                 return;
             }
 
-            const isValid = await comparePassword(oldPassword, member.password);
+            const isValid = await comparePassword(oldPassword, record.password);
             if (!isValid) {
                 setError("Current password is incorrect");
                 return;
             }
 
             // Update password
-            await updateMemberPassword(user.id, newPassword);
+            if (isStudent) {
+                await updateStudentPassword(user.id, newPassword);
+            } else {
+                await updateMemberPassword(user.id, newPassword);
+            }
 
             // Clear the flag in context
             clearMustChangePassword();

@@ -127,9 +127,54 @@ export async function getAdminAuditLog(): Promise<AuditEntry[]> {
     }));
 }
 
-/**
- * Check if there is an active admin session in this tab.
- */
 export function hasActiveAdminSession(): boolean {
     return sessionStorage.getItem(SESSION_KEY) !== null;
+}
+
+/**
+ * Log a structural action (Create/Update/Delete) by an Admin or Core Team member.
+ */
+export async function logAction(
+    action: string, 
+    resourceType: string, 
+    resourceId?: string, 
+    metadata: any = {}
+): Promise<void> {
+    // Current user context
+    const userJson = localStorage.getItem("midas_user");
+    if (!userJson) return;
+
+    try {
+        const user = JSON.parse(userJson);
+        const { error } = await supabase.from('action_logs').insert({
+            actor_id: user.id,
+            actor_name: user.name,
+            actor_role: user.role,
+            action,
+            resource_type: resourceType,
+            resource_id: resourceId,
+            metadata
+        });
+
+        if (error) console.error("Failed to log action:", error);
+    } catch (e) {
+        console.error("Error parsing user for audit log:", e);
+    }
+}
+
+/**
+ * Get the full action log (structural changes).
+ */
+export async function getActionLogs(): Promise<any[]> {
+    const { data, error } = await supabase
+        .from('action_logs')
+        .select('*')
+        .order('timestamp', { ascending: false });
+
+    if (error) {
+        console.error("Failed to fetch action logs:", error);
+        return [];
+    }
+
+    return data;
 }

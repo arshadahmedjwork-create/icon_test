@@ -68,23 +68,21 @@ export const CertificateGenerator = {
 
         await Promise.all(winnerPromises);
 
-        // 2. Participation (Everyone else who attended)
+        // 2. Participation (All present attendees)
         const attendees = session.attendanceRecords || [];
 
         const participationPromises = attendees.map(async studentId => {
-            if (!winners.find(w => w.studentId === studentId)) {
-                const cert: Certificate = {
-                    id: crypto.randomUUID(),
-                    userId: studentId,
-                    sessionId: session.id,
-                    type: "participation",
-                    generatedAt: now,
-                    emailSent: false,
-                    downloadUrl: `${TEMPLATES.PARTICIPATION}?student=${studentId}`
-                };
-                await addCertificate(cert);
-                generated.push(cert);
-            }
+            const cert: Certificate = {
+                id: crypto.randomUUID(),
+                userId: studentId,
+                sessionId: session.id,
+                type: "participation",
+                generatedAt: now,
+                emailSent: false,
+                downloadUrl: `${TEMPLATES.PARTICIPATION}?student=${studentId}`
+            };
+            await addCertificate(cert);
+            generated.push(cert);
         });
 
         await Promise.all(participationPromises);

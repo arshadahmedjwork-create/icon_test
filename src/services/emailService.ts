@@ -17,14 +17,14 @@
 // ─── EmailJS Configuration ───────────────────────────────────────────────────
 
 const EMAILJS_CONFIG = {
-    publicKey: import.meta.env.VITE_EMAILJS_PUBLIC_KEY || 'YOUR_EMAILJS_PUBLIC_KEY',
-    serviceId: import.meta.env.VITE_EMAILJS_SERVICE_ID || 'service_midas',
+    publicKey: import.meta.env.VITE_EMAILJS_PUBLIC_KEY || 'lrlURJI71d3rcNXHt',
+    serviceId: import.meta.env.VITE_EMAILJS_SERVICE_ID || 'service_q8vimpl',
     templates: {
-        registration: 'template_h87xu0d',
+        registration: 'template_rt3pe6e',
         allocation: 'template_midas_alloc',  // Single unified template
         acceptance: 'template_midas_accpt',  // Provisional acceptance
-        approval: 'template_h87xu0d',    // Staff Approval with Temp Password
-        account_creation: 'template_h87xu0d', // For Judges, Core Team, etc.
+        approval: 'template_rt3pe6e',    // Staff Approval with Temp Password
+        account_creation: 'template_rt3pe6e', // For Judges, Core Team, etc.
     },
 };
 
@@ -61,6 +61,32 @@ export interface AccountCreationEmailData {
     user_email: string;
     temp_password: string;
     login_url: string;
+    role?: string;
+}
+
+export async function sendAccountCreationEmail(data: AccountCreationEmailData) {
+    console.log('[EmailService] Sending account creation credentials to:', data.user_email);
+    
+    // Choose template based on role:
+    // UG, PG, Student, Faculty, Clinician use template_rt3pe6e (student welcome)
+    // Judge, Volunteer, Core Team, Admin, Staff Coordinator use template_h87xu0d (staff welcome)
+    const normalizedRole = (data.role || '').toLowerCase();
+    const isStaffRole = ['judge', 'volunteer', 'core_team', 'core_scientific_team', 'staff_coordinator', 'staff', 'admin'].some(r => normalizedRole.includes(r));
+    
+    const templateId = isStaffRole ? 'template_h87xu0d' : 'template_rt3pe6e';
+    
+    const templateParams = {
+        to_email: data.user_email,
+        student_email: data.user_email,
+        to_name: data.user_name,
+        user_name: data.user_name,
+        student_name: data.user_name,
+        role: normalizedRole.replace('_', ' '),
+        temp_password: data.temp_password,
+        login_url: data.login_url,
+    };
+    
+    return sendEmailJS(templateId, templateParams);
 }
 
 export interface AllocationEmailData {
@@ -89,23 +115,42 @@ export interface AllocationEmailData {
 // ─── QR Code URL Generator ──────────────────────────────────────────────────
 
 export function generateQRCodeUrl(
-    midasId: string,
+    id: string,
     studentName: string,
     college: string,
-    size: number = 300
+    size: number = 300,
+    program: string = 'MIDAS'
 ): string {
-    const payload = `MIDAS|${midasId}|${studentName}|${college}`;
+    const payload = `${program}|${id}|${studentName}|${college}`;
     const encodedPayload = encodeURIComponent(payload);
     return `https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&data=${encodedPayload}&format=png&margin=10&color=1a1a2e&bgcolor=ffffff`;
 }
 
-// ─── MIDAS ID Generator ─────────────────────────────────────────────────────
+// ─── ID Generator ─────────────────────────────────────────────────────
 
 let clientSequence = 0;
-export function generateMidasId(existingCount?: number): string {
+export function generateMidasId(base?: string | number, program: string = 'MIDAS'): string {
     const year = new Date().getFullYear();
-    const seq = (existingCount ?? ++clientSequence).toString().padStart(4, '0');
-    return `MIDAS-${year}-${seq}`;
+    const prefix = program === 'ICON' ? 'ICON' : 'MIDAS';
+    let nextSeq = 1;
+
+    if (typeof base === 'number') {
+        nextSeq = base + 1;
+    } else if (typeof base === 'string') {
+        // Extract sequence from "PREFIX-YYYY-XXXX"
+        const parts = base.split('-');
+        if (parts.length === 3) {
+            const lastSeq = parseInt(parts[2], 10);
+            if (!isNaN(lastSeq)) {
+                nextSeq = lastSeq + 1;
+            }
+        }
+    } else {
+        nextSeq = ++clientSequence;
+    }
+
+    const seqStr = nextSeq.toString().padStart(4, '0');
+    return `${prefix}-${year}-${seqStr}`;
 }
 
 // ─── Mode-Specific HTML Builders (Client-side) ──────────────────────────────
@@ -183,21 +228,27 @@ export async function sendProvisionalAcceptanceEmail(data: ProvisionalAcceptance
     return sendEmailJS(EMAILJS_CONFIG.templates.acceptance, data as unknown as Record<string, string>);
 }
 
+export interface AbstractStatusEmailData {
+    student_name: string;
+    student_email: string;
+    abstract_title: string;
+    status: string;
+    remarks: string;
+    program: string;
+    login_url: string;
+}
+
+export async function sendAbstractStatusEmail(data: AbstractStatusEmailData) {
+    console.log('[EmailService] Sending abstract evaluation status email to:', data.student_email);
+    return sendEmailJS('template_n4x2ljs', data as unknown as Record<string, string>);
+}
+
 export async function sendApprovalEmail(data: ApprovalEmailData) {
     console.log('[EmailService] Sending registration approval to:', data.student_email);
     return sendEmailJS(EMAILJS_CONFIG.templates.approval, data as unknown as Record<string, string>);
 }
 
-export async function sendAccountCreationEmail(data: AccountCreationEmailData) {
-    console.log('[EmailService] Sending account creation email to:', data.user_email);
-    const payload = {
-        student_name: data.user_name,
-        student_email: data.user_email,
-        temp_password: data.temp_password,
-        login_url: data.login_url
-    };
-    return sendEmailJS(EMAILJS_CONFIG.templates.account_creation, payload as unknown as Record<string, string>);
-}
+
 
 export async function sendAllocationEmail(data: AllocationEmailData) {
     const isOnline = data.mode.toLowerCase() === 'online';

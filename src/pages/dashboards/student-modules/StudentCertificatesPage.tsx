@@ -1,11 +1,21 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
-    Award, Download, Trophy, Medal, Star, Loader2
+    Award, Download, Trophy, Medal, Star, Loader2, Sparkles, CheckCircle2
 } from "lucide-react";
+import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+} from "@/components/ui/dialog";
+import { useAuth } from "@/contexts/AuthContext";
+import { useProgram } from "@/contexts/ProgramContext";
+import { getCertificates, getSessions } from "@/services/supabaseService";
+import { generateSignedUrl } from "@/services/signedUrlHelper";
 
 interface CertificateItem {
     id: string;
@@ -53,46 +63,89 @@ const certConfig = {
     },
 };
 
-const mockCertificates: CertificateItem[] = [
-    {
-        id: "cert-1", eventName: "Paper Presentation — Prosthodontics", eventType: "PAPER",
-        eventDate: "2026-03-15", participated: true, prizePosition: "1st",
-        certificateType: "WINNER", fileUrl: null,
-    },
-    {
-        id: "cert-2", eventName: "Poster Presentation — Endodontics", eventType: "POSTER",
-        eventDate: "2026-03-16", participated: true, prizePosition: "2nd",
-        certificateType: "RUNNER_UP", fileUrl: null,
-    },
-    {
-        id: "cert-3", eventName: "Quiz Competition — Dental Sciences", eventType: "QUIZ",
-        eventDate: "2026-03-17", participated: true, prizePosition: "3rd",
-        certificateType: "SECOND_RUNNER_UP", fileUrl: null,
-    },
-    {
-        id: "cert-4", eventName: "Workshop — Digital Dentistry", eventType: "WORKSHOP",
-        eventDate: "2026-03-18", participated: true, prizePosition: null,
-        certificateType: "PARTICIPATION", fileUrl: null,
-    },
-];
-
 export default function StudentCertificatesPage() {
-    const [certificates] = useState(mockCertificates);
+    const { user } = useAuth();
+    const { currentProgram } = useProgram();
+    const [certificates, setCertificates] = useState<CertificateItem[]>([]);
+    const [loading, setLoading] = useState(true);
     const [generating, setGenerating] = useState<string | null>(null);
 
+    useEffect(() => {
+        const loadCertificates = async () => {
+            if (user) {
+                try {
+                    const [allCerts, allSessions] = await Promise.all([
+                        getCertificates(),
+                        getSessions(currentProgram)
+                    ]);
+                    
+                    const myCerts = allCerts.filter(c => c.userId === user.id);
+                    
+                    const mapped: CertificateItem[] = myCerts.map(c => {
+                        const session = allSessions.find(s => s.id === c.sessionId);
+                        
+                        let prizePos = null;
+                        if (c.rank === 1) prizePos = "1st";
+                        else if (c.rank === 2) prizePos = "2nd";
+                        else if (c.rank === 3) prizePos = "3rd";
+                        
+                        let certType: any = "PARTICIPATION";
+                        if (c.type === "winner") {
+                            if (c.rank === 1) certType = "WINNER";
+                            else if (c.rank === 2) certType = "RUNNER_UP";
+                            else if (c.rank === 3) certType = "SECOND_RUNNER_UP";
+                        }
+                        
+                        return {
+                            id: c.id,
+                            eventName: session?.name || `Participation Certificate - ${c.id.slice(0, 8)}`,
+                            eventType: session?.type || "EVENT",
+                            eventDate: session?.date || c.generatedAt || new Date().toISOString(),
+                            participated: true,
+                            prizePosition: prizePos,
+                            certificateType: certType,
+                            fileUrl: c.downloadUrl
+                        };
+                    });
+                    
+                    setCertificates(mapped);
+                } catch (e) {
+                    console.error("Failed to load certificates:", e);
+                } finally {
+                    setLoading(false);
+                }
+            }
+        };
+        loadCertificates();
+    }, [user, currentProgram]);
+
     const handleDownload = (cert: CertificateItem) => {
-        setGenerating(cert.id);
-        setTimeout(() => {
-            setGenerating(null);
-            toast.success(`Certificate for "${cert.eventName}" downloaded!`);
-        }, 2000);
+        const signedUrl = generateSignedUrl(cert.id);
+        window.open(signedUrl, "_blank");
+        toast.success("Downloading official PDF certificate...");
     };
+
+    if (loading) {
+        return (
+            <div className="flex flex-col items-center justify-center p-24 text-center space-y-4">
+                <Loader2 className="w-8 h-8 animate-spin text-[#004d40]" />
+                <p className="text-slate-500 text-sm">Retrieving your dynamic certificates...</p>
+            </div>
+        );
+    }
 
     return (
         <div className="space-y-6">
-            <div>
-                <h1 className="text-2xl font-bold text-slate-900">Certificates</h1>
-                <p className="text-sm text-slate-500 mt-1">Download certificates for events you participated in or won.</p>
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div>
+                    <h1 className="text-2xl font-bold text-slate-900">Certificates</h1>
+                    <p className="text-sm text-slate-500 mt-1">Download certificates for events you participated in or won.</p>
+                </div>
+
+                {/* Header Ad Box */}
+                <div className="flex-grow bg-white border border-slate-150 rounded-2xl overflow-hidden shadow-sm flex items-center justify-center h-[110px]">
+                    <img src="/gold.png" alt="Gold Sponsor" className="w-full h-full object-contain p-1" />
+                </div>
             </div>
 
             {/* Certificate Types Legend */}

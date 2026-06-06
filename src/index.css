@@ -62,12 +62,27 @@
     --shadow-elevated: 0 12px 40px -8px hsl(174 62% 30% / 0.15);
   }
 
+  .theme-icon {
+    --primary: 0 65% 35%;
+    --ring: 0 65% 35%;
+    --sidebar-primary: 0 65% 45%;
+    --sidebar-ring: 0 65% 45%;
+
+    --gradient-primary: linear-gradient(135deg, hsl(0, 65%, 35%), hsl(10, 70%, 45%));
+    --gradient-accent: linear-gradient(135deg, hsl(20, 90%, 55%), hsl(10, 85%, 50%));
+    --gradient-hero: linear-gradient(160deg, hsl(0, 25%, 8%) 0%, hsl(10, 40%, 15%) 50%, hsl(0, 50%, 20%) 100%);
+
+    --shadow-soft: 0 2px 15px -3px hsl(0 65% 35% / 0.1), 0 4px 6px -4px hsl(0 65% 35% / 0.05);
+    --shadow-card: 0 1px 3px hsl(0 25% 10% / 0.06), 0 6px 16px hsl(0 25% 10% / 0.04);
+    --shadow-elevated: 0 12px 40px -8px hsl(0 65% 35% / 0.15);
+  }
+
   .dark {
     --background: 200 25% 6%;
     --foreground: 180 10% 95%;
     --card: 200 20% 10%;
     --card-foreground: 180 10% 95%;
-    --popover: 200 20% 10%;
+    --popover: 200 20% 10%; 
     --popover-foreground: 180 10% 95%;
     --primary: 174 55% 45%;
     --primary-foreground: 200 25% 6%;

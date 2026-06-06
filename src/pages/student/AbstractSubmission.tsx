@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { useAuth } from "@/contexts/AuthContext";
-import { addAbstract, getEvents } from "@/services/supabaseService";
+import { addAbstract, getEvents, uploadAbstractFile } from "@/services/supabaseService";
+import { useProgram } from "@/contexts/ProgramContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -25,16 +26,19 @@ interface AbstractData {
 
 export default function AbstractSubmission({ onComplete }: { onComplete: () => void }) {
     const { user } = useAuth();
+    const { currentProgram } = useProgram();
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [events, setEvents] = useState<Event[]>([]);
+    
+    const isIcon = currentProgram === 'ICON';
 
     useEffect(() => {
         const loadConfig = async () => {
-            const c = await getEvents();
+            const c = await getEvents(currentProgram);
             setEvents(c);
         };
         loadConfig();
-    }, []);
+    }, [currentProgram]);
 
     const { register, handleSubmit, formState: { errors }, setValue, watch } = useForm<AbstractData>();
     const selectedType = watch("type");
@@ -44,6 +48,15 @@ export default function AbstractSubmission({ onComplete }: { onComplete: () => v
         setIsSubmitting(true);
 
         try {
+            const fileInput = document.getElementById('abstractFile') as HTMLInputElement;
+            const file = fileInput?.files?.[0];
+            let fileUrl = "https://mock-s3-bucket/abstract.pdf"; // Default mock
+
+            if (file) {
+                const uploadedUrl = await uploadAbstractFile(user.id, file);
+                if (uploadedUrl) fileUrl = uploadedUrl;
+            }
+
             const newAbstract: Omit<Abstract, "id" | "submittedAt" | "status"> = {
                 studentId: user.id,
                 title: data.title,
@@ -54,7 +67,7 @@ export default function AbstractSubmission({ onComplete }: { onComplete: () => v
                 mentorName: data.mentorName,
                 coAuthors: data.coAuthors ? data.coAuthors.split(",").map(s => s.trim()) : [],
                 coAuthorMidasIds: data.coAuthorMidasIds ? data.coAuthorMidasIds.split(",").map(s => s.trim()) : [],
-                fileUrl: "https://mock-s3-bucket/abstract.pdf", // Mock URL - In real app, upload first then get URL
+                fileUrl: fileUrl,
                 feedback: ""
             } as any;
 
@@ -145,8 +158,8 @@ export default function AbstractSubmission({ onComplete }: { onComplete: () => v
                                     if (!value) return true;
                                     const count = value.split(",").filter(s => s.trim().length > 0).length;
                                     const type = watch("type");
-                                    if (type === "Poster Presentation" && count > 0) return "Co-authors not allowed for Poster Presentation";
-                                    if (type === "Paper Presentation" && count > 2) return "Max 2 co-authors allowed for Paper Presentation";
+                                    if ((type === "Poster" || type === "Poster Presentation") && count > 0) return "Co-authors not allowed for Poster Presentation";
+                                    if ((type === "Paper" || type === "Paper Presentation") && count > 2) return "Max 2 co-authors allowed for Paper Presentation";
                                     return true;
                                 }
                             })}
@@ -156,9 +169,9 @@ export default function AbstractSubmission({ onComplete }: { onComplete: () => v
                         {errors.coAuthors && <p className="text-xs text-destructive">{errors.coAuthors.message}</p>}
                     </div>
 
-                    {selectedType === "Paper Presentation" && (
+                    {(selectedType === "Paper" || selectedType === "Paper Presentation") && (
                         <div className="space-y-2">
-                            <Label htmlFor="coAuthorMidasIds">Co-Authors MIDAS IDs (if any)</Label>
+                            <Label htmlFor="coAuthorMidasIds">Co-Authors {isIcon ? 'ICON' : 'MIDAS'} IDs (if any)</Label>
                             <Input
                                 id="coAuthorMidasIds"
                                 {...register("coAuthorMidasIds", {
@@ -169,9 +182,9 @@ export default function AbstractSubmission({ onComplete }: { onComplete: () => v
                                         return true;
                                     }
                                 })}
-                                placeholder="E.g. MIDAS-2026-0001, MIDAS-2026-0002"
+                                placeholder={isIcon ? "E.g. ICON-2026-0001" : "E.g. MIDAS-2026-0001"}
                             />
-                            <p className="text-xs text-muted-foreground">Must be valid MIDAS IDs of registered students.</p>
+                            <p className="text-xs text-muted-foreground">Must be valid {isIcon ? 'ICON' : 'MIDAS'} IDs of registered students.</p>
                             {errors.coAuthorMidasIds && <p className="text-xs text-destructive">{errors.coAuthorMidasIds.message}</p>}
                         </div>
                     )}

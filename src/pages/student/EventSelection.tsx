@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
+import { useProgram } from "@/contexts/ProgramContext";
 import { getEventConfig, getEventStudents, updateEventStudent } from "@/services/supabaseService";
 import { Student, EventConfig } from "@/types";
 import { Button } from "@/components/ui/button";
@@ -19,6 +20,7 @@ interface EventOption {
 
 export default function EventSelection() {
     const { user } = useAuth();
+    const { currentProgram } = useProgram();
     const { toast } = useToast();
     const [config, setConfig] = useState<EventConfig | null>(null);
     const [eventOptions, setEventOptions] = useState<EventOption[]>([]);
@@ -28,7 +30,7 @@ export default function EventSelection() {
         const loadData = async () => {
             if (!user) return;
 
-            const eventConfig = await getEventConfig();
+            const eventConfig = await getEventConfig(currentProgram);
             if (!eventConfig) return;
             setConfig(eventConfig);
 
@@ -42,7 +44,7 @@ export default function EventSelection() {
 
             // Generate all possible event combinations
             // This is heavy. In real app, consider caching stats or using a view.
-            const allStudents = await getEventStudents();
+            const allStudents = await getEventStudents(currentProgram);
 
             const options: EventOption[] = [];
             eventConfig.subjects.forEach(subject => {
@@ -52,11 +54,19 @@ export default function EventSelection() {
                         const capacity = eventConfig.capacities[capacityKey] || 12;
 
                         // Count current enrollments
-                        const enrolled = allStudents.filter(s =>
-                            s.selectedEvents?.some(e =>
-                                e.subject === subject && e.type === type && e.mode === mode
-                            )
-                        ).length;
+                        const enrolled = allStudents.filter(s => {
+                            let selections = s.selectedEvents;
+                            if (typeof selections === 'string') {
+                                try { selections = JSON.parse(selections); } catch { return false; }
+                            }
+                            if (!selections || !Array.isArray(selections)) return false;
+                            
+                            return selections.some(e =>
+                                e.subject?.toString().trim().toLowerCase() === subject.trim().toLowerCase() && 
+                                e.type?.toString().trim().toLowerCase() === type.trim().toLowerCase() && 
+                                e.mode?.toString().trim().toLowerCase() === mode.trim().toLowerCase()
+                            );
+                        }).length;
 
                         options.push({ subject, type, mode, capacity, enrolled });
                     });
@@ -67,7 +77,7 @@ export default function EventSelection() {
         };
 
         loadData();
-    }, [user]);
+    }, [user, currentProgram]);
 
     const handleSelectEvent = async (event: EventOption) => {
         if (!user) return;

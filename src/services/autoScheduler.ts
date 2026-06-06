@@ -2,13 +2,17 @@ import {
     Session,
     Abstract,
     Judge,
-    EventConfig
+    EventConfig,
+    Program
 } from "@/types";
 
 interface SchedulerConfig {
     abstracts: Abstract[];
     judges: Judge[];
     config: EventConfig;
+    events: any[];
+    program: Program;
+    customCapacity?: number;
 }
 
 export interface ScheduleResult {
@@ -18,45 +22,54 @@ export interface ScheduleResult {
 }
 
 /**
- * MIDAS Auto-Scheduler Service
+ * MIDAS & ICON Auto-Scheduler Service
  * Automates session creation based on abstract grouping and judge availability.
  * Enforces:
  * 1. SRS Capacity Rules (varies by Mode/Type)
  * 2. Max 2 students per college per session
- * 3. Judge Composition (1 Academic + 2 Non-Academic)
+ * 3. Judge Composition (1 Academic + 1 Non-Academic)
  * 4. Conflict of Interest (Judge College !== ANY Student College in the session)
  */
 export class AutoScheduler {
     private abstracts: Abstract[];
     private judges: Judge[];
     private config: EventConfig;
+    private events: any[];
+        private program: Program;
+    private customCapacity?: number;
     private warnings: string[] = [];
 
-    constructor({ abstracts, judges, config }: SchedulerConfig) {
-        // Only accept approved abstracts
-        this.abstracts = abstracts.filter(a => a.status === "approved" || a.status === "completed" as any);
-        this.judges = judges.filter(j => j.status === "Available");
+    constructor({ abstracts, judges, config, events, program, customCapacity }: SchedulerConfig) {
+        this.program = program;
+        this.customCapacity = customCapacity;
+        // Only accept approved abstracts for the current program
+        this.abstracts = abstracts.filter(a => 
+            (a.status === "approved" || a.status === "completed" as any) && 
+            a.program === program
+        );
+        // Only accept judges for the current program
+        this.judges = judges.filter(j => j.status === "Available" && j.program === program);
         this.config = config;
+        this.events = events;
     }
 
     public generateSchedule(targetMode: "Online" | "Offline"): ScheduleResult {
-        const generatedSessions: Session[] = [];
-        const unassigned: Abstract[] = [];
-
-        // 1. Filter by Target Mode
-        const modeAbstracts = this.abstracts.filter(a => a.mode.toLowerCase() === targetMode.toLowerCase());
-
-        if (modeAbstracts.length === 0) {
-            this.warnings.push(`No approved ${targetMode} abstracts found to schedule.`);
+        // Enforce ICON is Offline only for now
+        if (this.program === 'ICON' && targetMode === 'Online') {
+            this.warnings.push(`Madras ICON is currently OFFLINE only. Online scheduling is disabled.`);
             return { sessions: [], unassignedAbstracts: [], warnings: this.warnings };
         }
+
+        const generatedSessions: Session[] = [];
+        const unassigned: Abstract[] = [];
+        const modeAbstracts = this.abstracts.filter(a => a.mode.toLowerCase() === targetMode.toLowerCase());
 
         // 2. Group by Subject + Type (Mode is already filtered)
         const groups = this.groupAbstracts(modeAbstracts);
 
-        // 3. Process each group (Subject + Type)
+        // 3. Process each group (Subject + Type + DelegateType)
         for (const [groupKey, groupAbstracts] of Object.entries(groups)) {
-            const { subject, type } = this.parseGroupKey(groupKey);
+            const { subject, type, delegateType } = this.parseGroupKey(groupKey);
             const capacity = this.getCapacity(targetMode, type);
 
             // 4. Distribute into session buckets enforcing College limits
@@ -66,10 +79,11 @@ export class AutoScheduler {
             buckets.forEach((bucket, index) => {
                 try {
                     const assignedJudges = this.assignJudges(subject, bucket);
+                    const delegateLabel = delegateType && delegateType !== 'UG' ? ` (${delegateType})` : '';
 
                     const session: Session = {
                         id: crypto.randomUUID(),
-                        name: `${subject} - ${type} (${targetMode}) - Session ${index + 1}`,
+                        name: `${subject} - ${type}${delegateLabel} (${targetMode}) - Session ${index + 1}`,
                         subject,
                         type,
                         mode: targetMode,
@@ -78,7 +92,9 @@ export class AutoScheduler {
                         venue: targetMode === "Online" ? "Zoom Link TBD" : "Hall TBD",
                         judges: assignedJudges.map(j => j.id),
                         abstractIds: bucket.map(a => a.id),
-                        status: "scheduled"
+                        eventId: this.events.find(e => e.name === subject && e.type === type && e.mode === targetMode)?.id,
+                        status: "scheduled",
+                        program: this.program
                     };
 
                     // Attach names for the preview UI (we will strip this before saving)
@@ -107,7 +123,8 @@ export class AutoScheduler {
     private groupAbstracts(abstracts: Abstract[]): Record<string, Abstract[]> {
         const groups: Record<string, Abstract[]> = {};
         for (const abs of abstracts) {
-            const key = `${abs.subject}|${abs.type}`; // Mode is uniform for the run
+            const delegateType = (abs as any).delegateType || 'UG';
+            const key = `${abs.subject}|${abs.type}|${delegateType}`; // Mode is uniform for the run
             if (!groups[key]) groups[key] = [];
             groups[key].push(abs);
         }
@@ -115,11 +132,17 @@ export class AutoScheduler {
     }
 
     private parseGroupKey(key: string) {
-        const [subject, type] = key.split('|');
-        return { subject, type };
+        const [subject, type, delegateType] = key.split('|');
+        return { subject, type, delegateType };
     }
 
     private getCapacity(mode: string, type: string): number {
+        if (this.customCapacity) {
+            return this.customCapacity;
+        }
+        if (this.program === 'ICON') {
+            return 4; // Max 4 delegates per session for ICON
+        }
         // Mappings based on MIDAS requirements
         // Type: Paper -> online: 12, offline: 8
         // Type: Poster -> online: 15, offline: 12
@@ -167,14 +190,14 @@ export class AutoScheduler {
     }
 
     /**
-     * Assigns exactly 1 Academic Judge and 2 Non-Academic judges.
+     * Assigns exactly 1 Academic Judge and 1 Non-Academic judge.
      * Enforces Conflict of Interest: Judge college != ANY student college in the bucket.
      */
     private assignJudges(subject: string, bucket: Abstract[]): Judge[] {
         // Collect all student colleges in the bucket to check for conflicts
         const studentColleges = new Set(bucket.map(a => a.college || 'Unknown').filter(c => c !== 'Unknown'));
 
-        // Filter by Subject/Specialization first for academic
+        // Strictly filter judges by Subject/Specialization
         const eligibleJudges = this.judges.filter(j => j.specialization === subject);
 
         // Helper to check conflict
@@ -184,17 +207,7 @@ export class AutoScheduler {
         };
 
         const academicCandidates = eligibleJudges.filter(j => j.type === "Academic" && !hasConflict(j));
-
-        // Find Non-Academic: prefer specialization match, but fallback to any without conflict
-        let nonAcademicCandidates = eligibleJudges.filter(j => j.type === "Non-Academic" && !hasConflict(j));
-        if (nonAcademicCandidates.length < 2) {
-            const fallbackNonAcademic = this.judges.filter(j =>
-                j.type === "Non-Academic" &&
-                !hasConflict(j) &&
-                !nonAcademicCandidates.some(c => c.id === j.id)
-            );
-            nonAcademicCandidates = [...nonAcademicCandidates, ...fallbackNonAcademic];
-        }
+        const nonAcademicCandidates = eligibleJudges.filter(j => j.type === "Non-Academic" && !hasConflict(j));
 
         const assigned: Judge[] = [];
 
@@ -204,11 +217,10 @@ export class AutoScheduler {
             assigned.push(academicCandidates[0]);
         }
 
-        if (nonAcademicCandidates.length < 2) {
-            this.warnings.push(`Insufficient Non-Academic Judges for ${subject} without college conflicts. Found: ${nonAcademicCandidates.length}, Needed: 2.`);
-            assigned.push(...nonAcademicCandidates);
+        if (nonAcademicCandidates.length < 1) {
+            this.warnings.push(`Insufficient Non-Academic Judges for ${subject} without college conflicts. Found: ${nonAcademicCandidates.length}, Needed: 1.`);
         } else {
-            assigned.push(nonAcademicCandidates[0], nonAcademicCandidates[1]);
+            assigned.push(nonAcademicCandidates[0]);
         }
 
         return assigned;

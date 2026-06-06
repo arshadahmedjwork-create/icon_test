@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useNavigate } from "react-router-dom";
 import { User, Abstract, Deadline } from "@/types";
+import { useProgram } from "@/contexts/ProgramContext";
 
 export default function StaffOverview() {
     const { user } = useAuth();
@@ -20,17 +21,18 @@ export default function StaffOverview() {
     const [deadlines, setDeadlines] = useState<Deadline[]>([]);
 
     const staffCollege = user?.college || "Your College";
+    const { currentProgram } = useProgram();
 
     useEffect(() => {
         const loadData = async () => {
-            const query = supabase.from('event_students').select('*');
+            const query = supabase.from('event_students').select('*').eq('program', currentProgram);
             if (staffCollege !== "Your College" && staffCollege) {
                 query.eq('college', staffCollege);
             }
 
             const [studentsRes, fetchedAbstracts, fetchedDeadlines] = await Promise.all([
                 query,
-                getAbstracts(),
+                getAbstracts(currentProgram),
                 getDeadlines()
             ]);
 
@@ -39,7 +41,7 @@ export default function StaffOverview() {
             setDeadlines(fetchedDeadlines);
         };
         loadData();
-    }, [staffCollege]);
+    }, [staffCollege, currentProgram]);
 
 
     const pendingRegistrations = allStudents.filter((s) => s.approvalStatus === "PENDING");

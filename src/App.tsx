@@ -12,8 +12,10 @@ import StudentDashboard from "./pages/dashboards/StudentDashboard";
 import StudentEventDashboard from "./pages/dashboards/StudentEventDashboard";
 import JudgeDashboard from "./pages/dashboards/JudgeDashboard";
 import VolunteerDashboard from "./pages/dashboards/VolunteerDashboard";
+import CertificateVerification from "./pages/CertificateVerification";
 import NotFound from "./pages/NotFound";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
+import { ProgramProvider } from "@/contexts/ProgramContext";
 import ChangePasswordModal from "./components/ChangePasswordModal";
 
 const AuthModalWrapper = () => {
@@ -33,21 +35,24 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <AuthProvider>
-          <AuthModalWrapper />
-          <Routes>
-            <Route path="/" element={<Navigate to="/member-login" replace />} />
-            <Route path="/login" element={<Navigate to="/member-login" replace />} />
-            <Route path="/member-login" element={<MemberLoginPage />} />
-            <Route path="/student-registration" element={<StudentRegistrationPage />} />
-            <Route path="/dashboard/admin/*" element={<AdminDashboard />} />
-            <Route path="/dashboard/core-team/*" element={<CoreTeamDashboard />} />
-            <Route path="/dashboard/staff/*" element={<StaffDashboard />} />
-            <Route path="/dashboard/student/*" element={<StudentDashboard />} />
-            <Route path="/dashboard/student-event/*" element={<StudentEventDashboard />} />
-            <Route path="/dashboard/judge/*" element={<JudgeDashboard />} />
-            <Route path="/dashboard/volunteer/*" element={<VolunteerDashboard />} />
-            <Route path="*" element={<NotFound />} />
-          </Routes>
+          <ProgramProvider>
+            <AuthModalWrapper />
+            <Routes>
+              <Route path="/" element={<Navigate to="/member-login" replace />} />
+              <Route path="/login" element={<Navigate to="/member-login" replace />} />
+              <Route path="/member-login" element={<MemberLoginPage />} />
+              <Route path="/student-registration" element={<StudentRegistrationPage />} />
+              <Route path="/certificate/verify/:certificateId" element={<CertificateVerification />} />
+              <Route path="/dashboard/admin/*" element={<AdminDashboard />} />
+              <Route path="/dashboard/core-team/*" element={<CoreTeamDashboard />} />
+              <Route path="/dashboard/staff/*" element={<StaffDashboard />} />
+              <Route path="/dashboard/student/*" element={<StudentDashboard />} />
+              <Route path="/dashboard/student-event/*" element={<StudentEventDashboard />} />
+              <Route path="/dashboard/judge/*" element={<JudgeDashboard />} />
+              <Route path="/dashboard/volunteer/*" element={<VolunteerDashboard />} />
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </ProgramProvider>
         </AuthProvider>
       </BrowserRouter>
     </TooltipProvider>

@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { getDashboardStats } from "@/services/supabaseService";
+import { useProgram } from "@/contexts/ProgramContext";
 
 interface RecentRegistration {
     id: string;
@@ -18,6 +19,8 @@ interface RecentRegistration {
 
 export default function AdminOverview() {
     const navigate = useNavigate();
+    const { currentProgram } = useProgram();
+    const isIcon = currentProgram === 'ICON';
     const [stats, setStats] = useState([
         { label: "Total Registrations", value: "0", change: "+0%", icon: Users, trend: "neutral" },
         { label: "Payments Collected", value: "₹0", change: "+0%", icon: BarChart3, trend: "neutral" },
@@ -29,7 +32,7 @@ export default function AdminOverview() {
     useEffect(() => {
         const loadDashboard = async () => {
             try {
-                const data = await getDashboardStats();
+                const data = await getDashboardStats(currentProgram);
 
                 setStats([
                     { label: "Total Registrations", value: data.totalStudents.toString(), change: "+12%", icon: Users, trend: "up" },
@@ -44,7 +47,7 @@ export default function AdminOverview() {
             }
         };
         loadDashboard();
-    }, []);
+    }, [currentProgram]);
 
     const quickActions = [
         { label: "Add Judge", icon: Plus, action: () => navigate("/dashboard/admin/judges?action=add") },
@@ -68,8 +71,8 @@ export default function AdminOverview() {
     return (
         <div className="space-y-6">
             <div className="flex flex-col gap-1">
-                <h1 className="font-display text-2xl font-bold tracking-tight">Admin Dashboard</h1>
-                <p className="text-muted-foreground">Welcome back. Here's what's happening today.</p>
+                <h1 className="font-display text-2xl font-bold tracking-tight">{isIcon ? 'Madras ICON' : 'MIDAS'} Admin Dashboard</h1>
+                <p className="text-muted-foreground">Welcome back. Here's what's happening with {isIcon ? 'Madras ICON' : 'MIDAS'} today.</p>
             </div>
 
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">

@@ -48,9 +48,14 @@ const stats = [
   { value: "80%", label: "Time Saved" },
 ];
 
+import { useProgram } from "@/contexts/ProgramContext";
+
 export default function LandingPage() {
   const navigate = useNavigate();
+  const { currentProgram } = useProgram();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  const isIcon = currentProgram === 'ICON';
 
   return (
     <div className="min-h-screen bg-background">
@@ -61,7 +66,9 @@ export default function LandingPage() {
             <div className="w-9 h-9 rounded-lg bg-gradient-primary flex items-center justify-center">
               <Stethoscope className="w-5 h-5 text-primary-foreground" />
             </div>
-            <span className="font-display text-xl font-bold text-foreground">MIDAS</span>
+            <span className="font-display text-xl font-bold text-foreground">
+              {isIcon ? "Madras ICON" : "MIDAS"}
+            </span>
           </Link>
 
           <div className="hidden md:flex items-center gap-8">
@@ -72,7 +79,9 @@ export default function LandingPage() {
 
           <div className="hidden md:flex items-center gap-3">
             <Button variant="ghost" size="sm" onClick={() => navigate("/member-login")}>Member Login</Button>
-            <Button variant="hero" size="sm" onClick={() => navigate("/student-registration")}>Event Registration</Button>
+            <Button variant="hero" size="sm" onClick={() => navigate("/student-registration")}>
+              {isIcon ? "Delegate Registration" : "Event Registration"}
+            </Button>
           </div>
 
           <button className="md:hidden text-foreground" onClick={() => setMobileMenuOpen(!mobileMenuOpen)}>
@@ -87,7 +96,7 @@ export default function LandingPage() {
             <a href="#roles" className="block text-sm text-muted-foreground" onClick={() => setMobileMenuOpen(false)}>Roles</a>
             <div className="pt-2 flex gap-2">
               <Button variant="outline" size="sm" className="flex-1" onClick={() => navigate("/member-login")}>Member Login</Button>
-              <Button variant="hero" size="sm" className="flex-1" onClick={() => navigate("/student-registration")}>Event Registration</Button>
+              <Button variant="hero" size="sm" className="flex-1" onClick={() => navigate("/student-registration")}>Registration</Button>
             </div>
           </div>
         )}
@@ -114,18 +123,23 @@ export default function LandingPage() {
               <span className="text-xs font-medium text-primary">Scientific Event Management</span>
             </div>
             <h1 className="font-display text-4xl sm:text-5xl lg:text-6xl font-bold leading-tight mb-6">
-              <span className="text-primary-foreground">Manage dental symposiums </span>
+              <span className="text-primary-foreground">
+                {isIcon ? "Empowering Clinicians " : "Manage dental symposiums "}
+              </span>
               <span className="text-gradient-primary">with precision</span>
             </h1>
             <p className="text-lg text-primary-foreground/70 max-w-xl mb-8 leading-relaxed">
-              MIDAS digitizes the complete lifecycle of inter-college dental scientific events — from registration to certificates, all in one platform.
+              {isIcon 
+                ? "Madras ICON is the premier platform for postgraduates and faculty to showcase research, engage in peer review, and elevate scientific standards."
+                : "MIDAS digitizes the complete lifecycle of inter-college dental scientific events — from registration to certificates, all in one platform."
+              }
             </p>
             <div className="flex flex-wrap gap-4">
-              <Button variant="hero" size="xl" onClick={() => navigate("/member-login")} className="bg-[#004d40] hover:bg-[#003d33]">
+              <Button variant="hero" size="xl" onClick={() => navigate("/member-login")}>
                 Member Login <ArrowRight className="w-5 h-5 ml-2" />
               </Button>
-              <Button variant="outline-hero" size="xl" onClick={() => navigate("/student-registration")} className="border-[#004d40] text-[#004d40] hover:bg-[#004d40]/10">
-                UG Delegate Registration
+              <Button variant="outline-hero" size="xl" onClick={() => navigate("/student-registration")} className="border-primary-foreground/50 text-primary-foreground hover:bg-white/10">
+                {isIcon ? "Professional Registration" : "UG Delegate Registration"}
               </Button>
             </div>
           </motion.div>
@@ -209,7 +223,7 @@ export default function LandingPage() {
               { role: "Admin", desc: "Full system control, analytics, and master data management.", color: "bg-primary/10 text-primary" },
               { role: "Core Team", desc: "Session planning, judge allocation, and event monitoring.", color: "bg-accent/20 text-accent-foreground" },
               { role: "Staff Coordinator", desc: "Verify registrations and scrutinize abstracts for your college.", color: "bg-primary/10 text-primary" },
-              { role: "Student", desc: "Register, pay, submit abstracts, and receive certificates.", color: "bg-accent/20 text-accent-foreground" },
+              { role: "Delegate", desc: "Register, pay, submit research, and receive certificates.", color: "bg-accent/20 text-accent-foreground" },
               { role: "Judge", desc: "Evaluate presentations with structured digital scoring.", color: "bg-primary/10 text-primary" },
               { role: "Volunteer", desc: "Manage attendance and presentations on the ground.", color: "bg-accent/20 text-accent-foreground" },
             ].map((item, i) => (
@@ -239,9 +253,9 @@ export default function LandingPage() {
           >
             <h2 className="font-display text-3xl md:text-4xl font-bold mb-4">Ready to modernize your events?</h2>
             <p className="text-muted-foreground max-w-md mx-auto mb-8">
-              Start managing inter-college dental symposiums with the efficiency they deserve.
+              Start managing scientific symposiums with the efficiency they deserve.
             </p>
-            <Button variant="hero" size="xl" onClick={() => navigate("/login")}>
+            <Button variant="hero" size="xl" onClick={() => navigate("/member-login")}>
               Get Started Now <ArrowRight className="w-5 h-5" />
             </Button>
           </motion.div>
@@ -255,9 +269,11 @@ export default function LandingPage() {
             <div className="w-7 h-7 rounded-md bg-gradient-primary flex items-center justify-center">
               <Stethoscope className="w-4 h-4 text-primary-foreground" />
             </div>
-            <span className="font-display text-sm font-semibold text-foreground">MIDAS</span>
+            <span className="font-display text-sm font-semibold text-foreground">
+              {isIcon ? "Madras ICON" : "MIDAS"}
+            </span>
           </div>
-          <p className="text-xs text-muted-foreground">© 2026 MIDAS. Scientific Event Management System.</p>
+          <p className="text-xs text-muted-foreground">© 2026 {isIcon ? "Madras ICON" : "MIDAS"}. Scientific Event Management System.</p>
         </div>
       </footer>
     </div>

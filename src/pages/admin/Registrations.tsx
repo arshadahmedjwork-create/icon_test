@@ -23,6 +23,7 @@ import { sendApprovalEmail } from "@/services/emailService";
 import bcrypt from "bcryptjs";
 import { Student } from "@/types";
 import { useToast } from "@/hooks/use-toast";
+import { useProgram } from "@/contexts/ProgramContext";
 
 export default function AdminRegistrations() {
     const [students, setStudents] = useState<Student[]>([]);
@@ -30,14 +31,16 @@ export default function AdminRegistrations() {
     const [statusFilter, setStatusFilter] = useState("ALL");
     const [paymentFilter, setPaymentFilter] = useState("ALL");
     const { toast } = useToast();
+    const { currentProgram } = useProgram();
+    const isIcon = currentProgram === 'ICON';
 
     useEffect(() => {
         loadData();
-    }, []);
+    }, [currentProgram]);
 
     const loadData = async () => {
         try {
-            const data = await getEventStudents();
+            const data = await getEventStudents(currentProgram);
             setStudents(data);
         } catch (error) {
             console.error("Failed to load students", error);
@@ -58,7 +61,8 @@ export default function AdminRegistrations() {
 
             await updateEventStudent(id, {
                 approvalStatus: "APPROVED",
-                password: hashedPassword
+                password: hashedPassword,
+                mustChangePassword: true
             });
 
             // Send Email
@@ -96,7 +100,7 @@ export default function AdminRegistrations() {
     };
 
     const handleExport = () => {
-        const headers = ["MIDAS ID", "Name", "Email", "Phone", "College", "Payment Status", "Approval Status", "Date"];
+        const headers = [isIcon ? "ICON ID" : "MIDAS ID", "Name", "Email", "Phone", "College", "Payment Status", "Approval Status", "Date"];
         const csvContent = [
             headers.join(","),
             ...filteredStudents.map(s => [
@@ -137,7 +141,7 @@ export default function AdminRegistrations() {
         <div className="space-y-6">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                 <div>
-                    <h2 className="text-2xl font-bold font-display">Registration Management</h2>
+                    <h2 className="text-2xl font-bold font-display">{isIcon ? 'ICON' : 'MIDAS'} Registration Management</h2>
                     <p className="text-muted-foreground">View and approve student registrations.</p>
                 </div>
                 <Button variant="outline" size="sm" onClick={handleExport}>
@@ -149,7 +153,7 @@ export default function AdminRegistrations() {
                 <div className="flex items-center gap-2 flex-1">
                     <Search className="w-4 h-4 text-muted-foreground" />
                     <Input
-                        placeholder="Search by name, email or MIDAS ID..."
+                        placeholder={`Search by name, email or ${isIcon ? 'ICON' : 'MIDAS'} ID...`}
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
                         className="max-w-sm"
@@ -186,9 +190,15 @@ export default function AdminRegistrations() {
                     <TableHeader>
                         <TableRow>
                             <TableHead>Student</TableHead>
-                            <TableHead>Contact</TableHead>
+                            <TableHead>Contact / Mobile</TableHead>
                             <TableHead>College</TableHead>
                             <TableHead>Bonafide</TableHead>
+                            {isIcon && (
+                                <>
+                                    <TableHead>DCI Number</TableHead>
+                                    <TableHead>DCI Certificate</TableHead>
+                                </>
+                            )}
                             <TableHead>Payment</TableHead>
                             <TableHead>Status</TableHead>
                             <TableHead className="text-right">Actions</TableHead>
@@ -197,7 +207,7 @@ export default function AdminRegistrations() {
                     <TableBody>
                         {filteredStudents.length === 0 ? (
                             <TableRow>
-                                <TableCell colSpan={6} className="text-center h-24 text-muted-foreground">
+                                <TableCell colSpan={isIcon ? 9 : 7} className="text-center h-24 text-muted-foreground">
                                     No registrations found.
                                 </TableCell>
                             </TableRow>
@@ -210,7 +220,7 @@ export default function AdminRegistrations() {
                                     </TableCell>
                                     <TableCell>
                                         <div className="text-sm">{student.email}</div>
-                                        <div className="text-xs text-muted-foreground">{student.phone}</div>
+                                        <div className="text-xs font-semibold text-slate-700 mt-0.5">{student.phone || "—"}</div>
                                     </TableCell>
                                     <TableCell className="max-w-[200px] truncate" title={student.college}>
                                         {student.college}
@@ -224,6 +234,22 @@ export default function AdminRegistrations() {
                                             <span className="text-xs text-muted-foreground italic">Not uploaded</span>
                                         )}
                                     </TableCell>
+                                    {isIcon && (
+                                        <>
+                                            <TableCell className="font-mono text-sm">
+                                                {student.dciNumber || <span className="text-xs text-muted-foreground italic">—</span>}
+                                            </TableCell>
+                                            <TableCell>
+                                                {student.dciCertificateUrl ? (
+                                                    <a href={student.dciCertificateUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 bg-blue-50 px-2 py-1 rounded-md border border-blue-100 hover:underline">
+                                                        View Certificate <ExternalLink className="w-3 h-3" />
+                                                    </a>
+                                                ) : (
+                                                    <span className="text-xs text-muted-foreground italic">—</span>
+                                                )}
+                                            </TableCell>
+                                        </>
+                                    )}
                                     <TableCell>
                                         <Badge variant="outline" className={student.paymentStatus === "PAID" ? "bg-green-50 text-green-700 border-green-200" : "bg-yellow-50 text-yellow-700 border-yellow-200"}>
                                             {student.paymentStatus}

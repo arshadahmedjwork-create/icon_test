@@ -28,9 +28,23 @@ import {
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Plus, Search, Trash2, Edit, FileSpreadsheet } from "lucide-react";
-import { getJudges, addJudge, updateJudge, deleteJudge } from "@/services/supabaseService";
+import { getJudges, addJudge, updateJudge, deleteJudge, getCollegesList } from "@/services/supabaseService";
 import { Judge, JudgeType } from "@/types";
 import { useToast } from "@/hooks/use-toast";
+import { useProgram } from "@/contexts/ProgramContext";
+
+const iconSpecialities = [
+    "Oral & Maxillofacial Surgery",
+    "Orthodontics",
+    "Periodontics",
+    "Conservative Dentistry & Endodontics",
+    "Prosthodontics",
+    "Oral Medicine & Radiology",
+    "Oral Pathology",
+    "Pedodontics",
+    "Public Health Dentistry",
+    "Other"
+];
 
 export default function AdminJudges() {
     const [searchParams] = useSearchParams();
@@ -38,7 +52,9 @@ export default function AdminJudges() {
     const [searchQuery, setSearchQuery] = useState("");
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const [editingJudge, setEditingJudge] = useState<Judge | null>(null);
+    const [collegesList, setCollegesList] = useState<{ value: string, label: string }[]>([]);
     const { toast } = useToast();
+    const { currentProgram } = useProgram();
 
     const [formData, setFormData] = useState<Partial<Judge>>({
         name: "",
@@ -53,14 +69,24 @@ export default function AdminJudges() {
 
     useEffect(() => {
         loadJudges();
+        loadColleges();
         if (searchParams.get("action") === "add") {
             setIsDialogOpen(true);
         }
-    }, [searchParams]);
+    }, [searchParams, currentProgram]);
+
+    const loadColleges = async () => {
+        try {
+            const cols = await getCollegesList();
+            setCollegesList(cols);
+        } catch (e) {
+            console.error("Failed to load colleges", e);
+        }
+    };
 
     const loadJudges = async () => {
         try {
-            const data = await getJudges();
+            const data = await getJudges(currentProgram);
             setJudges(data);
         } catch (error) {
             console.error("Failed to load judges", error);
@@ -75,7 +101,7 @@ export default function AdminJudges() {
                 await updateJudge(editingJudge.id, formData);
                 toast({ title: "Success", description: "Judge updated successfully" });
             } else {
-                await addJudge(formData as Judge);
+                await addJudge({ ...formData, program: currentProgram } as Judge);
                 toast({ title: "Success", description: "Judge added successfully" });
             }
 
@@ -153,8 +179,8 @@ export default function AdminJudges() {
         <div className="space-y-6">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                 <div>
-                    <h2 className="text-2xl font-bold font-display">Judge Management</h2>
-                    <p className="text-muted-foreground">Manage judge profiles and assignments.</p>
+                    <h2 className="text-2xl font-bold font-display">{currentProgram === 'ICON' ? 'ICON' : 'MIDAS'} Judge Management</h2>
+                    <p className="text-muted-foreground">Manage {currentProgram === 'ICON' ? 'Madras ICON' : 'MIDAS'} judge profiles and assignments.</p>
                 </div>
                 <div className="flex gap-2">
                     <Button variant="outline" size="sm" onClick={handleExport}>
@@ -185,7 +211,7 @@ export default function AdminJudges() {
                                         <Label htmlFor="type">Type</Label>
                                         <Select
                                             value={formData.type}
-                                            onValueChange={(val: JudgeType) => setFormData({ ...formData, type: val })}
+                                            onValueChange={(val: JudgeType) => setFormData({ ...formData, type: val, affiliation: val === "Academic" ? formData.affiliation : "" })}
                                         >
                                             <SelectTrigger>
                                                 <SelectValue placeholder="Select type" />
@@ -198,23 +224,41 @@ export default function AdminJudges() {
                                     </div>
                                     <div className="grid gap-2">
                                         <Label htmlFor="specialization">Specialization</Label>
-                                        <Input
-                                            id="specialization"
+                                        <Select
                                             value={formData.specialization || ""}
-                                            onChange={e => setFormData({ ...formData, specialization: e.target.value })}
-                                            required
-                                        />
+                                            onValueChange={(val) => setFormData({ ...formData, specialization: val })}
+                                        >
+                                            <SelectTrigger id="specialization">
+                                                <SelectValue placeholder="Select Specialization" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                {iconSpecialities.map(s => (
+                                                    <SelectItem key={s} value={s}>{s}</SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
                                     </div>
                                 </div>
-                                <div className="grid gap-2">
-                                    <Label htmlFor="affiliation">Affiliation (College/Hospital)</Label>
-                                    <Input
-                                        id="affiliation"
-                                        value={formData.affiliation || ""}
-                                        onChange={e => setFormData({ ...formData, affiliation: e.target.value })}
-                                        required
-                                    />
-                                </div>
+                                {formData.type === "Academic" && (
+                                    <div className="grid gap-2">
+                                         <Label htmlFor="affiliation">College</Label>
+                                         <Select
+                                             value={formData.affiliation || ""}
+                                             onValueChange={(val) => setFormData({ ...formData, affiliation: val })}
+                                         >
+                                             <SelectTrigger id="affiliation">
+                                                 <SelectValue placeholder="Select College" />
+                                             </SelectTrigger>
+                                             <SelectContent>
+                                                 {collegesList.map((opt) => (
+                                                     <SelectItem key={opt.value} value={opt.label}>
+                                                         {opt.label}
+                                                     </SelectItem>
+                                                 ))}
+                                             </SelectContent>
+                                         </Select>
+                                     </div>
+                                )}
                                 <div className="grid grid-cols-2 gap-4">
                                     <div className="grid gap-2">
                                         <Label htmlFor="email">Email</Label>
