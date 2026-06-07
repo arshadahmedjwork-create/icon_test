@@ -349,16 +349,16 @@ export default function SessionManagement() {
 
     return (
         <div className="space-y-6">
-            <div className="flex justify-between items-center">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                 <div>
                     <h2 className="text-xl font-bold font-display">Session Scheduling</h2>
-                    <p className="text-muted-foreground">Create and manage scientific sessions.</p>
+                    <p className="text-muted-foreground text-sm">Create and manage scientific sessions.</p>
                 </div>
-                <div className="flex gap-2">
-                    <Button variant="outline" onClick={handleAutoScheduleClick}>
+                <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+                    <Button variant="outline" onClick={handleAutoScheduleClick} className="w-full sm:w-auto">
                         <Users className="w-4 h-4 mr-2" /> Auto-Schedule
                     </Button>
-                    <Button onClick={() => { setEditingSession(null); setFormData({ name: "", subject: "", type: "", mode: "", date: "", time: "", venue: "", judges: [], abstractIds: [] }); setIsDialogOpen(true); }}>
+                    <Button onClick={() => { setEditingSession(null); setFormData({ name: "", subject: "", type: "", mode: "", date: "", time: "", venue: "", judges: [], abstractIds: [] }); setIsDialogOpen(true); }} className="w-full sm:w-auto">
                         <Plus className="w-4 h-4 mr-2" /> Schedule Session
                     </Button>
                 </div>
@@ -546,7 +546,7 @@ export default function SessionManagement() {
                         <DialogTitle>{editingSession ? "Edit Session" : "Schedule New Session"}</DialogTitle>
                     </DialogHeader>
                     <div className="grid gap-6 py-4">
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div className="space-y-2">
                                 <Label>Session Name</Label>
                                 <Input placeholder="e.g. Oral Path Session A" value={formData.name || ""} onChange={e => updateForm("name", e.target.value)} />
@@ -605,7 +605,7 @@ export default function SessionManagement() {
                                 <Label>Time</Label>
                                 <Input type="time" value={formData.time || ""} onChange={e => updateForm("time", e.target.value)} />
                             </div>
-                            <div className="space-y-2 col-span-2">
+                            <div className="space-y-2 col-span-1 sm:col-span-2">
                                 <Label>Venue / Link</Label>
                                 <Input placeholder="e.g. Hall 1 or Zoom Link" value={formData.venue || ""} onChange={e => updateForm("venue", e.target.value)} />
                             </div>

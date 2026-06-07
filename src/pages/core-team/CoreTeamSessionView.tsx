@@ -210,13 +210,13 @@ export default function CoreTeamSessionView() {
 
                 <TabsContent value="completed" className="space-y-4">
                     {sessions.filter(s => s.status?.toLowerCase() === "completed" || s.status?.toLowerCase() === "session_completed").length > 0 && (
-                        <div className="flex justify-between items-center bg-slate-50 p-4 rounded-xl border mb-4">
+                        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-slate-50 p-4 rounded-xl border mb-4">
                             <div>
                                 <h3 className="font-bold text-sm">Certificate Bulk Dispatch Control</h3>
                                 <p className="text-xs text-muted-foreground">Send certificates to participants, winners, and judges of all completed sessions.</p>
                             </div>
                             <Button 
-                                className="bg-primary hover:bg-primary/90 text-white font-bold rounded-xl"
+                                className="w-full md:w-auto bg-primary hover:bg-primary/90 text-white font-bold rounded-xl"
                                 disabled={dispatchingAll}
                                 onClick={handleSendAllCertificates}
                             >
@@ -236,16 +236,16 @@ export default function CoreTeamSessionView() {
                     {sessions.filter(s => s.status?.toLowerCase() === "completed" || s.status?.toLowerCase() === "session_completed").map(session => (
                         <Card key={session.id}>
                             <CardHeader>
-                                <div className="flex justify-between items-center">
+                                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                                     <div>
-                                        <CardTitle>{session.name} - Winners</CardTitle>
-                                        <CardDescription>{session.subject}</CardDescription>
+                                        <CardTitle className="text-base sm:text-lg">{session.name} - Winners</CardTitle>
+                                        <CardDescription className="text-xs sm:text-sm">{session.subject}</CardDescription>
                                     </div>
-                                    <div className="flex items-center gap-2">
+                                    <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto justify-start sm:justify-end">
                                         <Button 
                                             variant="outline" 
                                             size="sm"
-                                            className="border-primary/30 text-primary hover:bg-primary/5 rounded-xl font-medium"
+                                            className="border-primary/30 text-primary hover:bg-primary/5 rounded-xl font-medium text-xs py-1 h-8"
                                             disabled={dispatchingSession === session.id}
                                             onClick={() => handleSendSessionCertificates(session.id)}
                                         >
@@ -256,20 +256,20 @@ export default function CoreTeamSessionView() {
                                             )}
                                             Dispatch Session Certs
                                         </Button>
-                                        <Badge className="bg-green-100 text-green-800 hover:bg-green-100 border-green-200">
+                                        <Badge className="bg-green-100 text-green-800 hover:bg-green-100 border-green-200 text-xs">
                                             <CheckCircle2 className="w-3 h-3 mr-1" /> Completed
                                         </Badge>
                                     </div>
                                 </div>
                             </CardHeader>
-                            <CardContent>
+                            <CardContent className="overflow-x-auto w-full">
                                 <Table>
                                     <TableHeader>
                                         <TableRow>
-                                            <TableHead className="w-[100px]">Rank</TableHead>
-                                            <TableHead>Student</TableHead>
-                                            <TableHead className="text-right">Score</TableHead>
-                                            <TableHead className="text-right">Action</TableHead>
+                                            <TableHead className="w-[100px] min-w-[70px]">Rank</TableHead>
+                                            <TableHead className="min-w-[120px]">Student</TableHead>
+                                            <TableHead className="text-right min-w-[70px]">Score</TableHead>
+                                            <TableHead className="text-right min-w-[180px]">Action</TableHead>
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>

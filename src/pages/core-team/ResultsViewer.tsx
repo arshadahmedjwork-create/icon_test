@@ -111,20 +111,20 @@ export default function ResultsViewer() {
 
     return (
         <div className="space-y-6">
-            <div className="flex justify-between items-center">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                 <div>
                     <h2 className="text-xl font-bold font-display">Results Compilation</h2>
-                    <p className="text-muted-foreground">View calculated scores and standings.</p>
+                    <p className="text-muted-foreground text-sm">View calculated scores and standings.</p>
                 </div>
-                <Button variant="outline" disabled={!selectedSessionId}>
+                <Button variant="outline" disabled={!selectedSessionId} className="w-full sm:w-auto">
                     <Download className="w-4 h-4 mr-2" /> Export CSV
                 </Button>
             </div>
 
-            <div className="flex items-center gap-4">
-                <div className="w-[300px]">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4">
+                <div className="w-full sm:w-[300px]">
                     <Select value={selectedSessionId} onValueChange={setSelectedSessionId}>
-                        <SelectTrigger>
+                        <SelectTrigger className="w-full">
                             <SelectValue placeholder="Select Session to View Results" />
                         </SelectTrigger>
                         <SelectContent>
@@ -144,16 +144,16 @@ export default function ResultsViewer() {
                             Rankings based on average judge scores.
                         </CardDescription>
                     </CardHeader>
-                    <CardContent>
+                    <CardContent className="overflow-x-auto w-full">
                         <Table>
                             <TableHeader>
                                 <TableRow>
-                                    <TableHead className="w-[80px]">Rank</TableHead>
-                                    <TableHead>Student</TableHead>
-                                    <TableHead>College</TableHead>
-                                    <TableHead className="max-w-[300px]">Presentation</TableHead>
-                                    <TableHead className="text-right">Judges</TableHead>
-                                    <TableHead className="text-right">Avg Score</TableHead>
+                                    <TableHead className="w-[80px] min-w-[70px]">Rank</TableHead>
+                                    <TableHead className="min-w-[120px]">Student</TableHead>
+                                    <TableHead className="min-w-[120px]">College</TableHead>
+                                    <TableHead className="max-w-[300px] min-w-[180px]">Presentation</TableHead>
+                                    <TableHead className="text-right min-w-[70px]">Judges</TableHead>
+                                    <TableHead className="text-right min-w-[90px]">Avg Score</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>

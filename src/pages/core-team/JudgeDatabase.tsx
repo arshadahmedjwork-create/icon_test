@@ -90,25 +90,25 @@ export default function JudgeDatabase() {
 
             <Card>
                 <CardHeader>
-                    <div className="flex flex-col md:flex-row gap-4 justify-between">
+                    <div className="flex flex-col lg:flex-row gap-4 justify-between items-start lg:items-center">
                         <div className="space-y-1">
                             <CardTitle>Judge List</CardTitle>
                             <CardDescription>
                                 Total {judges.length} judges registered in the system.
                             </CardDescription>
                         </div>
-                        <div className="flex gap-2">
-                            <div className="relative w-full md:w-64">
+                        <div className="flex flex-col sm:flex-row gap-2 w-full lg:w-auto">
+                            <div className="relative w-full lg:w-64">
                                 <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                                 <Input
                                     placeholder="Search judges..."
-                                    className="pl-8"
+                                    className="pl-8 w-full"
                                     value={searchQuery}
                                     onChange={(e) => setSearchQuery(e.target.value)}
                                 />
                             </div>
                             <Select value={typeFilter} onValueChange={setTypeFilter}>
-                                <SelectTrigger className="w-[140px]">
+                                <SelectTrigger className="w-full sm:w-[140px]">
                                     <Filter className="w-4 h-4 mr-2" />
                                     <SelectValue placeholder="Type" />
                                 </SelectTrigger>
@@ -122,16 +122,16 @@ export default function JudgeDatabase() {
                     </div>
                 </CardHeader>
                 <CardContent>
-                    <div className="rounded-md border">
+                    <div className="rounded-md border overflow-x-auto w-full">
                         <Table>
                             <TableHeader>
                                 <TableRow>
-                                    <TableHead>Name</TableHead>
-                                    <TableHead>Specialization</TableHead>
-                                    <TableHead>Type</TableHead>
-                                    <TableHead>Affiliation</TableHead>
-                                    <TableHead>Contact Info</TableHead>
-                                    <TableHead>Status</TableHead>
+                                    <TableHead className="min-w-[120px]">Name</TableHead>
+                                    <TableHead className="min-w-[120px]">Specialization</TableHead>
+                                    <TableHead className="min-w-[100px]">Type</TableHead>
+                                    <TableHead className="min-w-[140px]">Affiliation</TableHead>
+                                    <TableHead className="min-w-[160px]">Contact Info</TableHead>
+                                    <TableHead className="min-w-[100px]">Status</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>

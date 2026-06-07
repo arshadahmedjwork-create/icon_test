@@ -163,23 +163,24 @@ export default function AbstractApproval() {
 
     return (
         <div className="space-y-6">
-            <div className="flex justify-between items-center">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                 <div>
                     <h2 className="text-xl font-bold font-display">Abstract Approval</h2>
-                    <p className="text-muted-foreground">Review, approve, or request revisions on student abstract submissions.</p>
+                    <p className="text-muted-foreground text-sm">Review, approve, or request revisions on student abstract submissions.</p>
                 </div>
             </div>
 
-            <div className="flex items-center gap-4">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4">
                 <div className="flex items-center gap-2 max-w-sm flex-1">
                     <Search className="w-4 h-4 text-muted-foreground" />
                     <Input
                         placeholder="Search by title, student, or college..."
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
+                        className="w-full"
                     />
                 </div>
-                <div className="w-[200px]">
+                <div className="w-full sm:w-[200px]">
                     <select
                         className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                         value={selectedSubject}
@@ -191,15 +192,15 @@ export default function AbstractApproval() {
                 </div>
             </div>
 
-            <div className="border rounded-lg overflow-hidden bg-white dark:bg-zinc-950">
+            <div className="border rounded-lg bg-white dark:bg-zinc-950 w-full overflow-x-auto">
                 <Table>
                     <TableHeader>
                         <TableRow>
-                            <TableHead>Title / Subject</TableHead>
-                            <TableHead>Student / College</TableHead>
-                            <TableHead>Type / Mode</TableHead>
-                            <TableHead>Status</TableHead>
-                            <TableHead className="text-right">Actions</TableHead>
+                            <TableHead className="min-w-[150px]">Title / Subject</TableHead>
+                            <TableHead className="min-w-[150px]">Student / College</TableHead>
+                            <TableHead className="min-w-[100px]">Type / Mode</TableHead>
+                            <TableHead className="min-w-[100px]">Status</TableHead>
+                            <TableHead className="text-right min-w-[80px]">Actions</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -251,16 +252,16 @@ export default function AbstractApproval() {
 
             {/* Integrated PDF Viewer Dialog */}
             <Dialog open={!!viewingPdf} onOpenChange={(val) => !val && setViewingPdf(null)}>
-                <DialogContent className="max-w-[95vw] max-h-[95vh] h-[95vh] p-0 flex flex-col md:flex-row overflow-hidden border-none shadow-2xl">
+                <DialogContent className="max-w-[95vw] max-h-[95vh] h-[95vh] p-0 flex flex-col md:flex-row overflow-y-auto md:overflow-hidden border-none shadow-2xl">
                     {/* Left: PDF Viewer */}
-                    <div className="flex-1 bg-muted/30 border-r flex flex-col overflow-hidden relative">
-                        <div className="p-4 border-b bg-background flex justify-between items-center shrink-0">
+                    <div className="flex-1 bg-muted/30 border-r flex flex-col overflow-hidden relative min-h-[300px] md:min-h-0">
+                        <div className="p-4 border-b bg-background flex flex-col sm:flex-row gap-3 justify-between items-start sm:items-center shrink-0">
                             <div className="flex items-center gap-3">
                                 <div className="p-2 bg-primary/10 rounded-lg">
                                     <FileText className="w-5 h-5 text-primary" />
                                 </div>
                                 <div>
-                                    <DialogTitle className="text-lg font-bold truncate max-w-[400px] leading-tight">
+                                    <DialogTitle className="text-base sm:text-lg font-bold truncate max-w-[280px] sm:max-w-[400px] leading-tight">
                                         {viewingPdf?.title}
                                     </DialogTitle>
                                     <p className="text-xs text-muted-foreground">Double check formatting and content before approval</p>
@@ -269,13 +270,13 @@ export default function AbstractApproval() {
                             <Button 
                                 variant="outline" 
                                 size="sm" 
-                                className="hover:bg-primary hover:text-white transition-colors"
+                                className="w-full sm:w-auto hover:bg-primary hover:text-white transition-colors"
                                 onClick={() => viewingPdf?.fileUrl && window.open(viewingPdf.fileUrl, "_blank")}
                             >
                                 <ExternalLink className="w-4 h-4 mr-2" /> Open Original
                             </Button>
                         </div>
-                        <div className="flex-1 p-0 bg-neutral-100/50">
+                        <div className="flex-1 p-0 bg-neutral-100/50 min-h-[250px] md:min-h-0">
                             {viewingPdf?.fileUrl ? (
                                 <iframe 
                                     src={viewingPdf.fileUrl} 
@@ -293,31 +294,31 @@ export default function AbstractApproval() {
                     </div>
 
                     {/* Right: Abstract Details & Fast Actions */}
-                    <div className="md:w-[400px] shrink-0 bg-background flex flex-col border-l shadow-xl z-10">
-                        <div className="flex-1 overflow-y-auto p-8">
-                            <div className="space-y-8">
+                    <div className="w-full md:w-[400px] shrink-0 bg-background flex flex-col border-t md:border-t-0 md:border-l shadow-xl z-10">
+                        <div className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
+                            <div className="space-y-6 sm:space-y-8">
                                 <section>
                                     <h3 className="text-xs font-black uppercase tracking-[0.2em] text-muted-foreground mb-4">Submission Metadata</h3>
-                                    <div className="space-y-4">
+                                    <div className="space-y-3 sm:space-y-4">
                                         <div className="flex justify-between items-start gap-4">
-                                            <span className="text-sm text-muted-foreground">Author:</span>
-                                            <span className="text-sm font-bold text-right">{viewingPdf ? getStudentName(viewingPdf.studentId) : "N/A"}</span>
+                                            <span className="text-xs sm:text-sm text-muted-foreground">Author:</span>
+                                            <span className="text-xs sm:text-sm font-bold text-right">{viewingPdf ? getStudentName(viewingPdf.studentId) : "N/A"}</span>
                                         </div>
                                         <div className="flex justify-between items-start gap-4">
-                                            <span className="text-sm text-muted-foreground">Institution:</span>
-                                            <span className="text-sm font-bold text-right">{viewingPdf ? getStudentCollege(viewingPdf.studentId) : "N/A"}</span>
+                                            <span className="text-xs sm:text-sm text-muted-foreground">Institution:</span>
+                                            <span className="text-xs sm:text-sm font-bold text-right">{viewingPdf ? getStudentCollege(viewingPdf.studentId) : "N/A"}</span>
                                         </div>
                                         <div className="flex justify-between items-center">
-                                            <span className="text-sm text-muted-foreground">Category:</span>
-                                            <Badge variant="secondary" className="font-bold">{viewingPdf?.subject}</Badge>
+                                            <span className="text-xs sm:text-sm text-muted-foreground">Category:</span>
+                                            <Badge variant="secondary" className="font-bold text-xs">{viewingPdf?.subject}</Badge>
                                         </div>
                                         <div className="flex justify-between items-center">
-                                            <span className="text-sm text-muted-foreground">Format:</span>
-                                            <Badge variant="outline" className="border-primary/30 text-primary font-bold">{viewingPdf?.type} ({viewingPdf?.mode})</Badge>
+                                            <span className="text-xs sm:text-sm text-muted-foreground">Format:</span>
+                                            <Badge variant="outline" className="border-primary/30 text-primary font-bold text-xs">{viewingPdf?.type} ({viewingPdf?.mode})</Badge>
                                         </div>
                                         <div className="flex justify-between items-center">
-                                            <span className="text-sm text-muted-foreground">Current Status:</span>
-                                            <Badge variant="outline" className="font-bold">{viewingPdf?.status}</Badge>
+                                            <span className="text-xs sm:text-sm text-muted-foreground">Current Status:</span>
+                                            <Badge variant="outline" className="font-bold text-xs">{viewingPdf?.status}</Badge>
                                         </div>
                                     </div>
                                 </section>
@@ -329,21 +330,21 @@ export default function AbstractApproval() {
                                         <div className="flex p-1 bg-muted rounded-xl gap-1">
                                             <Button 
                                                 variant={actionType === "approve" ? "default" : "ghost"}
-                                                className={`flex-1 rounded-lg text-xs font-bold ${actionType === "approve" ? "bg-emerald-600 hover:bg-emerald-700 text-white" : ""}`}
+                                                className={`flex-1 rounded-lg text-[10px] sm:text-xs font-bold ${actionType === "approve" ? "bg-emerald-600 hover:bg-emerald-700 text-white" : ""}`}
                                                 onClick={() => { setActionType("approve"); setFeedback(""); }}
                                             >
                                                 Approve
                                             </Button>
                                             <Button 
                                                 variant={actionType === "revision" ? "default" : "ghost"}
-                                                className={`flex-1 rounded-lg text-xs font-bold ${actionType === "revision" ? "bg-amber-600 hover:bg-amber-700 text-white" : ""}`}
+                                                className={`flex-1 rounded-lg text-[10px] sm:text-xs font-bold ${actionType === "revision" ? "bg-amber-600 hover:bg-amber-700 text-white" : ""}`}
                                                 onClick={() => { setActionType("revision"); setFeedback(""); }}
                                             >
                                                 Revise
                                             </Button>
                                             <Button 
                                                 variant={actionType === "reject" ? "default" : "ghost"}
-                                                className={`flex-1 rounded-lg text-xs font-bold ${actionType === "reject" ? "bg-rose-600 hover:bg-rose-700 text-white" : ""}`}
+                                                className={`flex-1 rounded-lg text-[10px] sm:text-xs font-bold ${actionType === "reject" ? "bg-rose-600 hover:bg-rose-700 text-white" : ""}`}
                                                 onClick={() => { setActionType("reject"); setFeedback(""); }}
                                             >
                                                 Reject
@@ -377,7 +378,7 @@ export default function AbstractApproval() {
                                                         />
                                                     </div>
                                                     <Button 
-                                                        className="w-full bg-emerald-600 hover:bg-emerald-700 rounded-xl text-white"
+                                                        className="w-full bg-emerald-600 hover:bg-emerald-700 rounded-xl text-white text-xs font-bold"
                                                         onClick={() => handleConfirmAction(viewingPdf, "approve", feedback)}
                                                     >
                                                         Confirm Approval
@@ -396,7 +397,7 @@ export default function AbstractApproval() {
                                                     />
                                                     <Button 
                                                         disabled={!feedback.trim()}
-                                                        className="w-full bg-amber-600 hover:bg-amber-700 rounded-xl text-white"
+                                                        className="w-full bg-amber-600 hover:bg-amber-700 rounded-xl text-white text-xs font-bold"
                                                         onClick={() => handleConfirmAction(viewingPdf, "revision", feedback)}
                                                     >
                                                         Send Revision Request
@@ -420,7 +421,7 @@ export default function AbstractApproval() {
                                                     </select>
                                                     <Button 
                                                         disabled={!feedback}
-                                                        className="w-full bg-rose-600 hover:bg-rose-700 rounded-xl text-white"
+                                                        className="w-full bg-rose-600 hover:bg-rose-700 rounded-xl text-white text-xs font-bold"
                                                         onClick={() => handleConfirmAction(viewingPdf, "reject", feedback)}
                                                     >
                                                         Confirm Rejection
@@ -433,7 +434,7 @@ export default function AbstractApproval() {
                             </div>
                         </div>
                         <div className="p-4 border-t bg-muted/10 shrink-0">
-                            <Button variant="ghost" className="w-full text-muted-foreground" onClick={() => setViewingPdf(null)}>
+                            <Button variant="ghost" className="w-full text-muted-foreground text-xs" onClick={() => setViewingPdf(null)}>
                                 Close Review Panel
                             </Button>
                         </div>
