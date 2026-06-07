@@ -105,7 +105,7 @@ export default function DashboardLayout({ children, roleName, roleColor, navItem
 
         {/* Ad Box */}
         <div className="px-3 py-2 mx-3 my-4 rounded-xl border border-sidebar-border overflow-hidden bg-sidebar-accent/10 flex items-center justify-center">
-          <img src="/silver.png" alt="Advertisement" className="w-full h-auto rounded-lg object-contain" />
+          <img src="/gold.png" alt="Gold Sponsor" className="w-full h-auto rounded-lg object-contain" />
         </div>
 
         <div className="p-4 border-t border-sidebar-border">

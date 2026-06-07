@@ -44,6 +44,45 @@ const iconSpecialities = [
     "Public Health Dentistry"
 ];
 
+const indianStates = [
+    "Andhra Pradesh",
+    "Arunachal Pradesh",
+    "Assam",
+    "Bihar",
+    "Chhattisgarh",
+    "Goa",
+    "Gujarat",
+    "Haryana",
+    "Himachal Pradesh",
+    "Jharkhand",
+    "Karnataka",
+    "Kerala",
+    "Madhya Pradesh",
+    "Maharashtra",
+    "Manipur",
+    "Meghalaya",
+    "Mizoram",
+    "Nagaland",
+    "Odisha",
+    "Punjab",
+    "Rajasthan",
+    "Sikkim",
+    "Tamil Nadu",
+    "Telangana",
+    "Tripura",
+    "Uttar Pradesh",
+    "Uttarakhand",
+    "West Bengal",
+    "Andaman and Nicobar Islands",
+    "Chandigarh",
+    "Dadra and Nagar Haveli and Daman and Diu",
+    "Delhi",
+    "Jammu and Kashmir",
+    "Ladakh",
+    "Lakshadweep",
+    "Puducherry"
+];
+
 export default function StudentRegistrationPage() {
     const navigate = useNavigate();
     const { currentProgram } = useProgram();
@@ -349,8 +388,13 @@ export default function StudentRegistrationPage() {
                                     <Input id="dciNumber" value={formData.dciNumber} onChange={handleInputChange} required className="h-12 rounded-xl" />
                                 </div>
                                 <div className="space-y-2">
-                                    <Label htmlFor="state">State *</Label>
-                                    <Input id="state" value={formData.state} onChange={handleInputChange} required className="h-12 rounded-xl" />
+                                    <Label>State *</Label>
+                                    <Select value={formData.state} onValueChange={(v) => handleSelectChange("state", v)}>
+                                        <SelectTrigger className="h-12 rounded-xl"><SelectValue placeholder="Select State" /></SelectTrigger>
+                                        <SelectContent>
+                                            {indianStates.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                                        </SelectContent>
+                                    </Select>
                                 </div>
                             </div>
                         ) : (

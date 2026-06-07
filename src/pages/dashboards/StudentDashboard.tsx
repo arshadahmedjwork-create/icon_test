@@ -139,7 +139,7 @@ export default function StudentDashboard() {
 
         {/* Ad Box */}
         <div className="px-3 py-2 mx-3 my-4 rounded-xl border border-white/10 overflow-hidden bg-slate-950/40 flex items-center justify-center">
-          <img src="/silver.png" alt="Advertisement" className="w-full h-auto rounded-lg object-contain" />
+          <img src="/gold.png" alt="Gold Sponsor" className="w-full h-auto rounded-lg object-contain" />
         </div>
 
         {/* User + Sign Out */}

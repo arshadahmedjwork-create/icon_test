@@ -122,6 +122,17 @@ export default function SessionEvaluation() {
         };
     }, [sessionId, user, currentProgram]);
 
+    useEffect(() => {
+        if (evaluating) {
+            // Collapse viewer by default on screens smaller than lg (1024px)
+            if (window.innerWidth < 1024) {
+                setViewerCollapsed(true);
+            } else {
+                setViewerCollapsed(false);
+            }
+        }
+    }, [evaluating]);
+
     const getCriterias = () => {
         // 1. Session-level criteria (Override)
         if (session?.criterias && session.criterias.length > 0) return session.criterias;
@@ -453,15 +464,15 @@ export default function SessionEvaluation() {
 
             <Dialog open={!!evaluating} onOpenChange={(val) => !val && setEvaluating(null)}>
                 <DialogContent className="max-w-[95vw] max-h-[95vh] h-[95vh] p-0 overflow-hidden flex flex-col">
-                    <DialogHeader className="p-6 pb-2 border-b shrink-0">
-                        <div className="flex justify-between items-start">
-                            <div>
-                                <DialogTitle className="text-2xl">{previewMode ? "Preview Abstract & Slides" : "Evaluate Presentation"}</DialogTitle>
-                                <CardDescription className="text-base">
+                    <DialogHeader className="p-4 sm:p-6 pb-2 border-b shrink-0">
+                        <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
+                            <div className="space-y-1 pr-6">
+                                <DialogTitle className="text-xl sm:text-2xl">{previewMode ? "Preview Abstract & Slides" : "Evaluate Presentation"}</DialogTitle>
+                                <CardDescription className="text-sm sm:text-base">
                                     {evaluating?.title} • {getStudentIdCode(evaluating?.studentId || "")}
                                 </CardDescription>
                             </div>
-                            <div className="flex gap-2 mr-8">
+                            <div className="flex flex-wrap gap-2 w-full sm:w-auto justify-start sm:justify-end">
                                  {!previewMode && evaluating?.presentationUrl && (
                                      <Button variant={viewMode === "presentation" ? "default" : "outline"} size="sm" onClick={() => setViewMode("presentation")}>
                                          Presentation
@@ -482,10 +493,10 @@ export default function SessionEvaluation() {
                         </div>
                     </DialogHeader>
 
-                    <div className="flex-1 flex overflow-hidden">
+                    <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
                         {/* Left Side: Presentation Viewer */}
                         {!viewerCollapsed && (
-                            <div className="flex-1 bg-muted/30 border-r overflow-auto flex items-center justify-center p-4">
+                            <div className="w-full h-[40vh] lg:h-full lg:flex-1 bg-muted/30 border-b lg:border-b-0 lg:border-r overflow-auto flex items-center justify-center p-4">
                                 {((viewMode === "presentation" && (evaluating?.presentationUrl || evaluating?.fileUrl)) || (viewMode === "abstract" && evaluating?.fileUrl)) ? (
                                     <div className="w-full h-full flex flex-col gap-4">
                                         {((viewMode === "presentation" && (evaluating?.presentationUrl?.toLowerCase().endsWith(".pdf") || evaluating?.fileUrl?.toLowerCase().endsWith(".pdf"))) || (viewMode === "abstract" && evaluating?.fileUrl?.toLowerCase().endsWith(".pdf"))) ? (
@@ -503,7 +514,7 @@ export default function SessionEvaluation() {
                                                     <h3 className="text-xl font-bold">PowerPoint Presentation</h3>
                                                     <p className="text-muted-foreground max-w-md mx-auto mt-2">
                                                         Direct browser preview for PowerPoint (.pptx) is limited. Please download or open it in a new window using the button below.
-                                                    </p>
+                                                     </p>
                                                 </div>
                                                 <Button size="lg" onClick={() => window.open(evaluating.presentationUrl || evaluating.fileUrl, "_blank")}>
                                                     <Download className="w-4 h-4 mr-2" /> View / Download Presentation
@@ -522,8 +533,8 @@ export default function SessionEvaluation() {
                         )}
 
                         {/* Right Side: Evaluation Form */}
-                        <div className={cn("overflow-y-auto p-6 bg-background transition-all duration-200", 
-                            viewerCollapsed ? "flex-grow w-full" : "w-[400px] shrink-0"
+                        <div className={cn("overflow-y-auto p-4 sm:p-6 bg-background transition-all duration-200", 
+                            viewerCollapsed ? "flex-grow w-full h-full" : "w-full lg:w-[400px] lg:shrink-0 flex-1 lg:h-full"
                         )}>
                             {previewMode ? (
                                 <div className="space-y-6">

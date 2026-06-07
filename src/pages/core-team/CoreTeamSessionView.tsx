@@ -16,7 +16,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Trophy, CheckCircle2, Download, Award, Mail, Loader2 } from "lucide-react";
 import { useProgram } from "@/contexts/ProgramContext";
 import { generateSignedUrl } from "@/services/signedUrlHelper";
-import { sendSingleCertificateEmail } from "@/services/certificateEmailWorker";
+import { sendSingleCertificateEmail, triggerCertificateDistribution } from "@/services/certificateEmailWorker";
 
 export default function CoreTeamSessionView() {
     const { toast } = useToast();
@@ -25,6 +25,8 @@ export default function CoreTeamSessionView() {
     const [certificates, setCertificates] = useState<Certificate[]>([]);
     const [view, setView] = useState<"ongoing" | "completed">("ongoing");
     const [emailing, setEmailing] = useState<string | null>(null);
+    const [dispatchingAll, setDispatchingAll] = useState(false);
+    const [dispatchingSession, setDispatchingSession] = useState<string | null>(null);
     const { currentProgram } = useProgram();
 
     useEffect(() => {
@@ -58,6 +60,83 @@ export default function CoreTeamSessionView() {
         } catch (error) {
             console.error(error);
             toast({ title: "Error", description: "Failed to calculate results.", variant: "destructive" });
+        }
+    };
+
+    const handleSendSessionCertificates = async (sessionId: string) => {
+        setDispatchingSession(sessionId);
+        toast({ title: "Session Dispatch Started", description: "Sending certificates to participants, winners, and judges of this session..." });
+
+        try {
+            const results = await triggerCertificateDistribution(sessionId, currentProgram);
+            const failed = results.filter(r => !r.success);
+            
+            // Refresh certificates
+            const fetchedCerts = await getCertificates();
+            setCertificates(fetchedCerts);
+
+            if (failed.length > 0) {
+                toast({
+                    title: "Dispatch Partial Success",
+                    description: `Sent ${results.length - failed.length} certificates. ${failed.length} failed.`,
+                    variant: "destructive"
+                });
+            } else {
+                toast({
+                    title: "Dispatch Complete",
+                    description: `Sent all ${results.length} certificates successfully!`
+                });
+            }
+        } catch (error) {
+            console.error(error);
+            toast({ title: "Dispatch Error", description: "Failed to dispatch certificates for this session.", variant: "destructive" });
+        } finally {
+            setDispatchingSession(null);
+        }
+    };
+
+    const handleSendAllCertificates = async () => {
+        const completedSessions = sessions.filter(s => s.status?.toLowerCase() === "completed" || s.status?.toLowerCase() === "session_completed");
+        if (completedSessions.length === 0) {
+            toast({ title: "No Sessions", description: "There are no completed sessions to dispatch certificates for." });
+            return;
+        }
+
+        setDispatchingAll(true);
+        toast({ title: "Bulk Dispatch Started", description: `Sending certificates for ${completedSessions.length} completed sessions...` });
+        
+        let successCount = 0;
+        let failCount = 0;
+
+        try {
+            for (const session of completedSessions) {
+                try {
+                    const results = await triggerCertificateDistribution(session.id, currentProgram);
+                    const failed = results.filter(r => !r.success);
+                    if (failed.length > 0) {
+                        failCount += failed.length;
+                    }
+                    successCount += (results.length - failed.length);
+                } catch (err) {
+                    console.error(`Error dispatching for session ${session.id}:`, err);
+                    failCount++;
+                }
+            }
+
+            // Refresh certificates
+            const fetchedCerts = await getCertificates();
+            setCertificates(fetchedCerts);
+
+            toast({
+                title: "Bulk Dispatch Complete",
+                description: `Sent ${successCount} certificates successfully. ${failCount > 0 ? `${failCount} failed.` : ""}`,
+                variant: failCount > 0 ? "destructive" : "default"
+            });
+        } catch (error) {
+            console.error(error);
+            toast({ title: "Bulk Dispatch Error", description: "Failed to dispatch all certificates.", variant: "destructive" });
+        } finally {
+            setDispatchingAll(false);
         }
     };
 
@@ -130,6 +209,30 @@ export default function CoreTeamSessionView() {
                 </TabsContent>
 
                 <TabsContent value="completed" className="space-y-4">
+                    {sessions.filter(s => s.status?.toLowerCase() === "completed" || s.status?.toLowerCase() === "session_completed").length > 0 && (
+                        <div className="flex justify-between items-center bg-slate-50 p-4 rounded-xl border mb-4">
+                            <div>
+                                <h3 className="font-bold text-sm">Certificate Bulk Dispatch Control</h3>
+                                <p className="text-xs text-muted-foreground">Send certificates to participants, winners, and judges of all completed sessions.</p>
+                            </div>
+                            <Button 
+                                className="bg-primary hover:bg-primary/90 text-white font-bold rounded-xl"
+                                disabled={dispatchingAll}
+                                onClick={handleSendAllCertificates}
+                            >
+                                {dispatchingAll ? (
+                                    <>
+                                        <Loader2 className="w-4 h-4 mr-2 animate-spin" /> Dispatching...
+                                    </>
+                                ) : (
+                                    <>
+                                        <Mail className="w-4 h-4 mr-2" /> Send All Certificates
+                                    </>
+                                )}
+                            </Button>
+                        </div>
+                    )}
+
                     {sessions.filter(s => s.status?.toLowerCase() === "completed" || s.status?.toLowerCase() === "session_completed").map(session => (
                         <Card key={session.id}>
                             <CardHeader>
@@ -138,9 +241,25 @@ export default function CoreTeamSessionView() {
                                         <CardTitle>{session.name} - Winners</CardTitle>
                                         <CardDescription>{session.subject}</CardDescription>
                                     </div>
-                                    <Badge className="bg-green-100 text-green-800 hover:bg-green-100 border-green-200">
-                                        <CheckCircle2 className="w-3 h-3 mr-1" /> Completed
-                                    </Badge>
+                                    <div className="flex items-center gap-2">
+                                        <Button 
+                                            variant="outline" 
+                                            size="sm"
+                                            className="border-primary/30 text-primary hover:bg-primary/5 rounded-xl font-medium"
+                                            disabled={dispatchingSession === session.id}
+                                            onClick={() => handleSendSessionCertificates(session.id)}
+                                        >
+                                            {dispatchingSession === session.id ? (
+                                                <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+                                            ) : (
+                                                <Mail className="w-3.5 h-3.5 mr-1.5" />
+                                            )}
+                                            Dispatch Session Certs
+                                        </Button>
+                                        <Badge className="bg-green-100 text-green-800 hover:bg-green-100 border-green-200">
+                                            <CheckCircle2 className="w-3 h-3 mr-1" /> Completed
+                                        </Badge>
+                                    </div>
                                 </div>
                             </CardHeader>
                             <CardContent>

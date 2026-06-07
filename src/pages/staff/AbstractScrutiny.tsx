@@ -141,20 +141,7 @@ export default function AbstractScrutiny() {
             await updateAbstractStatus(abstract.id, newStatus!, finalFeedback);
             toast({ title: "Updated", description: successMessage });
 
-            // Send provisional acceptance email if approved
-            if (newStatus === "approved") {
-                try {
-                    await sendProvisionalAcceptanceEmail({
-                        student_name: getStudentName(abstract.studentId),
-                        student_email: getStudentEmail(abstract.studentId),
-                        abstract_title: abstract.title,
-                        event_type: abstract.type,
-                        subject: abstract.subject
-                    });
-                } catch (emailErr) {
-                    console.error("Email failed:", emailErr);
-                }
-            }
+            // Status email is already sent automatically inside updateAbstractStatus
 
             setActionDialog(false);
             setViewingPdf(null);

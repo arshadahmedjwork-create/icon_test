@@ -24,16 +24,41 @@ async function sendCertificateEmailJS(
     program: string
 ): Promise<{ success: boolean; error?: string }> {
     try {
+        const type = (certificateType || '').toLowerCase();
+        let subject = `Your Official Certificate - ${program} 2026`;
+        let greeting = `Dear ${toName}`;
+        let body = `Thank you for your participation in ${program} 2026. Your certificate has been generated successfully.`;
+        let message = `Dear ${toName},\n\nThank you for participating in ${program}.\n\nYour certificate is attached.\n\nRegards,\nOrganising Committee`;
+
+        if (type === 'judge') {
+            subject = `Certificate of Appreciation - Judge - ${program} 2026`;
+            greeting = `Dear Dr. ${toName}`;
+            body = `Thank you for your invaluable contribution as a scientific judge in the proceedings of ${program} 2026. Your official certificate of appreciation has been generated and digitally registered.`;
+            message = `Dear Dr. ${toName},\n\nThank you for your valuable contribution as a judge at ${program} 2026.\n\nYour certificate is attached.\n\nRegards,\nOrganising Committee`;
+        } else if (type === 'winner') {
+            subject = `Official Certificate of Excellence - Winner - ${program} 2026`;
+            greeting = `Congratulations, ${toName}`;
+            body = `Congratulations on securing a winning position in the scientific proceedings of ${program} 2026. Your official certificate of excellence has been generated and digitally registered.`;
+            message = `Dear ${toName},\n\nCongratulations on winning a prize at ${program} 2026!\n\nYour certificate is attached.\n\nRegards,\nOrganising Committee`;
+        } else {
+            subject = `Your Official Certificate of Participation - ${program} 2026`;
+            greeting = `Congratulations, ${toName}`;
+            body = `Thank you for your valuable participation and academic contribution to the scientific proceedings of ${program} 2026. Your official participation certificate has been generated and digitally registered.`;
+            message = `Dear ${toName},\n\nThank you for participating in ${program} 2026.\n\nYour certificate is attached.\n\nRegards,\nOrganising Committee`;
+        }
+
         const emailParams = {
             to_email: toEmail,
             student_email: toEmail,
             student_name: toName,
             to_name: toName,
-            subject: `Your Official Certificate of Participation - ${program} 2026`,
-            message: `Dear ${toName},\n\nThank you for participating in ${program}.\n\nYour certificate is attached.\n\nRegards,\nOrganising Committee`,
+            subject: subject,
+            message: message,
             event_name: eventName,
             certificate_url: certificateUrl,
             program: program,
+            greeting: greeting,
+            body: body,
             // Pass base64 attachment in parameter (Supported by EmailJS file parameter/attachments array depending on template settings)
             certificate_attachment: pdfBase64,
         };
@@ -118,12 +143,19 @@ export async function triggerCertificateDistribution(
             if (role === 'judge') {
                 const { data: judge } = await supabase
                     .from('judges')
-                    .select('fullName, email')
+                    .select('fullName, memberId')
                     .eq('id', userId)
                     .single();
                 if (judge) {
                     recipientName = judge.fullName;
-                    recipientEmail = judge.email;
+                    const { data: member } = await supabase
+                        .from('members')
+                        .select('email')
+                        .eq('id', judge.memberId)
+                        .single();
+                    if (member) {
+                        recipientEmail = member.email;
+                    }
                 }
             } else {
                 const { data: student } = await supabase
@@ -231,12 +263,19 @@ export async function sendSingleCertificateEmail(
         if (role === 'judge') {
             const { data: judge } = await supabase
                 .from('judges')
-                .select('fullName, email')
+                .select('fullName, memberId')
                 .eq('id', userId)
                 .single();
             if (judge) {
                 recipientName = judge.fullName;
-                recipientEmail = judge.email;
+                const { data: member } = await supabase
+                    .from('members')
+                    .select('email')
+                    .eq('id', judge.memberId)
+                    .single();
+                if (member) {
+                    recipientEmail = member.email;
+                }
             }
         } else {
             const { data: student } = await supabase

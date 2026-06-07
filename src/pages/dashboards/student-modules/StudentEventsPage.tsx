@@ -200,8 +200,8 @@ export default function StudentEventsPage() {
                 </div>
 
                 {/* Header Ad Box */}
-                <div className="flex-grow bg-white border border-slate-150 rounded-2xl overflow-hidden shadow-sm flex items-center justify-center h-[110px]">
-                    <img src="/gold.png" alt="Gold Sponsor" className="w-full h-full object-contain p-1" />
+                <div className="flex-grow bg-red-600 border border-red-700 rounded-2xl overflow-hidden shadow-sm flex items-center justify-center h-[110px]">
+                    <img src="/silver.png" alt="Silver Sponsor" className="w-full h-full object-contain p-1" />
                 </div>
             </div>
 

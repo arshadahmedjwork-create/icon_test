@@ -77,22 +77,7 @@ export function PaymentComponent({ onPaymentComplete }: { onPaymentComplete: (us
                         transactionId: response.razorpay_payment_id,
                     });
 
-                    // 4. Send official registration confirmation email with MIDAS ID and QR
-                    try {
-                        await sendRegistrationEmail({
-                            student_name: participantName,
-                            student_email: user.email,
-                            midas_id: midasId,
-                            college_name: collegeName,
-                            event_type: isIcon ? "Professional Delegate" : "UG Delegate",
-                            mode: "Offline",
-                            qr_code_url: qrCodeUrl,
-                            registration_date: new Date().toLocaleDateString("en-IN"),
-                        });
-                    } catch (emailErr) {
-                        console.warn("Email sending error after payment:", emailErr);
-                    }
-
+                    // Registration email is not sent after payment to avoid duplicate emails
                     toast.success(`Payment Successful! Your ${isIcon ? 'ICON' : 'MIDAS'} ID is ` + midasId);
                     onPaymentComplete({
                         ...(updatedStudent || user as Student),

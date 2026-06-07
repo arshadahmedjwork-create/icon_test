@@ -51,9 +51,13 @@ export default function ForgotPasswordModal({ isOpen, onClose }: ForgotPasswordM
                     import.meta.env.VITE_EMAILJS_TEMPLATE_ID,
                     {
                         to_email: email,
+                        student_email: email,
                         to_name: `${userType} (Password Reset)`,
+                        student_name: `${userType} (Password Reset)`,
+                        user_name: `${userType} (Password Reset)`,
                         role: `${userType} Password Reset`,
                         temp_password: tempPassword,
+                        login_url: window.location.origin + "/member-login",
                     },
                     import.meta.env.VITE_EMAILJS_PUBLIC_KEY
                 );
