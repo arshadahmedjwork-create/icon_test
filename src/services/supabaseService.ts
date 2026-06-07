@@ -391,6 +391,8 @@ export const addJudge = async (judge: Omit<Judge, 'id'>) => {
     const tempPassword = Math.random().toString(36).slice(-8);
     const hashedPassword = await bcrypt.hash(tempPassword, 10);
 
+    const normalizedProgram = (judge.program ? judge.program.toUpperCase() : 'MIDAS') as 'MIDAS' | 'ICON';
+
     // Step 1: Create a member record with role JUDGE
     const { data: memberData, error: memberError } = await supabase
         .from('members')
@@ -400,7 +402,7 @@ export const addJudge = async (judge: Omit<Judge, 'id'>) => {
             name: judge.name,
             role: 'JUDGE',
             isActive: true,
-            program: judge.program,
+            program: normalizedProgram,
             updatedAt: new Date().toISOString(),
         })
         .select('id')
@@ -417,7 +419,7 @@ export const addJudge = async (judge: Omit<Judge, 'id'>) => {
             college: judge.affiliation || null,
             specialization: judge.specialization || null,
             time_slots: judge.timeSlots || [],
-            program: judge.program
+            program: normalizedProgram
         });
     if (judgeError) {
         // Rollback: delete the member if judge creation fails
