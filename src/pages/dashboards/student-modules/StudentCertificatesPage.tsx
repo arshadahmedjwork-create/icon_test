@@ -15,7 +15,7 @@ import {
 import { useAuth } from "@/contexts/AuthContext";
 import { useProgram } from "@/contexts/ProgramContext";
 import { getCertificates, getSessions } from "@/services/supabaseService";
-import { generateSignedUrl } from "@/services/signedUrlHelper";
+import { downloadCertificate } from "@/services/certificateEngine";
 
 interface CertificateItem {
     id: string;
@@ -119,10 +119,18 @@ export default function StudentCertificatesPage() {
         loadCertificates();
     }, [user, currentProgram]);
 
-    const handleDownload = (cert: CertificateItem) => {
-        const signedUrl = generateSignedUrl(cert.id);
-        window.open(signedUrl, "_blank");
-        toast.success("Downloading official PDF certificate...");
+    const handleDownload = async (cert: CertificateItem) => {
+        setGenerating(cert.id);
+        toast.info("Generating official PDF certificate...");
+        try {
+            await downloadCertificate(cert.id);
+            toast.success("Certificate downloaded successfully!");
+        } catch (error: any) {
+            console.error("Download failed:", error);
+            toast.error(`Failed to download certificate: ${error.message || error}`);
+        } finally {
+            setGenerating(null);
+        }
     };
 
     if (loading) {

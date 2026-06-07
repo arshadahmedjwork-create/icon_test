@@ -12,7 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Calendar, MapPin, Users, ArrowRight, Download } from "lucide-react";
 import { useProgram } from "@/contexts/ProgramContext";
-import { generateSignedUrl } from "@/services/signedUrlHelper";
+import { downloadCertificate } from "@/services/certificateEngine";
 
 export default function EvaluationList() {
     const { user } = useAuth();
@@ -106,9 +106,12 @@ export default function EvaluationList() {
                                             {myCert && (
                                                 <Button 
                                                     className="w-full bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-semibold"
-                                                    onClick={() => {
-                                                        const signedUrl = generateSignedUrl(myCert.id);
-                                                        window.open(signedUrl, "_blank");
+                                                    onClick={async () => {
+                                                        try {
+                                                            await downloadCertificate(myCert.id);
+                                                        } catch (error) {
+                                                            console.error("Download failed:", error);
+                                                        }
                                                     }}
                                                 >
                                                     <Download className="w-4 h-4 mr-2" /> Download Participation Certificate

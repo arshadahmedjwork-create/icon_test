@@ -1,6 +1,7 @@
 import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
 import QRCode from 'qrcode';
 import { cleanCertificateName } from '../lib/utils';
+import { supabase } from '../lib/supabaseClient';
 
 export interface CertificateDetails {
     certificateId: string;
@@ -134,4 +135,87 @@ export async function generateCertificatePDF(details: CertificateDetails): Promi
     const pdfBytes = await pdfDoc.save();
     return pdfBytes;
 }
+
+export async function downloadCertificate(certificateId: string): Promise<void> {
+    // 1. Fetch certificate metadata
+    const { data: cert, error: certErr } = await supabase
+        .from('certificates')
+        .select('*')
+        .eq('id', certificateId)
+        .single();
+
+    if (certErr || !cert) {
+        throw new Error(certErr?.message || 'Certificate metadata not found.');
+    }
+
+    // Determine recipient details
+    let recipientName = 'Attendee';
+    const role = (cert.role || cert.certificateType || cert.type || 'participation').toLowerCase();
+    const userId = cert.user_id || cert.eventStudentId;
+
+    if (role === 'judge') {
+        const { data: judge } = await supabase
+            .from('judges')
+            .select('fullName')
+            .eq('id', userId)
+            .single();
+        if (judge) {
+            recipientName = judge.fullName;
+        }
+    } else {
+        const { data: student } = await supabase
+            .from('event_students')
+            .select('participantName')
+            .eq('id', userId)
+            .single();
+        if (student) {
+            recipientName = student.participantName;
+        }
+    }
+
+    // Fetch session details
+    let sessionName = 'Session Event';
+    const sessionId = cert.session_id || cert.eventId;
+    if (sessionId) {
+        const { data: session } = await supabase
+            .from('sessions')
+            .select('name')
+            .eq('id', sessionId)
+            .single();
+        if (session) {
+            sessionName = session.name;
+        }
+    }
+
+    // Generate PDF in memory using our existing generator
+    const dateStr = new Date(cert.generatedAt || cert.generated_at || cert.createdAt || Date.now()).toLocaleDateString();
+    const pdfBytes = await generateCertificatePDF({
+        certificateId: cert.id,
+        participantName: recipientName,
+        sessionName: sessionName,
+        role: role as any,
+        date: dateStr,
+        eventName: "MADRAS ICON'26",
+        type: role
+    });
+
+    // Create blob and trigger download
+    const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `certificate_${certificateId}.pdf`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(link.href);
+
+    // Log downloaded status to certificate_audit_logs table
+    await supabase.from('certificate_audit_logs').insert({
+        userId: userId,
+        sessionId: sessionId || null,
+        action: 'DOWNLOADED',
+        details: 'Downloaded via client-side web browser'
+    });
+}
+
 

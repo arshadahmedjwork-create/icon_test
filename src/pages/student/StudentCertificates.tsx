@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Award, Download, AlertCircle } from "lucide-react";
-import { generateSignedUrl } from "@/services/signedUrlHelper";
+import { downloadCertificate } from "@/services/certificateEngine";
 
 export default function StudentCertificates() {
     const { user } = useAuth();
@@ -79,9 +79,12 @@ export default function StudentCertificates() {
                                 <Button
                                     className="w-full"
                                     variant={isWinner ? "default" : "secondary"}
-                                    onClick={() => {
-                                        const signedUrl = generateSignedUrl(cert.id);
-                                        window.open(signedUrl, "_blank");
+                                    onClick={async () => {
+                                        try {
+                                            await downloadCertificate(cert.id);
+                                        } catch (error) {
+                                            console.error("Download failed:", error);
+                                        }
                                     }}
                                 >
                                     <Download className="w-4 h-4 mr-2" />

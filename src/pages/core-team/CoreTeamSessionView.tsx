@@ -15,7 +15,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { useToast } from "@/hooks/use-toast";
 import { Trophy, CheckCircle2, Download, Award, Mail, Loader2 } from "lucide-react";
 import { useProgram } from "@/contexts/ProgramContext";
-import { generateSignedUrl } from "@/services/signedUrlHelper";
+import { downloadCertificate } from "@/services/certificateEngine";
 import { sendSingleCertificateEmail, triggerCertificateDistribution } from "@/services/certificateEmailWorker";
 
 export default function CoreTeamSessionView() {
@@ -295,10 +295,15 @@ export default function CoreTeamSessionView() {
                                                                      <Button 
                                                                          variant="outline" 
                                                                          size="sm"
-                                                                         onClick={() => {
-                                                                             const signedUrl = generateSignedUrl(cert.id);
-                                                                             window.open(signedUrl, '_blank');
-                                                                             toast({ title: "Downloading", description: "Official PDF certificate download started." });
+                                                                         onClick={async () => {
+                                                                             toast({ title: "Downloading", description: "Generating certificate PDF..." });
+                                                                             try {
+                                                                                 await downloadCertificate(cert.id);
+                                                                                 toast({ title: "Success", description: "Certificate downloaded successfully." });
+                                                                             } catch (error: any) {
+                                                                                 console.error("Download failed:", error);
+                                                                                 toast({ title: "Error", description: `Download failed: ${error.message || error}`, variant: "destructive" });
+                                                                             }
                                                                          }}
                                                                      >
                                                                          <Download className="w-3 h-3 mr-1" /> Download
