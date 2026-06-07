@@ -400,6 +400,7 @@ export const addJudge = async (judge: Omit<Judge, 'id'>) => {
             name: judge.name,
             role: 'JUDGE',
             isActive: true,
+            program: judge.program,
             updatedAt: new Date().toISOString(),
         })
         .select('id')
