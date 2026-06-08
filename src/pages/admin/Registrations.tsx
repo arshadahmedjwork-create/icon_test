@@ -17,13 +17,15 @@ import {
     SelectTrigger,
     SelectValue
 } from "@/components/ui/select";
-import { CheckCircle2, Search, XCircle, FileSpreadsheet, ExternalLink } from "lucide-react";
+import { CheckCircle2, Search, XCircle, FileSpreadsheet, ExternalLink, RefreshCw } from "lucide-react";
 import { getEventStudents, updateEventStudent } from "@/services/supabaseService";
 import { sendApprovalEmail } from "@/services/emailService";
 import bcrypt from "bcryptjs";
 import { Student } from "@/types";
 import { useToast } from "@/hooks/use-toast";
 import { useProgram } from "@/contexts/ProgramContext";
+import { supabase } from "@/lib/supabaseClient";
+import { verifyDciCertificate } from "@/services/dciService";
 
 export default function AdminRegistrations() {
     const [students, setStudents] = useState<Student[]>([]);
@@ -33,6 +35,22 @@ export default function AdminRegistrations() {
     const { toast } = useToast();
     const { currentProgram } = useProgram();
     const isIcon = currentProgram === 'ICON';
+
+    const handleTriggerOCR = async (studentId: string) => {
+        try {
+            toast({ title: "Processing OCR", description: "Verifying DCI certificate..." });
+            const result = await verifyDciCertificate(studentId);
+            if (!result.success) {
+                throw new Error("Verification failed");
+            }
+            toast({ title: "OCR Completed", description: `Result: ${result.status || 'Success'}` });
+            loadData();
+        } catch (error: any) {
+            console.error(error);
+            toast({ title: "OCR Failed", description: error.message || "Failed to process certificate.", variant: "destructive" });
+            loadData();
+        }
+    };
 
     useEffect(() => {
         loadData();
@@ -241,9 +259,24 @@ export default function AdminRegistrations() {
                                             </TableCell>
                                             <TableCell>
                                                 {student.dciCertificateUrl ? (
-                                                    <a href={student.dciCertificateUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 bg-blue-50 px-2 py-1 rounded-md border border-blue-100 hover:underline">
-                                                        View Certificate <ExternalLink className="w-3 h-3" />
-                                                    </a>
+                                                    <div className="flex flex-col gap-1.5 items-start">
+                                                        <a href={student.dciCertificateUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 bg-blue-50 px-2 py-1 rounded-md border border-blue-100 hover:underline">
+                                                            View Certificate <ExternalLink className="w-3 h-3" />
+                                                        </a>
+                                                        {((student as any).dciVerificationStatus === 'VERIFIED') ? (
+                                                            <Badge className="bg-green-100 text-green-800 border-none font-bold text-[10px] py-0.5 px-1.5">OCR: Match</Badge>
+                                                        ) : ((student as any).dciVerificationStatus === 'FAILED') ? (
+                                                            <div className="flex items-center gap-1.5">
+                                                                <Badge variant="destructive" className="font-bold text-[10px] py-0.5 px-1.5">OCR: Mismatch</Badge>
+                                                                <Button variant="outline" size="icon" className="w-6 h-6 rounded-md" onClick={() => handleTriggerOCR(student.id)} title="Retry OCR"><RefreshCw className="w-3.5 h-3.5" /></Button>
+                                                            </div>
+                                                        ) : (
+                                                            <div className="flex items-center gap-1.5">
+                                                                <Badge className="bg-amber-100 text-amber-800 border-none font-bold text-[10px] py-0.5 px-1.5">OCR: Pending</Badge>
+                                                                <Button variant="outline" size="icon" className="w-6 h-6 rounded-md" onClick={() => handleTriggerOCR(student.id)} title="Verify OCR"><RefreshCw className="w-3.5 h-3.5" /></Button>
+                                                            </div>
+                                                        )}
+                                                    </div>
                                                 ) : (
                                                     <span className="text-xs text-muted-foreground italic">—</span>
                                                 )}

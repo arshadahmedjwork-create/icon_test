@@ -119,6 +119,8 @@ export interface Student extends User {
     delegateType?: 'PG' | 'Clinician' | 'Guest' | 'Academician';
     bonafideUrl?: string;
     dciCertificateUrl?: string;
+    dciVerificationStatus?: 'PENDING' | 'VERIFIED' | 'FAILED';
+    dciVerificationDetails?: any;
 }
 
 export interface Registration {

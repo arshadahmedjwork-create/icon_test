@@ -14,6 +14,7 @@ import { uploadBonafide, getCollegesList } from "@/services/supabaseService";
 import { useProgram } from "@/contexts/ProgramContext";
 import bcrypt from 'bcryptjs';
 import { sendAccountCreationEmail } from "@/services/emailService";
+import { verifyDciCertificate } from "@/services/dciService";
 
 const colleges = [
     "KLE VK Institute of Dental Sciences, Belagavi",
@@ -214,13 +215,24 @@ export default function StudentRegistrationPage() {
                 dciCertificateUrl: dciCertUrl || null,
             };
 
-            const { error } = await supabase.from("event_students").insert(payload);
+            const { data: insertedStudent, error } = await supabase
+                .from("event_students")
+                .insert(payload)
+                .select("id")
+                .single();
 
             if (error) {
                 if (error.code === '23505') {
                     throw new Error("An account with this email or mobile number already exists.");
                 }
                 throw error;
+            }
+
+            // Trigger DCI OCR verification in background if DCI certificate uploaded
+            if (isIcon && dciCertUrl && insertedStudent?.id) {
+                verifyDciCertificate(insertedStudent.id).catch(err => {
+                    console.error("Failed to run DCI OCR verification:", err);
+                });
             }
 
             // 3. Send Credentials Email
