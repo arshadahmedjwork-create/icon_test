@@ -98,7 +98,7 @@ export default function StudentRegistrationPage() {
         fetchColleges();
     }, []);
 
-    const [delegateType, setDelegateType] = useState<'PG' | 'Clinician' | 'Faculty' | 'UG'>(currentProgram === 'ICON' ? 'PG' : 'UG');
+    const [delegateType, setDelegateType] = useState<'PG' | 'Clinician' | 'Academician' | 'UG'>(currentProgram === 'ICON' ? 'PG' : 'UG');
 
     const [formData, setFormData] = useState({
         firstName: "",
@@ -149,10 +149,10 @@ export default function StudentRegistrationPage() {
         const fullName = `${formData.firstName.trim()} ${formData.lastName.trim()}`;
 
         if (isIcon) {
-            if ((delegateType === 'Clinician' || delegateType === 'Faculty' || delegateType === 'PG') && !formData.dciNumber) {
+            if ((delegateType === 'Clinician' || delegateType === 'Academician' || delegateType === 'PG') && !formData.dciNumber) {
                 toast.error("DCI Number is required"); return;
             }
-            if ((delegateType === 'Clinician' || delegateType === 'Faculty') && !formData.qualification) {
+            if ((delegateType === 'Clinician' || delegateType === 'Academician') && !formData.qualification) {
                 toast.error("Qualification is required"); return;
             }
             if ((delegateType === 'PG' || formData.qualification === 'MDS') && !formData.speciality) {
@@ -275,7 +275,7 @@ export default function StudentRegistrationPage() {
 
                     <div className="space-y-4">
                         <h2 className="text-3xl font-semibold leading-tight">
-                            Registration For {isIcon ? (delegateType === 'PG' ? 'Postgraduate' : 'Clinician/Faculty') : 'UG'} Delegate
+                            Registration For {isIcon ? (delegateType === 'PG' ? 'Postgraduate' : 'Clinician/Academician') : 'UG'} Delegate
                         </h2>
                         <p className="text-white/80 text-lg leading-relaxed font-light">
                             {isIcon
@@ -348,8 +348,8 @@ export default function StudentRegistrationPage() {
                                     <Label htmlFor="clinician">Clinician</Label>
                                 </div>
                                 <div className="flex items-center space-x-2">
-                                    <RadioGroupItem value="Faculty" id="faculty" />
-                                    <Label htmlFor="faculty">Faculty</Label>
+                                    <RadioGroupItem value="Academician" id="academician" />
+                                    <Label htmlFor="academician">Academician</Label>
                                 </div>
                             </RadioGroup>
                         )}

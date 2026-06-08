@@ -68,7 +68,7 @@ export async function sendAccountCreationEmail(data: AccountCreationEmailData) {
     console.log('[EmailService] Sending account creation credentials to:', data.user_email);
     
     // Choose template based on role:
-    // UG, PG, Student, Faculty, Clinician use template_rt3pe6e (student welcome)
+    // UG, PG, Student, Academician, Clinician use template_rt3pe6e (student welcome)
     // Judge, Volunteer, Core Team, Admin, Staff Coordinator use template_h87xu0d (staff welcome)
     const normalizedRole = (data.role || '').toLowerCase();
     const isStaffRole = ['judge', 'volunteer', 'core_team', 'core_scientific_team', 'staff_coordinator', 'staff', 'admin'].some(r => normalizedRole.includes(r));

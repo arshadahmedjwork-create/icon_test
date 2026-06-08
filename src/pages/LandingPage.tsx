@@ -130,7 +130,7 @@ export default function LandingPage() {
             </h1>
             <p className="text-lg text-primary-foreground/70 max-w-xl mb-8 leading-relaxed">
               {isIcon 
-                ? "Madras ICON is the premier platform for postgraduates and faculty to showcase research, engage in peer review, and elevate scientific standards."
+                ? "Madras ICON is the premier platform for postgraduates and academicians to showcase research, engage in peer review, and elevate scientific standards."
                 : "MIDAS digitizes the complete lifecycle of inter-college dental scientific events — from registration to certificates, all in one platform."
               }
             </p>

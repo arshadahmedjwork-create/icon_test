@@ -116,7 +116,7 @@ export interface Student extends User {
     teachingExperience?: string;
     academicPosition?: string;
     qualification?: string;
-    delegateType?: 'PG' | 'Clinician' | 'Guest' | 'Faculty';
+    delegateType?: 'PG' | 'Clinician' | 'Guest' | 'Academician';
     bonafideUrl?: string;
     dciCertificateUrl?: string;
 }

@@ -17,6 +17,7 @@ import NotFound from "./pages/NotFound";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { ProgramProvider } from "@/contexts/ProgramContext";
 import ChangePasswordModal from "./components/ChangePasswordModal";
+import ProtectedRoute from "./components/ProtectedRoute";
 
 const AuthModalWrapper = () => {
   const { user } = useAuth();
@@ -43,13 +44,41 @@ const App = () => (
               <Route path="/member-login" element={<MemberLoginPage />} />
               <Route path="/student-registration" element={<StudentRegistrationPage />} />
               <Route path="/certificate/verify/:certificateId" element={<CertificateVerification />} />
-              <Route path="/dashboard/admin/*" element={<AdminDashboard />} />
-              <Route path="/dashboard/core-team/*" element={<CoreTeamDashboard />} />
-              <Route path="/dashboard/staff/*" element={<StaffDashboard />} />
-              <Route path="/dashboard/student/*" element={<StudentDashboard />} />
-              <Route path="/dashboard/student-event/*" element={<StudentEventDashboard />} />
-              <Route path="/dashboard/judge/*" element={<JudgeDashboard />} />
-              <Route path="/dashboard/volunteer/*" element={<VolunteerDashboard />} />
+              <Route path="/dashboard/admin/*" element={
+                <ProtectedRoute allowedRoles={["admin"]}>
+                  <AdminDashboard />
+                </ProtectedRoute>
+              } />
+              <Route path="/dashboard/core-team/*" element={
+                <ProtectedRoute allowedRoles={["core_team"]}>
+                  <CoreTeamDashboard />
+                </ProtectedRoute>
+              } />
+              <Route path="/dashboard/staff/*" element={
+                <ProtectedRoute allowedRoles={["staff"]}>
+                  <StaffDashboard />
+                </ProtectedRoute>
+              } />
+              <Route path="/dashboard/student/*" element={
+                <ProtectedRoute allowedRoles={["student"]}>
+                  <StudentDashboard />
+                </ProtectedRoute>
+              } />
+              <Route path="/dashboard/student-event/*" element={
+                <ProtectedRoute allowedRoles={["student"]}>
+                  <StudentEventDashboard />
+                </ProtectedRoute>
+              } />
+              <Route path="/dashboard/judge/*" element={
+                <ProtectedRoute allowedRoles={["judge"]}>
+                  <JudgeDashboard />
+                </ProtectedRoute>
+              } />
+              <Route path="/dashboard/volunteer/*" element={
+                <ProtectedRoute allowedRoles={["volunteer"]}>
+                  <VolunteerDashboard />
+                </ProtectedRoute>
+              } />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </ProgramProvider>

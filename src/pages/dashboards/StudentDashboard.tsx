@@ -50,7 +50,7 @@ export default function StudentDashboard() {
   const getDashboardBadgeLabel = () => {
     if (!isIcon) return "Student Dashboard";
     if (delegateType === 'PG') return "Postgraduate Dashboard";
-    if (delegateType === 'Faculty') return "Faculty Dashboard";
+    if (delegateType === 'Academician') return "Academician Dashboard";
     if (delegateType === 'Clinician') return "Clinician Dashboard";
     return "ICON Portal";
   };

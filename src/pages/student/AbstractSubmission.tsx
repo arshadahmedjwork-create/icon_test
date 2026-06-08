@@ -144,7 +144,7 @@ export default function AbstractSubmission({ onComplete }: { onComplete: () => v
                         </div>
 
                         <div className="space-y-2">
-                            <Label htmlFor="mentorName">Guide / Mentor Name</Label>
+                            <Label htmlFor="mentorName">Guide Name (if any)</Label>
                             <Input id="mentorName" {...register("mentorName")} placeholder="Dr. Name (Optional)" />
                         </div>
                     </div>

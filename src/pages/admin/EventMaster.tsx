@@ -234,7 +234,7 @@ export default function AdminEventMaster() {
                                     >
                                         <option value="">Select Event Category</option>
                                         <option value="Postgraduate Presentation">Postgraduate Presentation</option>
-                                        <option value="Faculty Presentation">Faculty Presentation</option>
+                                        <option value="Academician Presentation">Academician Presentation</option>
                                         <option value="Clinician Presentation">Clinician Presentation</option>
                                     </select>
                                 ) : (
@@ -247,7 +247,7 @@ export default function AdminEventMaster() {
                                     <Label>Presentation Type</Label>
                                     <select className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" value={type} onChange={e => setType(e.target.value)}>
                                         <option value="Paper">Paper</option>
-                                        <option value="Poster">Poster</option>
+                                        <option value="Poster" disabled>Poster (Disabled)</option>
                                     </select>
                                 </div>
                                 <div className="space-y-2">

@@ -22,7 +22,7 @@ export default function ProtectedRoute({ children, allowedRoles }: ProtectedRout
     }
 
     if (!user) {
-        return <Navigate to="/login" state={{ from: location }} replace />;
+        return <Navigate to="/member-login" state={{ from: location }} replace />;
     }
 
     if (allowedRoles && !allowedRoles.includes(user.role)) {
@@ -35,7 +35,7 @@ export default function ProtectedRoute({ children, allowedRoles }: ProtectedRout
             judge: '/dashboard/judge',
             volunteer: '/dashboard/volunteer',
         };
-        return <Navigate to={dashboardPaths[user.role] || '/login'} replace />;
+        return <Navigate to={dashboardPaths[user.role] || '/member-login'} replace />;
     }
 
     return <>{children}</>;

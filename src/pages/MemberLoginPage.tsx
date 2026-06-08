@@ -151,7 +151,7 @@ export default function MemberLoginPage() {
                                     : "text-slate-500 hover:text-slate-700 hover:bg-slate-200/50"
                             )}
                         >
-                            STUDENT DELEGATE
+                            DELEGATE
                         </button>
                         <button
                             type="button"

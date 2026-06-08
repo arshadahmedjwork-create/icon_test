@@ -509,8 +509,17 @@ export default function StudentSubmissionsPage() {
                                 </div>
                                 {user?.role === 'student' && (
                                     <div className="space-y-2">
-                                        <Label>HOD / Guide Name *</Label>
-                                        <Input value={newForm.hodName} onChange={(e) => setNewForm({ ...newForm, hodName: e.target.value })} placeholder="Enter HOD Name" className="h-11 rounded-xl" />
+                                        {(user as any)?.delegateType === 'Clinician' ? (
+                                            <>
+                                                <Label>Guide Name (if any)</Label>
+                                                <Input value={newForm.hodName} onChange={(e) => setNewForm({ ...newForm, hodName: e.target.value })} placeholder="Enter Guide Name" className="h-11 rounded-xl" />
+                                            </>
+                                        ) : (
+                                            <>
+                                                <Label>HOD / Guide Name *</Label>
+                                                <Input value={newForm.hodName} onChange={(e) => setNewForm({ ...newForm, hodName: e.target.value })} placeholder="Enter HOD Name" className="h-11 rounded-xl" />
+                                            </>
+                                        )}
                                     </div>
                                 )}
                             </>

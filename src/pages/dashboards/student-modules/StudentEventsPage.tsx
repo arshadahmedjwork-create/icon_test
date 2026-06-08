@@ -98,8 +98,8 @@ export default function StudentEventsPage() {
                 const role = (user as Student)?.delegateType;
                 if (role === 'PG') {
                     filteredOptions = allOptions.filter(e => e.name.toLowerCase().includes("postgraduate"));
-                } else if (role === 'Faculty') {
-                    filteredOptions = allOptions.filter(e => e.name.toLowerCase().includes("faculty"));
+                } else if (role === 'Academician') {
+                    filteredOptions = allOptions.filter(e => e.name.toLowerCase().includes("academician"));
                 } else if (role === 'Clinician') {
                     filteredOptions = allOptions.filter(e => e.name.toLowerCase().includes("clinician"));
                 } else {
