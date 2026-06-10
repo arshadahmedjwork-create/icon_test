@@ -962,6 +962,19 @@ export const addSession = async (session: Omit<Session, "id">) => {
 
     // 2. Insert Judges if any (only for competitive sessions)
     if (!isNonComp && session.judges && session.judges.length > 0) {
+        for (const judgeId of session.judges) {
+            const { count, error: countError } = await supabase
+                .from('session_judges')
+                .select('*', { count: 'exact', head: true })
+                .eq('judgeId', judgeId);
+            if (countError) throw countError;
+            if (count && count >= 3) {
+                const { data: judgeData } = await supabase.from('judges').select('*').eq('id', judgeId).single();
+                const judgeName = judgeData?.fullName || judgeData?.full_name || judgeData?.name || judgeId;
+                throw new Error(`Judge ${judgeName} is already assigned to 3 sessions. A judge can be assigned to at most 3 sessions.`);
+            }
+        }
+
         const judgePayloads = session.judges.map(judgeId => ({
             sessionId,
             judgeId,
@@ -1040,6 +1053,21 @@ export const updateSession = async (id: string, updates: Partial<Session>) => {
 
     // Update Judges
     if (updates.judges !== undefined) {
+        if (!isNonComp && updates.judges.length > 0) {
+            for (const judgeId of updates.judges) {
+                const { count, error: countError } = await supabase
+                    .from('session_judges')
+                    .select('*', { count: 'exact', head: true })
+                    .eq('judgeId', judgeId)
+                    .neq('sessionId', id);
+                if (countError) throw countError;
+                if (count && count >= 3) {
+                    const { data: judgeData } = await supabase.from('judges').select('*').eq('id', judgeId).single();
+                    const judgeName = judgeData?.fullName || judgeData?.full_name || judgeData?.name || judgeId;
+                    throw new Error(`Judge ${judgeName} is already assigned to 3 sessions. A judge can be assigned to at most 3 sessions.`);
+                }
+            }
+        }
         await supabase.from('session_judges').delete().eq('sessionId', id);
         if (!isNonComp && updates.judges.length > 0) {
             const judgePayloads = updates.judges.map(judgeId => ({

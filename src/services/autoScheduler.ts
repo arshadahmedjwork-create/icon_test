@@ -13,6 +13,7 @@ interface SchedulerConfig {
     events: any[];
     program: Program;
     customCapacity?: number;
+    existingSessions?: Session[];
 }
 
 export interface ScheduleResult {
@@ -35,11 +36,12 @@ export class AutoScheduler {
     private judges: Judge[];
     private config: EventConfig;
     private events: any[];
-        private program: Program;
+    private program: Program;
     private customCapacity?: number;
+    private existingSessions: Session[];
     private warnings: string[] = [];
 
-    constructor({ abstracts, judges, config, events, program, customCapacity }: SchedulerConfig) {
+    constructor({ abstracts, judges, config, events, program, customCapacity, existingSessions }: SchedulerConfig) {
         this.program = program;
         this.customCapacity = customCapacity;
         // Only accept approved abstracts for the current program
@@ -51,6 +53,7 @@ export class AutoScheduler {
         this.judges = judges.filter(j => j.status === "Available" && j.program === program);
         this.config = config;
         this.events = events;
+        this.existingSessions = existingSessions || [];
     }
 
     public generateSchedule(targetMode: "Online" | "Offline"): ScheduleResult {
@@ -63,6 +66,16 @@ export class AutoScheduler {
         const generatedSessions: Session[] = [];
         const unassigned: Abstract[] = [];
         const modeAbstracts = this.abstracts.filter(a => a.mode.toLowerCase() === targetMode.toLowerCase());
+
+        // Track judge assignments. Initialize with counts from existing sessions.
+        const assignmentCounts = new Map<string, number>();
+        for (const s of this.existingSessions) {
+            if (s.judges) {
+                for (const judgeId of s.judges) {
+                    assignmentCounts.set(judgeId, (assignmentCounts.get(judgeId) || 0) + 1);
+                }
+            }
+        }
 
         // 2. Group by Subject + Type (Mode is already filtered)
         const groups = this.groupAbstracts(modeAbstracts);
@@ -78,7 +91,7 @@ export class AutoScheduler {
             // 5. Assign Judges & Create Sessions
             buckets.forEach((bucket, index) => {
                 try {
-                    const assignedJudges = this.assignJudges(subject, bucket);
+                    const assignedJudges = this.assignJudges(subject, bucket, assignmentCounts);
                     const delegateLabel = delegateType && delegateType !== 'UG' ? ` (${delegateType})` : '';
 
                     const session: Session = {
@@ -193,7 +206,7 @@ export class AutoScheduler {
      * Assigns exactly 1 Academic Judge and 1 Non-Academic judge.
      * Enforces Conflict of Interest: Judge college != ANY student college in the bucket.
      */
-    private assignJudges(subject: string, bucket: Abstract[]): Judge[] {
+    private assignJudges(subject: string, bucket: Abstract[], assignmentCounts: Map<string, number>): Judge[] {
         // Collect all student colleges in the bucket to check for conflicts
         const studentColleges = new Set(bucket.map(a => a.college || 'Unknown').filter(c => c !== 'Unknown'));
 
@@ -206,21 +219,26 @@ export class AutoScheduler {
             return studentColleges.has(judge.college || judge.affiliation || '');
         };
 
-        const academicCandidates = eligibleJudges.filter(j => j.type === "Academic" && !hasConflict(j));
-        const nonAcademicCandidates = eligibleJudges.filter(j => j.type === "Non-Academic" && !hasConflict(j));
+        // Enforce max 3 sessions limit per judge
+        const academicCandidates = eligibleJudges.filter(j => j.type === "Academic" && !hasConflict(j) && (assignmentCounts.get(j.id) || 0) < 3);
+        const nonAcademicCandidates = eligibleJudges.filter(j => j.type === "Non-Academic" && !hasConflict(j) && (assignmentCounts.get(j.id) || 0) < 3);
 
         const assigned: Judge[] = [];
 
         if (academicCandidates.length < 1) {
             this.warnings.push(`Insufficient Academic Judges for ${subject} without college conflicts (${Array.from(studentColleges).join(', ')}). Session created without one.`);
         } else {
-            assigned.push(academicCandidates[0]);
+            const judge = academicCandidates[0];
+            assigned.push(judge);
+            assignmentCounts.set(judge.id, (assignmentCounts.get(judge.id) || 0) + 1);
         }
 
         if (nonAcademicCandidates.length < 1) {
             this.warnings.push(`Insufficient Non-Academic Judges for ${subject} without college conflicts. Found: ${nonAcademicCandidates.length}, Needed: 1.`);
         } else {
-            assigned.push(nonAcademicCandidates[0]);
+            const judge = nonAcademicCandidates[0];
+            assigned.push(judge);
+            assignmentCounts.set(judge.id, (assignmentCounts.get(judge.id) || 0) + 1);
         }
 
         return assigned;

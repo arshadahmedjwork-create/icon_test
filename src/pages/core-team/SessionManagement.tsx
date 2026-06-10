@@ -206,9 +206,9 @@ export default function SessionManagement() {
                 judges: [],
                 abstractIds: []
             });
-        } catch (error) {
+        } catch (error: any) {
             console.error(error);
-            toast({ title: "Error", description: "Failed to save session.", variant: "destructive" });
+            toast({ title: "Error", description: error?.message || "Failed to save session.", variant: "destructive" });
         } finally {
             setIsSubmitting(false);
         }
@@ -277,6 +277,7 @@ export default function SessionManagement() {
             events,
             program: currentProgram,
             customCapacity,
+            existingSessions: sessions,
             // @ts-ignore
             config: {
                 subjects: Array.from(new Set(events.map(e => e.name))),
@@ -333,9 +334,9 @@ export default function SessionManagement() {
             setIsPreviewOpen(false);
             refreshData();
             toast({ title: "Schedule Published", description: `${previewSessions.length} sessions created successfully.` });
-        } catch (error) {
+        } catch (error: any) {
             console.error(error);
-            toast({ title: "Error", description: "Failed to publish schedule.", variant: "destructive" });
+            toast({ title: "Error", description: error?.message || "Failed to publish schedule.", variant: "destructive" });
         }
     };
 
