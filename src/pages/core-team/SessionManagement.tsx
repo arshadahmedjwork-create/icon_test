@@ -473,7 +473,7 @@ export default function SessionManagement() {
                     <DialogHeader>
                         <DialogTitle>Auto-Schedule Preview</DialogTitle>
                         <DialogDescription>
-                            Generated {previewSessions.length} sessions based on SRS rules.
+                            Generated {previewSessions.length} sessions.
                         </DialogDescription>
                     </DialogHeader>
 
