@@ -433,7 +433,8 @@ export const addJudge = async (judge: Omit<Judge, 'id'>) => {
             user_name: judge.name,
             user_email: judge.email,
             temp_password: tempPassword,
-            login_url: window.location.origin + "/member-login"
+            login_url: window.location.origin + "/member-login",
+            role: "judge"
         });
     } catch (emailError) {
         console.error("Failed to send judge account creation email:", emailError);
