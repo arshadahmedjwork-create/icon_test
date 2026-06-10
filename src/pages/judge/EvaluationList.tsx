@@ -98,33 +98,40 @@ export default function EvaluationList() {
                                             <span>{session.abstractIds.length} Presentations</span>
                                         </div>
                                     </div>
-                                    {isCompleted ? (
-                                        <div className="space-y-2">
-                                            <Button disabled className="w-full" variant="secondary">
-                                                Event Ended
-                                            </Button>
-                                            {myCert && (
-                                                <Button 
-                                                    className="w-full bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-semibold"
-                                                    onClick={async () => {
-                                                        try {
-                                                            await downloadCertificate(myCert.id);
-                                                        } catch (error) {
-                                                            console.error("Download failed:", error);
-                                                        }
-                                                    }}
-                                                >
-                                                    <Download className="w-4 h-4 mr-2" /> Download Participation Certificate
-                                                </Button>
-                                            )}
-                                        </div>
-                                    ) : (
-                                        <Button asChild className="w-full">
-                                            <Link to={`/dashboard/judge/session/${session.id}`}>
-                                                Start Evaluation <ArrowRight className="w-4 h-4 ml-2" />
+                                    <div className="space-y-2">
+                                        <Button asChild variant="outline" className="w-full border-blue-600/30 text-blue-700 hover:bg-blue-50 rounded-xl font-semibold">
+                                            <Link to={`/dashboard/judge/session/${session.id}/scoreboard`}>
+                                                View Scoreboard
                                             </Link>
                                         </Button>
-                                    )}
+                                        {isCompleted ? (
+                                            <div className="space-y-2">
+                                                <Button disabled className="w-full" variant="secondary">
+                                                    Event Ended
+                                                </Button>
+                                                {myCert && (
+                                                    <Button 
+                                                        className="w-full bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-semibold"
+                                                        onClick={async () => {
+                                                            try {
+                                                                await downloadCertificate(myCert.id);
+                                                            } catch (error) {
+                                                                console.error("Download failed:", error);
+                                                            }
+                                                        }}
+                                                    >
+                                                        <Download className="w-4 h-4 mr-2" /> Download Participation Certificate
+                                                    </Button>
+                                                )}
+                                            </div>
+                                        ) : (
+                                            <Button asChild className="w-full">
+                                                <Link to={`/dashboard/judge/session/${session.id}`}>
+                                                    Start Evaluation <ArrowRight className="w-4 h-4 ml-2" />
+                                                </Link>
+                                            </Button>
+                                        )}
+                                    </div>
                                 </CardContent>
                             </Card>
                         );

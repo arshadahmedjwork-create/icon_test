@@ -8,7 +8,11 @@ import {
     getJudges,
     getAbstracts,
     getEvents,
-    getEventStudents
+    getEventStudents,
+    getUsers,
+    getVolunteerAssignments,
+    assignVolunteerToSession,
+    removeVolunteerFromSession
 } from "@/services/supabaseService";
 import { sendAllocationEmail } from "@/services/emailService";
 import { AutoScheduler } from "@/services/autoScheduler";
@@ -70,6 +74,57 @@ export default function SessionManagement() {
     const [editingCriteriaSession, setEditingCriteriaSession] = useState<Session | null>(null);
     const [tempCriterias, setTempCriterias] = useState<any[]>([]);
     const [viewingStatusSession, setViewingStatusSession] = useState<Session | null>(null);
+
+    // Volunteer Assignment State
+    const [editingVolunteersSession, setEditingVolunteersSession] = useState<Session | null>(null);
+    const [allVolunteers, setAllVolunteers] = useState<any[]>([]);
+    const [assignedVolunteers, setAssignedVolunteers] = useState<string[]>([]);
+
+    const handleOpenVolunteersEditor = async (session: Session) => {
+        setEditingVolunteersSession(session);
+        try {
+            const [users, assignments] = await Promise.all([
+                getUsers(currentProgram),
+                getVolunteerAssignments(session.id)
+            ]);
+            const vols = users.filter((u: any) => u.role === 'volunteer');
+            setAllVolunteers(vols);
+            setAssignedVolunteers(assignments.map((a: any) => a.memberId));
+        } catch (error) {
+            console.error("Failed to load volunteers", error);
+            toast({ title: "Error", description: "Failed to load volunteers.", variant: "destructive" });
+        }
+    };
+
+    const handleToggleVolunteer = (volunteerId: string) => {
+        if (assignedVolunteers.includes(volunteerId)) {
+            setAssignedVolunteers(assignedVolunteers.filter(id => id !== volunteerId));
+        } else {
+            setAssignedVolunteers([...assignedVolunteers, volunteerId]);
+        }
+    };
+
+    const handleSaveVolunteers = async () => {
+        if (!editingVolunteersSession) return;
+        try {
+            const initialAssignments = await getVolunteerAssignments(editingVolunteersSession.id);
+            const initialIds = initialAssignments.map((a: any) => a.memberId);
+
+            const toAssign = assignedVolunteers.filter(id => !initialIds.includes(id));
+            const toRemove = initialIds.filter(id => !assignedVolunteers.includes(id));
+
+            await Promise.all([
+                ...toAssign.map(id => assignVolunteerToSession(id, editingVolunteersSession.id)),
+                ...toRemove.map(id => removeVolunteerFromSession(id, editingVolunteersSession.id))
+            ]);
+
+            toast({ title: "Volunteers Updated", description: "Volunteers successfully assigned." });
+            setEditingVolunteersSession(null);
+        } catch (error) {
+            console.error("Failed to save volunteers", error);
+            toast({ title: "Error", description: "Failed to update assignments.", variant: "destructive" });
+        }
+    };
 
     useEffect(() => {
         refreshData();
@@ -519,14 +574,17 @@ export default function SessionManagement() {
                                         </Button>
                                     ) : (
                                         <>
-                                            <Button variant="outline" size="sm" className="flex-1 text-xs px-2.5" onClick={() => handleEdit(session)}>
-                                                <Edit className="w-3.5 h-3.5 mr-1 shrink-0" /> Edit
+                                            <Button variant="outline" size="sm" className="flex-1 text-[10px] px-1" onClick={() => handleEdit(session)}>
+                                                <Edit className="w-3 h-3 mr-1 shrink-0" /> Edit
                                             </Button>
-                                            <Button variant="outline" size="sm" className="flex-1 text-xs px-2.5" onClick={() => handleOpenCriteriaEditor(session)}>
-                                                <FileText className="w-3.5 h-3.5 mr-1 shrink-0" /> Criteria
+                                            <Button variant="outline" size="sm" className="flex-1 text-[10px] px-1" onClick={() => handleOpenCriteriaEditor(session)}>
+                                                <FileText className="w-3 h-3 mr-1 shrink-0" /> Criteria
                                             </Button>
-                                            <Button variant="outline" size="sm" className="flex-1 text-xs px-2.5" onClick={() => setViewingStatusSession(session)}>
-                                                <Users className="w-3.5 h-3.5 mr-1 shrink-0" /> Status
+                                            <Button variant="outline" size="sm" className="flex-1 text-[10px] px-1" onClick={() => setViewingStatusSession(session)}>
+                                                <Users className="w-3 h-3 mr-1 shrink-0" /> Status
+                                            </Button>
+                                            <Button variant="outline" size="sm" className="flex-1 text-[10px] px-1" onClick={() => handleOpenVolunteersEditor(session)}>
+                                                <Users className="w-3 h-3 mr-1 shrink-0" /> Assign
                                             </Button>
                                         </>
                                     )}
@@ -809,6 +867,44 @@ export default function SessionManagement() {
                     })()}
                     <DialogFooter>
                         <Button onClick={() => setViewingStatusSession(null)}>Close</Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* Volunteer Assignment Dialog */}
+            <Dialog open={!!editingVolunteersSession} onOpenChange={(val) => !val && setEditingVolunteersSession(null)}>
+                <DialogContent className="max-w-md">
+                    <DialogHeader>
+                        <DialogTitle>Assign Volunteers</DialogTitle>
+                        <DialogDescription>
+                            Select volunteers to assign to "{editingVolunteersSession?.name}".
+                        </DialogDescription>
+                    </DialogHeader>
+                    
+                    <div className="space-y-4 py-4">
+                        <div className="border rounded p-3 h-64 overflow-y-auto space-y-2">
+                            {allVolunteers.length === 0 ? (
+                                <p className="text-sm text-muted-foreground text-center py-8">No volunteers found.</p>
+                            ) : (
+                                allVolunteers.map(volunteer => (
+                                    <div key={volunteer.id} className="flex items-center space-x-2 border-b pb-2 last:border-0">
+                                        <Checkbox
+                                            id={`vol-${volunteer.id}`}
+                                            checked={assignedVolunteers.includes(volunteer.id)}
+                                            onCheckedChange={() => handleToggleVolunteer(volunteer.id)}
+                                        />
+                                        <label htmlFor={`vol-${volunteer.id}`} className="text-sm font-medium leading-none cursor-pointer">
+                                            {volunteer.name} ({volunteer.email})
+                                        </label>
+                                    </div>
+                                ))
+                            )}
+                        </div>
+                    </div>
+
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setEditingVolunteersSession(null)}>Cancel</Button>
+                        <Button onClick={handleSaveVolunteers}>Save Assignments</Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>

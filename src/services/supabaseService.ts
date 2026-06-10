@@ -820,17 +820,111 @@ export const getSessions = async (program?: string): Promise<Session[]> => {
             status: d.status ? d.status.toUpperCase() : 'SESSION_NOT_STARTED',
             currentPresenterId: d.currentPresenterId || null,
             program: d.program,
-            winners: typeof d.winners === 'string' ? (()=>{ try { return JSON.parse(d.winners); } catch(e){ return []; } })() : (Array.isArray(d.winners) ? d.winners : [])
+            winners: typeof d.winners === 'string' ? (()=>{ try { return JSON.parse(d.winners); } catch(e){ return []; } })() : (Array.isArray(d.winners) ? d.winners : []),
+            completed_participants: typeof d.completed_participants === 'string' ? (()=>{ try { return JSON.parse(d.completed_participants); } catch(e){ return []; } })() : (Array.isArray(d.completed_participants) ? d.completed_participants : (d.completed_participants || []))
         };
     }) as Session[];
 };
 
+const getCurrentUserFromStorage = (): any => {
+    try {
+        const stored = localStorage.getItem("midas_user");
+        if (stored) return JSON.parse(stored);
+    } catch (e) {}
+    return null;
+};
+
+export const isNonCompetitiveSession = (session: { type?: string; name?: string; subject?: string } | null | undefined): boolean => {
+    if (!session) return false;
+    const typeLower = (session.type || '').toLowerCase();
+    const nameLower = (session.name || '').toLowerCase();
+    const subjectLower = (session.subject || '').toLowerCase();
+    return typeLower.includes('accommodation') || typeLower.includes('clinician') || typeLower.includes('academician') || typeLower.includes('faculty') ||
+           nameLower.includes('accommodation') || nameLower.includes('clinician') || nameLower.includes('academician') || nameLower.includes('faculty') ||
+           subjectLower.includes('accommodation') || subjectLower.includes('clinician') || subjectLower.includes('academician') || subjectLower.includes('faculty');
+};
+
+export const validateSessionAccess = async (sessionId: string, actionDescription: string) => {
+    const user = getCurrentUserFromStorage();
+    if (!user) return; // Allow if not logged in
+
+    // Admin and Core Team have full access
+    if (user.role === 'admin' || user.role === 'core_team') {
+        return;
+    }
+
+    if (user.role === 'volunteer') {
+        const { data, error } = await supabase
+            .from('volunteer_assignments')
+            .select('id')
+            .eq('memberId', user.id)
+            .eq('sessionId', sessionId)
+            .maybeSingle();
+        
+        if (error || !data) {
+            throw new Error(`Unauthorized: Volunteer is not assigned to this session. Cannot perform ${actionDescription}`);
+        }
+        return;
+    }
+
+    if (user.role === 'judge') {
+        const { data: judgeData, error: jErr } = await supabase
+            .from('judges')
+            .select('id')
+            .eq('memberId', user.id)
+            .maybeSingle();
+
+        if (jErr || !judgeData) {
+            throw new Error("Judge profile not found");
+        }
+
+        const { data: assignment, error: aErr } = await supabase
+            .from('session_judges')
+            .select('id')
+            .eq('sessionId', sessionId)
+            .eq('judgeId', judgeData.id)
+            .maybeSingle();
+
+        if (aErr || !assignment) {
+            throw new Error(`Unauthorized: Judge is not assigned to this session. Cannot perform ${actionDescription}`);
+        }
+        return;
+    }
+};
+
 export const updateSessionStatus = async (id: string, status: string) => {
+    await validateSessionAccess(id, "update status");
+    
+    // Validate finalization rule
+    if (status.toUpperCase() === 'SESSION_COMPLETED' || status.toUpperCase() === 'COMPLETED') {
+        const { data: session } = await supabase.from('sessions').select('*').eq('id', id).single();
+        if (session) {
+            const allAbstracts = await getAbstracts(session.program);
+            const sessionAbstracts = allAbstracts.filter(a => session.abstractIds && session.abstractIds.includes(a.id));
+            const attendedSubIds = (session as any)._attendedSubmissionIds || [];
+            
+            const { data: evaluations } = await supabase.from('evaluations').select('*').eq('session_id', id);
+            const evals = evaluations || [];
+            
+            const isCompetitive = !isNonCompetitiveSession(session);
+            for (const p of sessionAbstracts) {
+                const isAbsent = !attendedSubIds.includes(p.id);
+                if (!isAbsent && isCompetitive) {
+                    const hasEval = evals.some(e => e.student_id === p.studentId || e.eventStudentId === p.studentId);
+                    if (!hasEval) {
+                        throw new Error(`Cannot finalize: Participant ${p.studentId} is present but has not been evaluated.`);
+                    }
+                }
+            }
+        }
+    }
+
     const { error } = await supabase.from('sessions').update({ status: status.toUpperCase() }).eq('id', id);
     if (error) throw error;
 };
 
 export const updateCurrentPresenter = async (id: string, studentId: string | null) => {
+    await validateSessionAccess(id, "update presenter");
     const { error } = await supabase.from('sessions').update({ currentPresenterId: studentId }).eq('id', id);
     if (error) throw error;
 };
@@ -840,6 +934,8 @@ export const addSession = async (session: Omit<Session, "id">) => {
     if (!["PAPER", "POSTER", "QUIZ", "DEBATE", "WORKSHOP"].includes(eventType)) {
         eventType = "PAPER";
     }
+
+    const isNonComp = isNonCompetitiveSession(session);
 
     const sessionPayload = {
         name: session.name,
@@ -864,8 +960,8 @@ export const addSession = async (session: Omit<Session, "id">) => {
     if (sessionError) throw sessionError;
     const sessionId = newSession.id;
 
-    // 2. Insert Judges if any
-    if (session.judges && session.judges.length > 0) {
+    // 2. Insert Judges if any (only for competitive sessions)
+    if (!isNonComp && session.judges && session.judges.length > 0) {
         const judgePayloads = session.judges.map(judgeId => ({
             sessionId,
             judgeId,
@@ -928,16 +1024,24 @@ export const updateSession = async (id: string, updates: Partial<Session>) => {
     }
     if (updates.eventId !== undefined) dbUpdates.eventId = updates.eventId;
     if (updates.criterias !== undefined) dbUpdates.criterias = updates.criterias;
+    if ((updates as any).completed_participants !== undefined) dbUpdates.completed_participants = (updates as any).completed_participants;
 
     if (Object.keys(dbUpdates).length > 0) {
         const { error } = await supabase.from('sessions').update(dbUpdates).eq('id', id);
         if (error) throw error;
     }
 
+    const { data: currentSession } = await supabase.from('sessions').select('*').eq('id', id).single();
+    const isNonComp = isNonCompetitiveSession({
+        name: updates.name || currentSession?.name,
+        type: updates.type || currentSession?.type,
+        subject: updates.subject || currentSession?.subject
+    });
+
     // Update Judges
     if (updates.judges !== undefined) {
         await supabase.from('session_judges').delete().eq('sessionId', id);
-        if (updates.judges.length > 0) {
+        if (!isNonComp && updates.judges.length > 0) {
             const judgePayloads = updates.judges.map(judgeId => ({
                 sessionId: id,
                 judgeId,
@@ -982,7 +1086,7 @@ export const deleteSession = async (id: string) => {
 };
 
 export const updateSessionAttendance = async (sessionId: string, attendedStudentIds: string[]) => {
-    // Map studentIds to submissionIds using the server's submissions table
+    await validateSessionAccess(sessionId, "update attendance");
     const { data: abstracts, error } = await supabase.from('submissions').select('id, eventStudentId');
     if (error || !abstracts) {
         console.error("Failed to fetch abstracts for attendance mapping", error);
@@ -993,8 +1097,6 @@ export const updateSessionAttendance = async (sessionId: string, attendedStudent
         .filter(a => attendedStudentIds.includes(a.eventStudentId))
         .map(a => a.id);
 
-    // Supabase JS lacks a clean multiple-row conditional update, so we wipe and set.
-    // Ensure we use the correct column names for session_participants (camelCase)
     await supabase.from('session_participants').update({ attended: false }).eq('sessionId', sessionId);
 
     if (attendedSubmissionIds.length > 0) {
@@ -1033,19 +1135,35 @@ export const getEvaluations = async (program?: string): Promise<Evaluation[]> =>
 };
 
 export const addEvaluation = async (evaluation: Omit<Evaluation, "id" | "submittedAt"> & { program?: string }) => {
-    // 1. Fetch session status and current presenter
     const { data: session, error: sErr } = await supabase
         .from('sessions')
-        .select('status, currentPresenterId')
+        .select('*')
         .eq('id', evaluation.sessionId)
         .single();
     if (sErr || !session) throw new Error("Session not found");
+
+    if (session.status?.toLowerCase() === 'completed' || session.status?.toLowerCase() === 'session_completed') {
+        throw new Error("Scores cannot be edited after finalization");
+    }
+
+    if (isNonCompetitiveSession(session)) {
+        throw new Error("Accommodation/Clinician sessions cannot create judge records or evaluations");
+    }
+
+    const { data: sj, error: sjErr } = await supabase
+        .from('session_judges')
+        .select('id')
+        .eq('sessionId', evaluation.sessionId)
+        .eq('judgeId', evaluation.judgeId)
+        .maybeSingle();
+    if (sjErr || !sj) {
+        throw new Error("Judge is not assigned to this session");
+    }
 
     if (session.status !== 'SESSION_LIVE') {
         throw new Error("Evaluation not allowed until session is LIVE");
     }
 
-    // 2. Fetch participant attendance status
     const { data: participant, error: pErr } = await supabase
         .from('session_participants')
         .select('attended')
@@ -1059,7 +1177,6 @@ export const addEvaluation = async (evaluation: Omit<Evaluation, "id" | "submitt
         throw new Error("Participant marked absent");
     }
 
-    // 3. Verify they are the current live presenter
     if (session.currentPresenterId !== evaluation.studentId) {
         throw new Error("Only the active live presenter can be evaluated");
     }
@@ -1072,7 +1189,6 @@ export const addEvaluation = async (evaluation: Omit<Evaluation, "id" | "submitt
         total_score: evaluation.totalScore,
         feedback: evaluation.feedback,
         program: evaluation.program,
-        // Fill legacy/camelCase columns as well
         judgeId: evaluation.judgeId,
         eventStudentId: evaluation.studentId,
         comments: evaluation.feedback
@@ -1160,6 +1276,35 @@ export const calculateSessionResults = async (sessionId: string) => {
     // 1. Fetch Session
     const { data: session, error: sErr } = await supabase.from('sessions').select('*').eq('id', sessionId).single();
     if (sErr || !session) return null;
+
+    if (isNonCompetitiveSession(session)) {
+        const { error: uErr } = await supabase.from('sessions').update({
+            status: 'SESSION_COMPLETED',
+            session_status: 'CLOSED',
+            winners: []
+        }).eq('id', sessionId);
+        if (uErr) throw uErr;
+
+        const { data: participants } = await supabase
+            .from('session_participants')
+            .select('eventStudentId')
+            .eq('sessionId', sessionId)
+            .eq('attended', true);
+        
+        const presentAttendeeIds = (participants || []).map((p: any) => p.eventStudentId).filter(Boolean);
+        for (const studentId of presentAttendeeIds) {
+            await addCertificate({
+                id: crypto.randomUUID(),
+                userId: studentId,
+                sessionId: sessionId,
+                type: "participation",
+                generatedAt: new Date().toISOString(),
+                emailSent: false,
+                downloadUrl: `/api/certificate/download`
+            });
+        }
+        return [];
+    }
 
     // 2. Fetch Evaluations
     const { data: evaluations, error: eErr } = await supabase.from('evaluations').select('*').eq('session_id', sessionId);
@@ -1257,6 +1402,7 @@ export const calculateSessionResults = async (sessionId: string) => {
     // 6. Update Session
     const { error: uErr } = await supabase.from('sessions').update({
         status: 'SESSION_COMPLETED',
+        session_status: 'CLOSED',
         winners: winners
     }).eq('id', sessionId);
     if (uErr) throw uErr;
@@ -1533,5 +1679,32 @@ export const getStudentSessionsAndSubmissions = async (studentId: string, progra
         console.error('Failed to get student sessions and submissions:', err);
         return [];
     }
+};
+
+export const getVolunteerAssignments = async (sessionId?: string) => {
+    let query = supabase.from('volunteer_assignments').select('*');
+    if (sessionId) {
+        query = query.eq('sessionId', sessionId);
+    }
+    const { data, error } = await query;
+    if (error) throw error;
+    return data || [];
+};
+
+export const assignVolunteerToSession = async (memberId: string, sessionId: string) => {
+    const { data, error } = await supabase
+        .from('volunteer_assignments')
+        .upsert({ memberId, sessionId }, { onConflict: 'memberId,sessionId' });
+    if (error) throw error;
+    return data;
+};
+
+export const removeVolunteerFromSession = async (memberId: string, sessionId: string) => {
+    const { error } = await supabase
+        .from('volunteer_assignments')
+        .delete()
+        .eq('memberId', memberId)
+        .eq('sessionId', sessionId);
+    if (error) throw error;
 };
 

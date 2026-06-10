@@ -298,6 +298,11 @@ export default function SessionEvaluation() {
                 </div>
 
                 <div className="flex gap-2">
+                    <Button asChild variant="outline" className="rounded-xl border-blue-600/30 text-blue-700 hover:bg-blue-50">
+                        <Link to={`/dashboard/judge/session/${sessionId}/scoreboard`}>
+                            <Trophy className="w-4 h-4 mr-2" /> Scoreboard
+                        </Link>
+                    </Button>
                     <Dialog>
                         <DialogTrigger asChild>
                             <Button variant="outline" className="rounded-xl bg-slate-50 border-slate-200 hover:bg-slate-100">
@@ -435,14 +440,14 @@ export default function SessionEvaluation() {
                                 <Button
                                     className="w-full mt-4 rounded-xl font-semibold"
                                     onClick={() => handleStartEvaluation(abstract)}
-                                    disabled={finalized || !canEvaluate}
+                                    disabled={finalized || (isEvaluated ? false : !canEvaluate)}
                                     variant={isEvaluated ? "outline" : "default"}
                                 >
                                     {finalized ? "Evaluation Locked" :
                                         isAbsent ? "Participant Absent ❌" :
                                             !isSessionLive ? "Waiting for session to go LIVE ⏳" :
-                                                !isCurrentPresenter ? "Awaiting Live Turn 🎙️" :
-                                                    isEvaluated ? "Edit Evaluation" : "Evaluate Presentation"}
+                                                isEvaluated ? "Edit Evaluation" :
+                                                    !isCurrentPresenter ? "Awaiting Live Turn 🎙️" : "Evaluate Presentation"}
                                 </Button>
                                 <Button
                                     variant="outline"

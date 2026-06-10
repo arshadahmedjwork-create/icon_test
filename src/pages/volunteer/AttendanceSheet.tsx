@@ -1,6 +1,18 @@
 import { useState, useEffect } from "react";
-import { getSessions, getEventStudents, getAbstracts, updateSessionAttendance, updateSessionStatus, updateCurrentPresenter } from "@/services/supabaseService";
-import { Session, Student, Abstract } from "@/types";
+import { 
+    getSessions, 
+    getEventStudents, 
+    getAbstracts, 
+    updateSessionAttendance, 
+    updateSessionStatus, 
+    updateCurrentPresenter,
+    getVolunteerAssignments,
+    isNonCompetitiveSession,
+    getEvaluations,
+    updateSession,
+    calculateSessionResults
+} from "@/services/supabaseService";
+import { Session, Student, Abstract, Evaluation } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -10,6 +22,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Search, QrCode, Save, Users, CheckCircle2, Play, Square, Mic2, Radio, ExternalLink } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { useProgram } from "@/contexts/ProgramContext";
+import { useAuth } from "@/contexts/AuthContext";
 import {
     Dialog,
     DialogContent,
@@ -21,6 +34,7 @@ import {
 export default function AttendanceSheet() {
     const { toast } = useToast();
     const { currentProgram } = useProgram();
+    const { user } = useAuth();
     const [sessions, setSessions] = useState<Session[]>([]);
     const [selectedSessionId, setSelectedSessionId] = useState<string>("");
     const [students, setStudents] = useState<Student[]>([]);
@@ -29,31 +43,42 @@ export default function AttendanceSheet() {
     const [isScanning, setIsScanning] = useState(false);
     const [currentPresenterId, setCurrentPresenterId] = useState<string | null>(null);
     const [status, setStatus] = useState<string>("scheduled");
+    const [evaluations, setEvaluations] = useState<Evaluation[]>([]);
+    const [completedParticipants, setCompletedParticipants] = useState<string[]>([]);
+    const [selectedSession, setSelectedSession] = useState<Session | null>(null);
+
+    const loadSessions = async () => {
+        let data = await getSessions(currentProgram);
+        if (user?.role === 'volunteer') {
+            const assignments = await getVolunteerAssignments();
+            const assignedSessionIds = assignments
+                .filter((a: any) => a.memberId === user.id)
+                .map((a: any) => a.sessionId);
+            data = data.filter(s => assignedSessionIds.includes(s.id));
+        }
+        setSessions(data);
+    };
 
     useEffect(() => {
-        const loadSessions = async () => {
-            const data = await getSessions(currentProgram);
-            setSessions(data);
-        };
         loadSessions();
-    }, [currentProgram]);
+    }, [currentProgram, user]);
 
     useEffect(() => {
         const loadSessionData = async () => {
             if (selectedSessionId) {
-                const [allSessions, allStudents, allAbstracts] = await Promise.all([
+                const [allSessions, allStudents, allAbstracts, allEvaluations] = await Promise.all([
                     getSessions(currentProgram),
                     getEventStudents(currentProgram),
-                    getAbstracts(currentProgram)
+                    getAbstracts(currentProgram),
+                    getEvaluations(currentProgram)
                 ]);
 
                 const session = allSessions.find(s => s.id === selectedSessionId);
+                setSelectedSession(session || null);
                 if (session) {
-                    // Filter students in this session
                     const sessionAbstracts = allAbstracts.filter(a => session.abstractIds && session.abstractIds.includes(a.id));
                     const studentIds = sessionAbstracts.map(a => a.studentId);
 
-                    // Extract matching students and normalize their names
                     const sessionStudents = allStudents
                         .filter((u: any) => studentIds.includes(u.id))
                         .map((u: any) => {
@@ -75,18 +100,29 @@ export default function AttendanceSheet() {
                             .map(a => a.studentId);
                         setAttendance(new Set(attendedStudents));
                     } else if (session.attendanceRecords) {
-                        // Fallback for legacy data
                         setAttendance(new Set(session.attendanceRecords));
                     } else {
                         setAttendance(new Set());
                     }
                     setCurrentPresenterId(session.currentPresenterId || null);
                     setStatus(session.status);
+                    setEvaluations(allEvaluations.filter(e => e.sessionId === selectedSessionId));
+                    setCompletedParticipants((session as any).completed_participants || []);
                 }
+            } else {
+                setSelectedSession(null);
+                setStudents([]);
+                setAttendance(new Set());
+                setCurrentPresenterId(null);
+                setStatus("scheduled");
+                setEvaluations([]);
+                setCompletedParticipants([]);
             }
         };
         loadSessionData();
     }, [selectedSessionId, currentProgram]);
+
+    const isNonComp = selectedSession ? isNonCompetitiveSession(selectedSession) : false;
 
     const normalizedStatus = status ? status.toLowerCase() : "";
     const isNotStarted = normalizedStatus === "scheduled" || normalizedStatus === "session_not_started";
@@ -94,14 +130,27 @@ export default function AttendanceSheet() {
     const isLive = normalizedStatus === "session_live";
     const isCompleted = normalizedStatus === "completed" || normalizedStatus === "session_completed";
 
+    // Helper to check if a student has completed their presentation
+    const isStudentCompleted = (studentId: string) => {
+        if (isNonComp) {
+            return completedParticipants.includes(studentId);
+        } else {
+            // Competitive: must have at least one evaluation record (that is not marked absent)
+            return evaluations.some(e => e.studentId === studentId && !e.isAbsent);
+        }
+    };
+
+    // Strict finalization checks: Every student must be Completed or Absent (i.e. no present student is pending completion)
+    const pendingStudents = students.filter(s => attendance.has(s.id) && !isStudentCompleted(s.id));
+    const canFinalize = selectedSessionId && pendingStudents.length === 0 && (isLive || isStarted);
+
     const handleStartSession = async () => {
         if (!selectedSessionId) return;
         try {
             await updateSessionStatus(selectedSessionId, "SESSION_STARTED");
             setStatus("SESSION_STARTED");
             toast({ title: "Session Started", description: "Attendance can now be finalized before going live." });
-            const data = await getSessions(currentProgram);
-            setSessions(data);
+            await loadSessions();
         } catch (error) {
             toast({ title: "Error", description: "Failed to start session.", variant: "destructive" });
         }
@@ -112,9 +161,8 @@ export default function AttendanceSheet() {
         try {
             await updateSessionStatus(selectedSessionId, "SESSION_LIVE");
             setStatus("SESSION_LIVE");
-            toast({ title: "Session is LIVE", description: "Judges can now evaluate active presenters." });
-            const data = await getSessions(currentProgram);
-            setSessions(data);
+            toast({ title: "Session is LIVE", description: isNonComp ? "Mark participants completed when finished presenting." : "Judges can now evaluate active presenters." });
+            await loadSessions();
         } catch (error) {
             toast({ title: "Error", description: "Failed to go live.", variant: "destructive" });
         }
@@ -123,15 +171,14 @@ export default function AttendanceSheet() {
     const handleEndSession = async () => {
         if (!selectedSessionId) return;
         try {
-            await updateSessionStatus(selectedSessionId, "SESSION_COMPLETED");
+            // Trigger results calculation & certificate generation
+            await calculateSessionResults(selectedSessionId);
             setStatus("SESSION_COMPLETED");
             setCurrentPresenterId(null);
-            await updateCurrentPresenter(selectedSessionId, null);
-            toast({ title: "Session Ended", description: "Session marked as completed." });
-            const data = await getSessions(currentProgram);
-            setSessions(data);
-        } catch (error) {
-            toast({ title: "Error", description: "Failed to end session.", variant: "destructive" });
+            toast({ title: "Session Finalized & Closed", description: "Lock complete. Certificates generated!" });
+            await loadSessions();
+        } catch (error: any) {
+            toast({ title: "Error", description: error.message || "Failed to finalize session.", variant: "destructive" });
         }
     };
 
@@ -151,22 +198,43 @@ export default function AttendanceSheet() {
     };
 
     const handleToggleAttendance = (studentId: string) => {
+        if (isCompleted) return;
         const newAttendance = new Set(attendance);
         if (newAttendance.has(studentId)) {
             newAttendance.delete(studentId);
+            // If they are marked absent, remove from completed participants list
+            if (completedParticipants.includes(studentId)) {
+                setCompletedParticipants(completedParticipants.filter(id => id !== studentId));
+            }
         } else {
             newAttendance.add(studentId);
         }
         setAttendance(newAttendance);
     };
 
+    const handleToggleCompletionNonComp = async (studentId: string) => {
+        if (isCompleted || !isNonComp) return;
+        let newCompleted = [...completedParticipants];
+        if (newCompleted.includes(studentId)) {
+            newCompleted = newCompleted.filter(id => id !== studentId);
+        } else {
+            newCompleted.push(studentId);
+        }
+        setCompletedParticipants(newCompleted);
+
+        try {
+            await updateSession(selectedSessionId, { completed_participants: newCompleted } as any);
+            toast({ title: "Updated Status", description: "Participant presentation completion toggled." });
+        } catch (err) {
+            toast({ title: "Error", description: "Failed to update completion status.", variant: "destructive" });
+        }
+    };
+
     const handleSave = async () => {
         if (!selectedSessionId) return;
 
         try {
-            // Update session_participants table mapping
             await updateSessionAttendance(selectedSessionId, Array.from(attendance));
-
             toast({ title: "Saved", description: "Attendance records updated successfully." });
         } catch (error) {
             console.error(error);
@@ -175,6 +243,7 @@ export default function AttendanceSheet() {
     };
 
     const handleBulkMark = () => {
+        if (isCompleted) return;
         const newAttendance = new Set(attendance);
         filteredStudents.forEach(s => newAttendance.add(s.id));
         setAttendance(newAttendance);
@@ -184,7 +253,6 @@ export default function AttendanceSheet() {
     const toggleScanner = () => {
         setIsScanning(!isScanning);
         if (!isScanning) {
-            // Mock scanning process
             toast({ title: "Camera Active", description: "Scanning for QR codes..." });
         }
     };
@@ -198,11 +266,11 @@ export default function AttendanceSheet() {
         <div className="space-y-6">
             <div className="flex justify-between items-center">
                 <div>
-                    <h2 className="text-xl font-bold font-display">Attendance Management</h2>
-                    <p className="text-muted-foreground">Mark student attendance for sessions.</p>
+                    <h2 className="text-xl font-bold font-display">Attendance & Presentation Controls</h2>
+                    <p className="text-muted-foreground">Mark student attendance and control live presenter flow.</p>
                 </div>
                 <div className="flex gap-2">
-                    <Button variant={isScanning ? "destructive" : "secondary"} onClick={toggleScanner}>
+                    <Button variant={isScanning ? "destructive" : "secondary"} onClick={toggleScanner} disabled={isCompleted}>
                         <QrCode className="w-4 h-4 mr-2" />
                         {isScanning ? "Stop Scan" : "Scan QR"}
                     </Button>
@@ -234,24 +302,27 @@ export default function AttendanceSheet() {
                     </select>
                 </div>
                 <div className="flex gap-2 items-center mb-[2px]">
-                    {isNotStarted && (
+                    {selectedSessionId && isNotStarted && (
                         <Button onClick={handleStartSession} className="bg-green-600 hover:bg-green-700 h-10 rounded-lg">
                             <Play className="w-4 h-4 mr-2" /> Start Session
                         </Button>
                     )}
-                    {isStarted && (
+                    {selectedSessionId && isStarted && (
                         <Button onClick={handleGoLive} className="bg-amber-600 hover:bg-amber-700 h-10 rounded-lg text-white">
                             <Radio className="w-4 h-4 mr-2 animate-pulse" /> Go Live
                         </Button>
                     )}
-                    {isLive && (
-                        <Button onClick={handleEndSession} variant="destructive" className="h-10 rounded-lg">
-                            <Square className="w-4 h-4 mr-2" /> Complete Session
+                    
+                    {/* STRICT FINALIZATION: Button is hidden (not displayed) unless canFinalize is true */}
+                    {canFinalize && (
+                        <Button onClick={handleEndSession} className="bg-red-600 hover:bg-red-700 h-10 rounded-lg text-white font-bold animate-bounce">
+                            <CheckCircle2 className="w-4 h-4 mr-2" /> Finalize Session
                         </Button>
                     )}
+
                     {isCompleted ? (
                         <Badge variant="secondary" className="h-10 px-4 text-sm font-bold bg-slate-100 text-slate-700 border-none rounded-lg">
-                            Event Ended
+                            Event Ended & Finalized
                         </Badge>
                     ) : (
                         <Button onClick={handleSave} disabled={!selectedSessionId} variant="outline" className="h-10 rounded-lg">
@@ -283,27 +354,31 @@ export default function AttendanceSheet() {
                                         <span className="font-semibold text-red-600">Absent:</span>
                                         <span className="font-bold text-red-700">{students.length - attendance.size}</span>
                                     </div>
-                                    <div className="flex flex-col gap-1">
-                                        <span className="font-semibold text-slate-600">Currently Presenting:</span>
-                                        <span className="font-bold text-primary bg-primary/5 p-3 rounded-xl border border-primary/10">
-                                            {currentPresenterId ? (
-                                                students.find(s => s.id === currentPresenterId)?.name || "Unknown Presenter"
-                                            ) : (
-                                                "No active presenter"
-                                            )}
-                                        </span>
-                                    </div>
+                                    {!isNonComp && (
+                                        <div className="flex flex-col gap-1">
+                                            <span className="font-semibold text-slate-600">Currently Presenting:</span>
+                                            <span className="font-bold text-primary bg-primary/5 p-3 rounded-xl border border-primary/10">
+                                                {currentPresenterId ? (
+                                                    students.find(s => s.id === currentPresenterId)?.name || "Unknown Presenter"
+                                                ) : (
+                                                    "No active presenter"
+                                                )}
+                                            </span>
+                                        </div>
+                                    )}
                                     <div className="mt-4 max-h-[200px] overflow-y-auto space-y-2 border rounded-xl p-2 bg-slate-50">
                                         <p className="text-xs font-bold text-slate-500 tracking-wider uppercase px-1">Delegate List</p>
                                         {students.map(s => {
                                             const isPresent = attendance.has(s.id);
                                             const isPres = currentPresenterId === s.id;
+                                            const completed = isStudentCompleted(s.id);
                                             return (
                                                 <div key={s.id} className="flex justify-between items-center text-sm p-1.5 rounded-lg bg-white border">
                                                     <span className="font-medium truncate max-w-[200px]">{s.name}</span>
-                                                    <div className="flex gap-1">
+                                                    <div className="flex gap-1 items-center">
                                                         {isPres && <Badge className="bg-accent text-accent-foreground text-[10px]">Live</Badge>}
-                                                        <Badge className={isPresent ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}>
+                                                        {completed && <Badge className="bg-blue-100 text-blue-800 text-[10px]">Completed</Badge>}
+                                                        <Badge className={isPresent ? "bg-green-100 text-green-800 text-[10px]" : "bg-red-100 text-red-800 text-[10px]"}>
                                                             {isPresent ? "Present" : "Absent"}
                                                         </Badge>
                                                     </div>
@@ -333,7 +408,7 @@ export default function AttendanceSheet() {
                             <Badge variant="outline" className="h-9 px-3">
                                 Present: {attendance.size} / {students.length}
                             </Badge>
-                            <Button variant="outline" size="sm" onClick={handleBulkMark}>
+                            <Button variant="outline" size="sm" onClick={handleBulkMark} disabled={isCompleted}>
                                 Mark All Visible
                             </Button>
                         </div>
@@ -346,26 +421,35 @@ export default function AttendanceSheet() {
                                     <TableHead className="w-[50px]"></TableHead>
                                     <TableHead>Student Name</TableHead>
                                     <TableHead>Email</TableHead>
-                                    <TableHead>Present</TableHead>
-                                    <TableHead>Presenting</TableHead>
+                                    <TableHead>Attendance</TableHead>
+                                    {isNonComp ? (
+                                        <TableHead>Presentation Completion</TableHead>
+                                    ) : (
+                                        <>
+                                            <TableHead>Presenting</TableHead>
+                                            <TableHead>Judging Status</TableHead>
+                                        </>
+                                    )}
                                     <TableHead>Slides Display</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
                                 {filteredStudents.length === 0 ? (
                                     <TableRow>
-                                        <TableCell colSpan={4} className="text-center h-24 text-muted-foreground">
+                                        <TableCell colSpan={isNonComp ? 5 : 6} className="text-center h-24 text-muted-foreground">
                                             No students found.
                                         </TableCell>
                                     </TableRow>
                                 ) : (
                                     filteredStudents.map(student => {
                                         const isPresent = attendance.has(student.id);
+                                        const completed = isStudentCompleted(student.id);
                                         return (
                                             <TableRow key={student.id} className={isPresent ? "bg-green-50/50" : ""}>
                                                 <TableCell>
                                                     <Checkbox
                                                         checked={isPresent}
+                                                        disabled={isCompleted}
                                                         onCheckedChange={() => handleToggleAttendance(student.id)}
                                                     />
                                                 </TableCell>
@@ -373,23 +457,50 @@ export default function AttendanceSheet() {
                                                 <TableCell className="text-sm">{student.email}</TableCell>
                                                 <TableCell>
                                                     {isPresent ? (
-                                                        <Badge className="bg-green-600">Yes</Badge>
+                                                        <Badge className="bg-green-600">Present</Badge>
                                                     ) : (
-                                                        <Badge variant="outline">No</Badge>
+                                                        <Badge variant="outline" className="text-red-500 border-red-200 bg-red-50/30">Absent</Badge>
                                                     )}
                                                 </TableCell>
-                                                <TableCell>
-                                                    <Button 
-                                                        size="sm" 
-                                                        variant={currentPresenterId === student.id ? "default" : "outline"}
-                                                        onClick={() => handleSetPresenter(student.id)}
-                                                        disabled={!isStarted && !isLive}
-                                                        className={currentPresenterId === student.id ? "bg-accent text-accent-foreground" : ""}
-                                                    >
-                                                        <Mic2 className={`w-4 h-4 ${currentPresenterId === student.id ? "mr-2" : ""}`} />
-                                                        {currentPresenterId === student.id ? "Live" : ""}
-                                                    </Button>
-                                                </TableCell>
+                                                
+                                                {isNonComp ? (
+                                                    <TableCell>
+                                                        <Button
+                                                            size="sm"
+                                                            variant={completed ? "default" : "outline"}
+                                                            className={completed ? "bg-blue-600 text-white" : "border-blue-600/30 text-blue-700 hover:bg-blue-50"}
+                                                            disabled={isCompleted || !isPresent}
+                                                            onClick={() => handleToggleCompletionNonComp(student.id)}
+                                                        >
+                                                            {completed ? "Completed ✅" : "Mark Completed"}
+                                                        </Button>
+                                                    </TableCell>
+                                                ) : (
+                                                    <>
+                                                        <TableCell>
+                                                            <Button 
+                                                                size="sm" 
+                                                                variant={currentPresenterId === student.id ? "default" : "outline"}
+                                                                onClick={() => handleSetPresenter(student.id)}
+                                                                disabled={isCompleted || (!isStarted && !isLive)}
+                                                                className={currentPresenterId === student.id ? "bg-accent text-accent-foreground" : ""}
+                                                            >
+                                                                <Mic2 className={`w-4 h-4 ${currentPresenterId === student.id ? "mr-2" : ""}`} />
+                                                                {currentPresenterId === student.id ? "Live" : "Set Presenter"}
+                                                            </Button>
+                                                        </TableCell>
+                                                        <TableCell>
+                                                            {completed ? (
+                                                                <Badge className="bg-green-100 text-green-800 hover:bg-green-100 border-green-200">Evaluated</Badge>
+                                                            ) : isPresent ? (
+                                                                <Badge variant="secondary" className="bg-yellow-100 text-yellow-800 hover:bg-yellow-100 border-yellow-200">Pending Eval</Badge>
+                                                            ) : (
+                                                                <span className="text-xs text-slate-400 italic">N/A (Absent)</span>
+                                                            )}
+                                                        </TableCell>
+                                                    </>
+                                                )}
+
                                                 <TableCell>
                                                     {(student as any).presentationUrl ? (
                                                         <Button
