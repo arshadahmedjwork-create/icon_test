@@ -30,7 +30,7 @@ import { Slider } from "@/components/ui/slider";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { useProgram } from "@/contexts/ProgramContext";
-import { ArrowLeft, CheckCircle, Clock, FileText, ExternalLink, Download, AlertTriangle, Users, Eye } from "lucide-react";
+import { ArrowLeft, CheckCircle, Clock, FileText, ExternalLink, Download, AlertTriangle, Users, Eye, Trophy } from "lucide-react";
 
 export default function SessionEvaluation() {
     const { sessionId } = useParams();
