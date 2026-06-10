@@ -403,6 +403,7 @@ export const addJudge = async (judge: Omit<Judge, 'id'>) => {
             role: 'JUDGE',
             isActive: true,
             program: normalizedProgram,
+            mustChangePassword: true,
             updatedAt: new Date().toISOString(),
         })
         .select('id')
