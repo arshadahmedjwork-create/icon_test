@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
-import { getSessions, getEvaluations, getEventStudents, isNonCompetitiveSession } from "@/services/supabaseService";
-import { Session, Evaluation, Student } from "@/types";
+import { getSessions, getEvaluations, getEventStudents, getAbstracts, isNonCompetitiveSession } from "@/services/supabaseService";
+import { Session, Evaluation, Student, Abstract } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -13,6 +13,7 @@ export default function ScoreboardPage() {
     const { currentProgram } = useProgram();
     const [session, setSession] = useState<Session | null>(null);
     const [students, setStudents] = useState<Student[]>([]);
+    const [abstracts, setAbstracts] = useState<Abstract[]>([]);
     const [evaluations, setEvaluations] = useState<Evaluation[]>([]);
     const [isLoading, setIsLoading] = useState(true);
 
@@ -20,16 +21,18 @@ export default function ScoreboardPage() {
         if (!sessionId) return;
         setIsLoading(true);
         try {
-            const [allSessions, fetchedStudents, allEvaluations] = await Promise.all([
+            const [allSessions, fetchedStudents, allEvaluations, fetchedAbstracts] = await Promise.all([
                 getSessions(currentProgram),
                 getEventStudents(currentProgram),
-                getEvaluations(currentProgram)
+                getEvaluations(currentProgram),
+                getAbstracts(currentProgram)
             ]);
 
             const foundSession = allSessions.find(s => s.id === sessionId);
             setSession(foundSession || null);
             setStudents(fetchedStudents);
             setEvaluations(allEvaluations.filter(e => e.sessionId === sessionId));
+            setAbstracts(fetchedAbstracts);
         } catch (error) {
             console.error("Failed to load scoreboard data:", error);
         } finally {
@@ -57,51 +60,40 @@ export default function ScoreboardPage() {
         );
     }
 
-    // Filter to present session participants (excluding those that didn't present or were absent)
-    const attendedSubIds = (session as any)._attendedSubmissionIds || [];
-    
-    // Group evaluations by student and calculate average score
-    const studentScores: Record<string, { totalWeighted: number, count: number }> = {};
-    evaluations.forEach(evalData => {
-        if (evalData.isAbsent) return;
-        
-        const studentId = evalData.studentId;
-        
-        // Use criterias for this session
-        const activeCriterias = session.criterias || [
-            { id: 'std-content', name: 'Scientific Content', maxScore: 10, weightage: 40 },
-            { id: 'std-delivery', name: 'Presentation / Delivery', maxScore: 10, weightage: 30 },
-            { id: 'std-impact', name: 'Innovation & Impact', maxScore: 10, weightage: 30 }
-        ];
-
-        let weightedSum = 0;
-        Object.entries(evalData.scores).forEach(([critId, score]) => {
-            const criteria = activeCriterias.find(c => c.id === critId);
-            const numScore = Number(score);
-            if (criteria && !isNaN(numScore)) {
-                weightedSum += (numScore / criteria.maxScore) * criteria.weightage;
-            }
-        });
-
-        if (!studentScores[studentId]) {
-            studentScores[studentId] = { totalWeighted: 0, count: 0 };
+    // Group evaluations by student
+    const studentScores: Record<string, { total: number, count: number }> = {};
+    evaluations.forEach(e => {
+        if (e.isAbsent) return;
+        if (!studentScores[e.studentId]) {
+            studentScores[e.studentId] = { total: 0, count: 0 };
         }
-        studentScores[studentId].totalWeighted += weightedSum;
-        studentScores[studentId].count += 1;
+        studentScores[e.studentId].total += e.totalScore;
+        studentScores[e.studentId].count += 1;
     });
 
-    // Generate ranked list
-    const rankings = Object.entries(studentScores)
-        .map(([studentId, data]) => {
-            const student = students.find(s => s.id === studentId);
+    // Generate ranked list from the session's abstractIds (matching ResultsViewer.tsx logic)
+    const rankings = (session.abstractIds || [])
+        .map(absId => {
+            const abstract = abstracts.find(a => a.id === absId);
+            if (!abstract) return null;
+
+            const student = students.find(s => s.id === abstract.studentId);
+            const scoreData = studentScores[abstract.studentId] || { total: 0, count: 0 };
+            const avgScore = scoreData.count > 0 ? (scoreData.total / scoreData.count) : 0;
+
             return {
-                studentId,
+                studentId: abstract.studentId,
                 name: student?.participantName || student?.name || "Unknown",
                 college: student?.college || "Unknown Institution",
-                score: Number((data.totalWeighted / data.count).toFixed(2))
+                abstractTitle: abstract.title,
+                score: Number(avgScore.toFixed(2)),
+                judgeCount: scoreData.count
             };
         })
-        .sort((a, b) => b.score - a.score);
+        .filter(row => row !== null) as any[];
+
+    // Sort by Score Descending
+    rankings.sort((a, b) => b.score - a.score);
 
     const isNonComp = isNonCompetitiveSession(session);
 
@@ -151,21 +143,27 @@ export default function ScoreboardPage() {
                                 
                                 return (
                                     <Card key={rank.studentId} className={`transition-all ${isTopThree ? 'border-amber-200 bg-amber-50/10 shadow-sm' : ''}`}>
-                                        <CardContent className="flex justify-between items-center p-6">
-                                            <div className="flex items-center gap-4">
-                                                <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center font-bold text-lg border">
+                                        <CardContent className="flex justify-between items-center p-6 gap-4">
+                                            <div className="flex items-center gap-4 min-w-0 flex-1">
+                                                <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center font-bold text-lg border shrink-0">
                                                     {medal || (index + 1)}
                                                 </div>
-                                                <div>
+                                                <div className="min-w-0 flex-1">
                                                     <div className="text-xs font-bold text-amber-600 uppercase tracking-wide">{ordinal}</div>
-                                                    <h3 className="font-bold text-lg text-slate-900 mt-0.5">{rank.name}</h3>
-                                                    <p className="text-sm text-slate-500">{rank.college}</p>
+                                                    <h3 className="font-bold text-lg text-slate-900 mt-0.5 truncate">{rank.name}</h3>
+                                                    <p className="text-sm text-slate-500 truncate">{rank.college}</p>
+                                                    <p className="text-xs text-slate-400 mt-1 italic truncate" title={rank.abstractTitle}>
+                                                        "{rank.abstractTitle}"
+                                                    </p>
                                                 </div>
                                             </div>
-                                            <div className="text-right">
+                                            <div className="text-right flex flex-col items-end gap-1 shrink-0">
                                                 <Badge className={`${isTopThree ? 'bg-amber-600' : 'bg-primary'} text-white font-bold text-lg px-4 py-1.5 rounded-xl border-none`}>
                                                     {rank.score}%
                                                 </Badge>
+                                                <span className="text-[10px] text-slate-400 font-medium">
+                                                    {rank.judgeCount} {rank.judgeCount === 1 ? 'Judge' : 'Judges'}
+                                                </span>
                                             </div>
                                         </CardContent>
                                     </Card>
