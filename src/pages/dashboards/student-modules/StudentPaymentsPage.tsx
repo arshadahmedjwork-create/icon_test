@@ -8,7 +8,9 @@ import {
     Wallet, Receipt, Loader2
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
-import { getStudentPayments } from "@/services/supabaseService";
+import { getStudentPayments, getLatestMidasId } from "@/services/supabaseService";
+import { useProgram } from "@/contexts/ProgramContext";
+import { generateMidasId, generateQRCodeUrl, sendRegistrationEmail } from "@/services/emailService";
 
 interface PaymentItem {
     id: string;
@@ -28,9 +30,12 @@ const statusConfig = {
 
 export default function StudentPaymentsPage() {
     const { user, refreshUser } = useAuth();
+    const { currentProgram } = useProgram();
     const [payments, setPayments] = useState<PaymentItem[]>([]);
     const [paying, setPaying] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(true);
+
+    const isIcon = currentProgram === 'ICON';
 
     useEffect(() => {
         // Load razorpay script
@@ -111,11 +116,89 @@ export default function StudentPaymentsPage() {
             return;
         }
 
+        if (isTest) {
+            // Bypass Razorpay for test payment
+            setPayments(prev => prev.map(p => p.id === payment.id ? {
+                ...p, status: "PAID" as const, transactionId: `pay_test_${Date.now()}`, paymentDate: new Date().toISOString()
+            } : p));
+
+            if (payment.id === "pending_reg") {
+                import("@/lib/supabaseClient").then(async ({ supabase }) => {
+                    try {
+                        // 1. Generate Program ID and QR Code now that payment is successful
+                        const latestId = await getLatestMidasId(currentProgram);
+                        const midasId = generateMidasId(latestId || 0, currentProgram);
+                        const collegeName = user?.college || "Dental College";
+                        const participantName = user?.name || "Delegate";
+                        const qrCodeUrl = generateQRCodeUrl(midasId, participantName, collegeName, 300, currentProgram);
+
+                        console.log(`Payment successful. Assigning ${isIcon ? 'ICON' : 'MIDAS'} ID:`, midasId);
+
+                        await supabase.from("payments").insert({
+                            eventStudentId: user?.id,
+                            amount: payment.amount,
+                            currency: "INR",
+                            status: "PAID",
+                            paymentGatewayId: `pay_test_${Date.now()}`,
+                            transactionId: `pay_test_${Date.now()}`,
+                        });
+
+                        // Also update the student record to PAID and save the ID + QR
+                        await supabase.from("event_students").update({
+                            paymentStatus: "PAID",
+                            paymentId: `pay_test_${Date.now()}`,
+                            midasId: midasId,
+                            qrCodeUrl: qrCodeUrl,
+                        }).eq("id", user?.id);
+
+                        // Send official registration confirmation email
+                        try {
+                            await sendRegistrationEmail({
+                                student_name: participantName,
+                                student_email: user?.email || '',
+                                midas_id: midasId,
+                                college_name: collegeName,
+                                event_type: isIcon ? "Professional Delegate" : "UG Delegate",
+                                mode: "Offline",
+                                qr_code_url: qrCodeUrl,
+                                registration_date: new Date().toLocaleDateString("en-IN"),
+                            });
+                        } catch (emailErr) {
+                            console.warn("Email sending error after payment:", emailErr);
+                        }
+
+                        toast.success(`Test Payment Successful! ${isIcon ? 'ICON' : 'MIDAS'} ID assigned: ` + midasId);
+                        await refreshUser(); // Reload context
+                    } catch (err) {
+                        console.error("Payment update error:", err);
+                        toast.error("Payment succeeded but database update failed. Please contact admin.");
+                    }
+                });
+            } else {
+                import("@/lib/supabaseClient").then(({ supabase }) => {
+                    supabase.from("payments").insert({
+                        eventStudentId: user?.id,
+                        amount: payment.amount,
+                        currency: "INR",
+                        status: "PAID",
+                        paymentGatewayId: `pay_test_${Date.now()}`,
+                        transactionId: `pay_test_${Date.now()}`,
+                    }).then(() => {
+                        refreshUser(); // Reload context
+                    });
+                });
+            }
+
+            setPaying(null);
+            toast.success(`Test Payment of ₹${payment.amount} successful!`);
+            return;
+        }
+
         const options = {
             key: razorpayKey,
             amount: isTest ? 100 : payment.amount * 100, // Convert to paise
             currency: "INR",
-            name: "MIDAS Scientific Event",
+            name: isIcon ? "Madras ICON" : "MIDAS Scientific Event",
             description: isTest ? `TEST - ${payment.eventName}` : payment.eventName,
             handler: function (response: any) {
                 setPayments(prev => prev.map(p => p.id === payment.id ? {
@@ -124,23 +207,56 @@ export default function StudentPaymentsPage() {
 
                 // Add to actual supabase payments table immediately if it was the generated one
                 if (payment.id === "pending_reg") {
-                    import("@/lib/supabaseClient").then(({ supabase }) => {
-                        supabase.from("payments").insert({
-                            eventStudentId: user?.id,
-                            amount: payment.amount,
-                            currency: "INR",
-                            status: "PAID",
-                            paymentGatewayId: response.razorpay_payment_id,
-                            transactionId: response.razorpay_payment_id,
-                        }).then(() => {
-                            // Also update the student record to PAID
-                            supabase.from("event_students").update({
-                                paymentStatus: "PAID",
-                                paymentId: response.razorpay_payment_id
-                            }).eq("id", user?.id).then(() => {
-                                refreshUser(); // Reload context
+                    import("@/lib/supabaseClient").then(async ({ supabase }) => {
+                        try {
+                            // 1. Generate Program ID and QR Code now that payment is successful
+                            const latestId = await getLatestMidasId(currentProgram);
+                            const midasId = generateMidasId(latestId || 0, currentProgram);
+                            const collegeName = user?.college || "Dental College";
+                            const participantName = user?.name || "Delegate";
+                            const qrCodeUrl = generateQRCodeUrl(midasId, participantName, collegeName, 300, currentProgram);
+
+                            console.log(`Payment successful. Assigning ${isIcon ? 'ICON' : 'MIDAS'} ID:`, midasId);
+
+                            await supabase.from("payments").insert({
+                                eventStudentId: user?.id,
+                                amount: payment.amount,
+                                currency: "INR",
+                                status: "PAID",
+                                paymentGatewayId: response.razorpay_payment_id,
+                                transactionId: response.razorpay_payment_id,
                             });
-                        });
+
+                            // Also update the student record to PAID and save the ID + QR
+                            await supabase.from("event_students").update({
+                                paymentStatus: "PAID",
+                                paymentId: response.razorpay_payment_id,
+                                midasId: midasId,
+                                qrCodeUrl: qrCodeUrl,
+                            }).eq("id", user?.id);
+
+                            // Send official registration confirmation email
+                            try {
+                                await sendRegistrationEmail({
+                                    student_name: participantName,
+                                    student_email: user?.email || '',
+                                    midas_id: midasId,
+                                    college_name: collegeName,
+                                    event_type: isIcon ? "Professional Delegate" : "UG Delegate",
+                                    mode: "Offline",
+                                    qr_code_url: qrCodeUrl,
+                                    registration_date: new Date().toLocaleDateString("en-IN"),
+                                });
+                            } catch (emailErr) {
+                                console.warn("Email sending error after payment:", emailErr);
+                            }
+
+                            toast.success(`Payment Successful! ${isIcon ? 'ICON' : 'MIDAS'} ID assigned: ` + midasId);
+                            await refreshUser(); // Reload context
+                        } catch (err) {
+                            console.error("Payment update error:", err);
+                            toast.error("Payment succeeded but database update failed. Please contact admin.");
+                        }
                     });
                 } else {
                     import("@/lib/supabaseClient").then(({ supabase }) => {
@@ -160,7 +276,7 @@ export default function StudentPaymentsPage() {
                 setPaying(null);
                 toast.success(`Payment of ₹${payment.amount} successful!`);
             },
-            theme: { color: isTest ? "#d97706" : "#004d40" },
+            theme: { color: isIcon ? "#b91c1c" : (isTest ? "#d97706" : "#004d40") },
             modal: {
                 ondismiss: function () {
                     setPaying(null);
@@ -187,7 +303,7 @@ export default function StudentPaymentsPage() {
                 </div>
 
                 {/* Header Ad Box */}
-                <div className="flex-grow bg-red-600 border border-red-700 rounded-2xl overflow-hidden shadow-sm flex items-center justify-center h-[110px]">
+                <div className="flex-grow rounded-2xl overflow-hidden shadow-sm flex items-center justify-center h-[110px] border border-[#b00004]" style={{ backgroundColor: '#d30005' }}>
                     <img src="/silver.png" alt="Silver Sponsor" className="w-full h-full object-contain p-1" />
                 </div>
             </div>

@@ -16,6 +16,7 @@ import StudentEventsPage from "./student-modules/StudentEventsPage";
 import StudentSubmissionsPage from "./student-modules/StudentSubmissionsPage";
 import StudentPaymentsPage from "./student-modules/StudentPaymentsPage";
 import StudentCertificatesPage from "./student-modules/StudentCertificatesPage";
+import SponsorSlideshow from "@/components/SponsorSlideshow";
 
 const navItems = [
   { label: "Overview", href: "/dashboard/student", icon: <LayoutDashboard className="w-4 h-4" /> },
@@ -137,10 +138,8 @@ export default function StudentDashboard() {
           })}
         </nav>
 
-        {/* Ad Box */}
-        <div className="px-3 py-2 mx-3 my-4 rounded-xl border border-white/10 overflow-hidden bg-slate-950/40 flex items-center justify-center">
-          <img src="/gold.png" alt="Gold Sponsor" className="w-full h-auto rounded-lg object-contain" />
-        </div>
+        {/* Sponsor/Sensodyne Slideshow */}
+        <SponsorSlideshow />
 
         {/* User + Sign Out */}
         <div className="p-4 border-t border-white/10 space-y-3">
