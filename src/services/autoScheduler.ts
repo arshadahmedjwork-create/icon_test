@@ -91,8 +91,18 @@ export class AutoScheduler {
             // 5. Assign Judges & Create Sessions
             buckets.forEach((bucket, index) => {
                 try {
-                    const assignedJudges = this.assignJudges(subject, bucket, assignmentCounts);
-                    const delegateLabel = delegateType && delegateType !== 'UG' ? ` (${delegateType})` : '';
+                    let delegateName = delegateType;
+                    if (delegateName && delegateName.toLowerCase() === 'faculty') {
+                        delegateName = 'Acadamecian';
+                    }
+                    
+                    const isNonComp = 
+                        subject.toLowerCase().includes('accommodation') || subject.toLowerCase().includes('clinician') || subject.toLowerCase().includes('academician') || subject.toLowerCase().includes('acadamecian') || subject.toLowerCase().includes('faculty') ||
+                        type.toLowerCase().includes('accommodation') || type.toLowerCase().includes('clinician') || type.toLowerCase().includes('academician') || type.toLowerCase().includes('acadamecian') || type.toLowerCase().includes('faculty') ||
+                        (delegateName || '').toLowerCase().includes('accommodation') || (delegateName || '').toLowerCase().includes('clinician') || (delegateName || '').toLowerCase().includes('academician') || (delegateName || '').toLowerCase().includes('acadamecian') || (delegateName || '').toLowerCase().includes('faculty');
+
+                    const assignedJudges = isNonComp ? [] : this.assignJudges(subject, bucket, assignmentCounts);
+                    const delegateLabel = delegateName && delegateName !== 'UG' ? ` (${delegateName})` : '';
 
                     const session: Session = {
                         id: crypto.randomUUID(),

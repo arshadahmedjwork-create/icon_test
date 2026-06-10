@@ -266,11 +266,15 @@ export default function SessionManagement() {
         const scheduler = new AutoScheduler({
             abstracts: abstracts.filter(a => a.status === "approved" || a.status === "completed").map(a => {
                 const student = students.find(s => s.id === a.studentId);
+                let delegateType = student?.delegateType || 'UG';
+                if (delegateType.toLowerCase() === 'faculty') {
+                    delegateType = 'Acadamecian';
+                }
                 return {
                     ...a,
                     _studentName: student?.participantName || student?.name || 'Unknown',
                     college: student?.college || 'Unknown',
-                    delegateType: student?.delegateType || 'UG'
+                    delegateType
                 };
             }),
             judges,
