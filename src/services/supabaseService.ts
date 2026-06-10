@@ -839,9 +839,9 @@ export const isNonCompetitiveSession = (session: { type?: string; name?: string;
     const typeLower = (session.type || '').toLowerCase();
     const nameLower = (session.name || '').toLowerCase();
     const subjectLower = (session.subject || '').toLowerCase();
-    return typeLower.includes('accommodation') || typeLower.includes('clinician') || typeLower.includes('academician') || typeLower.includes('faculty') ||
-           nameLower.includes('accommodation') || nameLower.includes('clinician') || nameLower.includes('academician') || nameLower.includes('faculty') ||
-           subjectLower.includes('accommodation') || subjectLower.includes('clinician') || subjectLower.includes('academician') || subjectLower.includes('faculty');
+    return typeLower.includes('accommodation') || typeLower.includes('clinician') || typeLower.includes('academician') || typeLower.includes('acadamecian') ||
+           nameLower.includes('accommodation') || nameLower.includes('clinician') || nameLower.includes('academician') || nameLower.includes('acadamecian') ||
+           subjectLower.includes('accommodation') || subjectLower.includes('clinician') || subjectLower.includes('academician') || subjectLower.includes('acadamecian');
 };
 
 export const validateSessionAccess = async (sessionId: string, actionDescription: string) => {

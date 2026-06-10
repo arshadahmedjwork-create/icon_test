@@ -291,19 +291,8 @@ export default function StudentEventsPage() {
 
                             {/* Details */}
                             <div className="px-5 space-y-2 text-xs text-slate-500">
-                                <div className="flex items-center gap-2">
-                                    <Users className="w-3.5 h-3.5 text-slate-300" />
-                                    <span>{event.enrolled} / {event.capacity} registered</span>
-                                </div>
-                                <div className="w-full bg-slate-100 rounded-full h-1.5 mt-1">
-                                    <div
-                                        className={`h-1.5 rounded-full ${isFull ? 'bg-red-500' : 'bg-emerald-500'}`}
-                                        style={{ width: `${Math.min(100, (event.enrolled / event.capacity) * 100)}%` }}
-                                    />
-                                </div>
-
                                 {/* Deadlines */}
-                                <div className="grid grid-cols-2 gap-2 mt-3 pt-2.5 border-t border-slate-100 text-[10px]">
+                                <div className="grid grid-cols-2 gap-2 text-[10px]">
                                     <div>
                                         <span className="text-slate-400 font-medium uppercase tracking-wider block">Abstract</span>
                                         <span className="font-bold text-red-500 mt-0.5 block">

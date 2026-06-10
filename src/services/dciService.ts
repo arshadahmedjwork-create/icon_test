@@ -24,7 +24,7 @@ export async function verifyDciCertificate(studentId: string): Promise<{ success
       throw new Error(fetchError?.message || 'Delegate not found');
     }
 
-    const { dciNumber, name: participantName, dciCertificateUrl } = student;
+    const { dciNumber, participantName, dciCertificateUrl } = student;
 
     if (!dciCertificateUrl) {
       throw new Error('No DCI Certificate URL found on delegate record');
@@ -121,14 +121,17 @@ export async function verifyDciCertificate(studentId: string): Promise<{ success
     };
 
     // Mark as FAILED on error
-    await supabase
-      .from('event_students')
-      .update({
-        dciVerificationStatus: 'FAILED',
-        dciVerificationDetails: failedDetails
-      })
-      .eq('id', studentId)
-      .catch(updateErr => console.error('Failed to update status to FAILED after OCR error:', updateErr));
+    try {
+      await supabase
+        .from('event_students')
+        .update({
+          dciVerificationStatus: 'FAILED',
+          dciVerificationDetails: failedDetails
+        })
+        .eq('id', studentId);
+    } catch (updateErr) {
+      console.error('Failed to update status to FAILED after OCR error:', updateErr);
+    }
 
     return { success: false, status: 'FAILED', details: failedDetails };
   }

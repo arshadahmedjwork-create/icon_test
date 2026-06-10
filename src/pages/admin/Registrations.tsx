@@ -17,7 +17,7 @@ import {
     SelectTrigger,
     SelectValue
 } from "@/components/ui/select";
-import { CheckCircle2, Search, XCircle, FileSpreadsheet, ExternalLink, RefreshCw } from "lucide-react";
+import { CheckCircle2, Search, XCircle, FileSpreadsheet, ExternalLink, RefreshCw, Pencil } from "lucide-react";
 import { getEventStudents, updateEventStudent } from "@/services/supabaseService";
 import { sendApprovalEmail } from "@/services/emailService";
 import bcrypt from "bcryptjs";
@@ -26,6 +26,8 @@ import { useToast } from "@/hooks/use-toast";
 import { useProgram } from "@/contexts/ProgramContext";
 import { supabase } from "@/lib/supabaseClient";
 import { verifyDciCertificate } from "@/services/dciService";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
 
 export default function AdminRegistrations() {
     const [students, setStudents] = useState<Student[]>([]);
@@ -35,6 +37,59 @@ export default function AdminRegistrations() {
     const { toast } = useToast();
     const { currentProgram } = useProgram();
     const isIcon = currentProgram === 'ICON';
+
+    const [editingStudent, setEditingStudent] = useState<Student | null>(null);
+    const [saving, setSaving] = useState(false);
+    const [editForm, setEditForm] = useState({
+        participantName: "",
+        email: "",
+        mobile: "",
+        college: "",
+        dciNumber: "",
+        delegateType: "",
+        paymentStatus: "PENDING",
+        approvalStatus: "PENDING",
+    });
+
+    const handleOpenEdit = (student: Student) => {
+        setEditingStudent(student);
+        setEditForm({
+            participantName: student.participantName || student.name || "",
+            email: student.email || "",
+            mobile: student.mobile || student.phone || "",
+            college: student.college || "",
+            dciNumber: student.dciNumber || "",
+            delegateType: student.delegateType || "",
+            paymentStatus: student.paymentStatus || "PENDING",
+            approvalStatus: student.approvalStatus || "PENDING",
+        });
+    };
+
+    const handleSaveEdit = async () => {
+        if (!editingStudent) return;
+        setSaving(true);
+        try {
+            await updateEventStudent(editingStudent.id, {
+                participantName: editForm.participantName,
+                email: editForm.email,
+                mobile: editForm.mobile,
+                college: editForm.college,
+                dciNumber: editForm.dciNumber,
+                delegateType: editForm.delegateType,
+                paymentStatus: editForm.paymentStatus,
+                approvalStatus: editForm.approvalStatus,
+            });
+
+            toast({ title: "Updated", description: "Student registration updated successfully." });
+            setEditingStudent(null);
+            loadData();
+        } catch (error: any) {
+            console.error(error);
+            toast({ title: "Error", description: error.message || "Failed to update registration.", variant: "destructive" });
+        } finally {
+            setSaving(false);
+        }
+    };
 
     const handleTriggerOCR = async (studentId: string) => {
         try {
@@ -302,6 +357,14 @@ export default function AdminRegistrations() {
                                             <Button
                                                 variant="ghost"
                                                 size="sm"
+                                                onClick={() => handleOpenEdit(student)}
+                                                className="text-slate-600 hover:text-slate-700 hover:bg-slate-50"
+                                            >
+                                                <Pencil className="w-4 h-4 mr-1" /> Edit
+                                            </Button>
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
                                                 onClick={() => handleApprove(student.id, student.approvalStatus || "PENDING")}
                                                 disabled={(student.approvalStatus || "PENDING") === "APPROVED"}
                                                 className="text-green-600 hover:text-green-700 hover:bg-green-50"
@@ -325,6 +388,129 @@ export default function AdminRegistrations() {
                     </TableBody>
                 </Table>
             </div>
+
+            {/* Edit Dialog */}
+            <Dialog open={!!editingStudent} onOpenChange={(open) => !open && setEditingStudent(null)}>
+                <DialogContent className="sm:max-w-lg rounded-3xl p-6">
+                    <DialogHeader>
+                        <DialogTitle className="text-xl font-bold">Edit Registration</DialogTitle>
+                    </DialogHeader>
+
+                    <div className="space-y-4 my-4 max-h-[60vh] overflow-y-auto px-1">
+                        <div className="space-y-1.5">
+                            <Label htmlFor="edit-name">Participant Name</Label>
+                            <Input
+                                id="edit-name"
+                                value={editForm.participantName}
+                                onChange={(e) => setEditForm({ ...editForm, participantName: e.target.value })}
+                            />
+                        </div>
+
+                        <div className="space-y-1.5">
+                            <Label htmlFor="edit-email">Email Address</Label>
+                            <Input
+                                id="edit-email"
+                                type="email"
+                                value={editForm.email}
+                                onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
+                            />
+                        </div>
+
+                        <div className="space-y-1.5">
+                            <Label htmlFor="edit-mobile">Mobile Number</Label>
+                            <Input
+                                id="edit-mobile"
+                                value={editForm.mobile}
+                                onChange={(e) => setEditForm({ ...editForm, mobile: e.target.value })}
+                            />
+                        </div>
+
+                        <div className="space-y-1.5">
+                            <Label htmlFor="edit-college">College</Label>
+                            <Input
+                                id="edit-college"
+                                value={editForm.college}
+                                onChange={(e) => setEditForm({ ...editForm, college: e.target.value })}
+                            />
+                        </div>
+
+                        {isIcon && (
+                            <>
+                                <div className="space-y-1.5">
+                                    <Label htmlFor="edit-dci">DCI Number</Label>
+                                    <Input
+                                        id="edit-dci"
+                                        value={editForm.dciNumber}
+                                        onChange={(e) => setEditForm({ ...editForm, dciNumber: e.target.value })}
+                                    />
+                                </div>
+
+                                <div className="space-y-1.5">
+                                    <Label htmlFor="edit-delegate-type">Delegate Type</Label>
+                                    <Select 
+                                        value={editForm.delegateType} 
+                                        onValueChange={(val) => setEditForm({ ...editForm, delegateType: val })}
+                                    >
+                                        <SelectTrigger id="edit-delegate-type">
+                                            <SelectValue placeholder="Select Type" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="PG">Postgraduate (PG)</SelectItem>
+                                            <SelectItem value="Academician">Academician</SelectItem>
+                                            <SelectItem value="Clinician">Clinician</SelectItem>
+                                            <SelectItem value="Guest">Guest</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                            </>
+                        )}
+
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-1.5">
+                                <Label htmlFor="edit-payment">Payment Status</Label>
+                                <Select 
+                                    value={editForm.paymentStatus} 
+                                    onValueChange={(val) => setEditForm({ ...editForm, paymentStatus: val })}
+                                >
+                                    <SelectTrigger id="edit-payment">
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="PENDING">Pending</SelectItem>
+                                        <SelectItem value="PAID">Paid</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+
+                            <div className="space-y-1.5">
+                                <Label htmlFor="edit-approval">Approval Status</Label>
+                                <Select 
+                                    value={editForm.approvalStatus} 
+                                    onValueChange={(val) => setEditForm({ ...editForm, approvalStatus: val })}
+                                >
+                                    <SelectTrigger id="edit-approval">
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="PENDING">Pending</SelectItem>
+                                        <SelectItem value="APPROVED">Approved</SelectItem>
+                                        <SelectItem value="REJECTED">Rejected</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <DialogFooter className="flex gap-2">
+                        <Button variant="outline" onClick={() => setEditingStudent(null)} className="rounded-xl">
+                            Cancel
+                        </Button>
+                        <Button onClick={handleSaveEdit} disabled={saving} className="rounded-xl">
+                            {saving ? "Saving..." : "Save Changes"}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }
