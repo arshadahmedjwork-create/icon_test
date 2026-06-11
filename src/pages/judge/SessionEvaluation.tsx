@@ -512,28 +512,40 @@ export default function SessionEvaluation() {
                             <div className="w-full h-[40vh] lg:h-full lg:flex-1 bg-muted/30 border-b lg:border-b-0 lg:border-r overflow-auto flex items-center justify-center p-4">
                                 {((viewMode === "presentation" && (evaluating?.presentationUrl || evaluating?.fileUrl)) || (viewMode === "abstract" && evaluating?.fileUrl)) ? (
                                     <div className="w-full h-full flex flex-col gap-4">
-                                        {((viewMode === "presentation" && (evaluating?.presentationUrl?.toLowerCase().endsWith(".pdf") || evaluating?.fileUrl?.toLowerCase().endsWith(".pdf"))) || (viewMode === "abstract" && evaluating?.fileUrl?.toLowerCase().endsWith(".pdf"))) ? (
-                                            <iframe
-                                                src={viewMode === "presentation" ? (evaluating?.presentationUrl || evaluating?.fileUrl) : evaluating?.fileUrl}
-                                                className="w-full h-full rounded-md border shadow-sm bg-white"
-                                                title="Presentation Viewer"
-                                            />
-                                        ) : (
-                                            <div className="flex flex-col items-center justify-center h-full text-center space-y-4 bg-white rounded-md border shadow-sm p-10">
-                                                <div className="w-20 h-20 rounded-full bg-orange-50 flex items-center justify-center">
-                                                    <FileText className="w-10 h-10 text-orange-500" />
+                                        {(() => {
+                                            const targetUrl = viewMode === "presentation" ? (evaluating?.presentationUrl || evaluating?.fileUrl) : evaluating?.fileUrl;
+                                            const lowerUrl = targetUrl?.toLowerCase() || "";
+                                            const isPdf = lowerUrl.endsWith(".pdf");
+                                            const isOfficeDoc = lowerUrl.endsWith(".pptx") || lowerUrl.endsWith(".ppt") || lowerUrl.endsWith(".docx") || lowerUrl.endsWith(".doc");
+                                            const viewerSrc = isPdf ? targetUrl : isOfficeDoc ? `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(targetUrl || "")}` : null;
+
+                                            if (viewerSrc) {
+                                                return (
+                                                    <iframe
+                                                        src={viewerSrc}
+                                                        className="w-full h-full rounded-md border shadow-sm bg-white"
+                                                        title="Presentation Viewer"
+                                                    />
+                                                );
+                                            }
+
+                                            return (
+                                                <div className="flex flex-col items-center justify-center h-full text-center space-y-4 bg-white rounded-md border shadow-sm p-10">
+                                                    <div className="w-20 h-20 rounded-full bg-orange-50 flex items-center justify-center">
+                                                        <FileText className="w-10 h-10 text-orange-500" />
+                                                    </div>
+                                                    <div>
+                                                        <h3 className="text-xl font-bold">Document Preview</h3>
+                                                        <p className="text-muted-foreground max-w-md mx-auto mt-2">
+                                                            Direct browser preview for this file type is limited. Please download or open it in a new window using the button below.
+                                                         </p>
+                                                    </div>
+                                                    <Button size="lg" onClick={() => window.open(targetUrl, "_blank")}>
+                                                        <Download className="w-4 h-4 mr-2" /> View / Download Document
+                                                    </Button>
                                                 </div>
-                                                <div>
-                                                    <h3 className="text-xl font-bold">PowerPoint Presentation</h3>
-                                                    <p className="text-muted-foreground max-w-md mx-auto mt-2">
-                                                        Direct browser preview for PowerPoint (.pptx) is limited. Please download or open it in a new window using the button below.
-                                                     </p>
-                                                </div>
-                                                <Button size="lg" onClick={() => window.open(evaluating.presentationUrl || evaluating.fileUrl, "_blank")}>
-                                                    <Download className="w-4 h-4 mr-2" /> View / Download Presentation
-                                                </Button>
-                                            </div>
-                                        )}
+                                            );
+                                        })()}
                                     </div>
                                 ) : (
                                     <div className="text-center p-10">
