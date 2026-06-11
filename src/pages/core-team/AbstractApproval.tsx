@@ -277,19 +277,34 @@ export default function AbstractApproval() {
                             </Button>
                         </div>
                         <div className="flex-1 p-0 bg-neutral-100/50 min-h-[250px] md:min-h-0">
-                            {viewingPdf?.fileUrl ? (
-                                <iframe 
-                                    src={viewingPdf.fileUrl} 
-                                    className="w-full h-full border-none"
-                                    title="Abstract PDF Preview"
-                                />
-                            ) : (
-                                <div className="flex flex-col items-center justify-center h-full text-muted-foreground p-10 text-center">
-                                    <AlertTriangle className="w-16 h-16 mb-4 opacity-20 text-yellow-500" />
-                                    <h3 className="text-xl font-bold">No Preview Available</h3>
-                                    <p className="max-w-xs">This abstract doesn't have a valid PDF file attached or it's currently unreachable.</p>
-                                </div>
-                            )}
+                            {(() => {
+                                const targetUrl = viewingPdf?.fileUrl;
+                                const lowerUrl = targetUrl?.toLowerCase() || "";
+                                const isPdf = lowerUrl.endsWith(".pdf");
+                                const isOfficeDoc = lowerUrl.endsWith(".pptx") || lowerUrl.endsWith(".ppt") || lowerUrl.endsWith(".docx") || lowerUrl.endsWith(".doc");
+                                const viewerSrc = isPdf ? targetUrl : isOfficeDoc ? `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(targetUrl || "")}` : null;
+
+                                if (viewerSrc) {
+                                    return (
+                                        <iframe 
+                                            src={viewerSrc} 
+                                            className="w-full h-full border-none"
+                                            title="Abstract PDF Preview"
+                                        />
+                                    );
+                                }
+
+                                return (
+                                    <div className="flex flex-col items-center justify-center h-full text-muted-foreground p-10 text-center">
+                                        <AlertTriangle className="w-16 h-16 mb-4 opacity-20 text-yellow-500" />
+                                        <h3 className="text-xl font-bold">No Preview Available</h3>
+                                        <p className="max-w-xs mb-4">Direct browser preview for this file type is limited. Please use the button below to download or open it.</p>
+                                        <Button size="sm" onClick={() => targetUrl && window.open(targetUrl, "_blank")}>
+                                            <ExternalLink className="w-4 h-4 mr-2" /> Open File
+                                        </Button>
+                                    </div>
+                                );
+                            })()}
                         </div>
                     </div>
 
