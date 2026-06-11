@@ -314,8 +314,8 @@ export default function AdminRegistrations() {
     };
 
     const handleAddStudent = async () => {
-        if (!newStudentForm.participantName.trim() || !newStudentForm.email.trim() || !newStudentForm.mobile.trim() || !newStudentForm.college.trim()) {
-            toast({ title: "Validation Error", description: "Name, email, mobile, and college are required.", variant: "destructive" });
+        if (!newStudentForm.participantName.trim() || !newStudentForm.email.trim() || !newStudentForm.mobile.trim()) {
+            toast({ title: "Validation Error", description: "Name, email, and mobile are required.", variant: "destructive" });
             return;
         }
         setSaving(true);
@@ -924,7 +924,7 @@ export default function AdminRegistrations() {
                         </div>
 
                         <div className="space-y-1.5">
-                            <Label htmlFor="add-college">College / Institution *</Label>
+                            <Label htmlFor="add-college">College / Institution (Optional)</Label>
                             <Select 
                                 value={newStudentForm.college} 
                                 onValueChange={(val) => setNewStudentForm({ ...newStudentForm, college: val })}
