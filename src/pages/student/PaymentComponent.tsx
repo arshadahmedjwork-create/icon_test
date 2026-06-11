@@ -62,6 +62,7 @@ export function PaymentComponent({ onPaymentComplete }: { onPaymentComplete: (us
                     status: "PAID",
                     paymentGatewayId: paymentId,
                     transactionId: paymentId,
+                    program: currentProgram,
                 });
 
                 // Registration email is not sent after payment to avoid duplicate emails

@@ -147,6 +147,7 @@ export default function StudentPaymentsPage() {
                                 status: "PAID",
                                 paymentGatewayId: response.razorpay_payment_id,
                                 transactionId: response.razorpay_payment_id,
+                                program: currentProgram,
                             });
 
                             // Also update the student record to PAID and save the ID + QR
@@ -189,6 +190,7 @@ export default function StudentPaymentsPage() {
                             status: "PAID",
                             paymentGatewayId: response.razorpay_payment_id,
                             transactionId: response.razorpay_payment_id,
+                            program: currentProgram,
                         }).then(() => {
                             refreshUser(); // Reload context
                         });
@@ -198,7 +200,7 @@ export default function StudentPaymentsPage() {
                 setPaying(null);
                 toast.success(`Payment of ₹${payment.amount} successful!`);
             },
-            theme: { color: isIcon ? "#b91c1c" : (isTest ? "#d97706" : "#004d40") },
+            theme: { color: isIcon ? "#b91c1c" : "#004d40" },
             modal: {
                 ondismiss: function () {
                     setPaying(null);

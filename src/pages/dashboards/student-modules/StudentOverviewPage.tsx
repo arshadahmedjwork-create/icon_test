@@ -215,6 +215,7 @@ export default function StudentOverviewPage() {
                         status: "PAID",
                         paymentGatewayId: paymentId,
                         transactionId: paymentId,
+                        program: currentProgram,
                     });
                     if (payError) console.error("Payment record error:", payError);
                 }
@@ -265,7 +266,7 @@ export default function StudentOverviewPage() {
             key: razorpayKey,
             amount: amount * 100, 
             currency: "INR",
-            name: isTest ? `${currentProgram} — Test Payment` : `${isIcon ? 'Madras ICON' : 'MIDAS'} Scientific Event`,
+            name: `${isIcon ? 'Madras ICON' : 'MIDAS'} Scientific Event`,
             description: `${isIcon ? 'Professional' : 'UG'} Delegate Registration Fee`,
             handler: async function (response: any) {
                 await processSuccess(response.razorpay_payment_id);
@@ -275,7 +276,7 @@ export default function StudentOverviewPage() {
                 email: user?.email,
                 contact: user?.phone || "9999999999",
             },
-            theme: { color: isIcon ? "#b91c1c" : (isTest ? "#d97706" : "#004d40") },
+            theme: { color: isIcon ? "#b91c1c" : "#004d40" },
             modal: {
                 ondismiss: function () {
                     toast.info("Payment cancelled.");
