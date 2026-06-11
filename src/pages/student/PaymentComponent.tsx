@@ -24,7 +24,7 @@ export function PaymentComponent({ onPaymentComplete }: { onPaymentComplete: (us
     
     const isIcon = currentProgram === 'ICON';
 
-    const handlePayment = async (isTest: boolean = false) => {
+    const handlePayment = async () => {
         if (!user) return;
 
         const processSuccess = async (paymentId: string) => {
@@ -54,10 +54,10 @@ export function PaymentComponent({ onPaymentComplete }: { onPaymentComplete: (us
 
                 if (studentError) throw studentError;
 
-                // Record payment in payments table
+                // Record payment in payments table (₹1)
                 await supabase.from("payments").insert({
                     eventStudentId: user.id,
-                    amount: 1030,
+                    amount: 1,
                     currency: "INR",
                     status: "PAID",
                     paymentGatewayId: paymentId,
@@ -80,11 +80,6 @@ export function PaymentComponent({ onPaymentComplete }: { onPaymentComplete: (us
             }
         };
 
-        if (isTest) {
-            await processSuccess(`pay_test_${Date.now()}`);
-            return;
-        }
-
         const razorpayKey = import.meta.env.VITE_RAZORPAY_LIVE_KEY;
         if (!razorpayKey) {
             toast.error("Payment configuration error. Please contact admin.");
@@ -93,7 +88,7 @@ export function PaymentComponent({ onPaymentComplete }: { onPaymentComplete: (us
 
         const options = {
             key: razorpayKey,
-            amount: 103000, // ₹1030 in paise
+            amount: 100, // ₹1 in paise
             currency: "INR",
             name: isIcon ? "Madras ICON" : "MIDAS Scientific Event",
             description: isIcon ? "Professional Registration Fee" : "Registration Fee — Conference Kit, Lunch, Certificate",
@@ -135,7 +130,7 @@ export function PaymentComponent({ onPaymentComplete }: { onPaymentComplete: (us
                 <div className="bg-white p-4 rounded-lg border">
                     <div className="flex justify-between items-center mb-2">
                         <span className="text-sm text-muted-foreground">Registration Fee</span>
-                        <span className="font-semibold">₹1,030.00</span>
+                        <span className="font-semibold">₹1.00</span>
                     </div>
                     <div className="flex justify-between items-center text-sm">
                         <span className="text-muted-foreground">Includes</span>
@@ -145,7 +140,7 @@ export function PaymentComponent({ onPaymentComplete }: { onPaymentComplete: (us
 
                 <div className="flex flex-col gap-2">
                     <Button
-                        onClick={() => handlePayment(false)}
+                        onClick={handlePayment}
                         className="w-full bg-green-600 hover:bg-green-700 font-bold"
                         size="lg"
                         disabled={isProcessing}
@@ -156,24 +151,14 @@ export function PaymentComponent({ onPaymentComplete }: { onPaymentComplete: (us
                             </>
                         ) : (
                             <>
-                                <CreditCard className="mr-2 h-4 w-4" /> Pay ₹1,030
+                                <CreditCard className="mr-2 h-4 w-4" /> Pay ₹1
                             </>
                         )}
-                    </Button>
-
-                    <Button
-                        onClick={() => handlePayment(true)}
-                        variant="outline"
-                        className="w-full border-dashed border-amber-300 text-amber-700 hover:bg-amber-100 font-bold"
-                        size="lg"
-                        disabled={isProcessing}
-                    >
-                        Test Payment (Bypass)
                     </Button>
                 </div>
                 
                 <p className="text-xs text-center text-muted-foreground">
-                    Secure payment via Razorpay. Live keys only function when hosted on the approved domain (<span className="font-mono">https://www.midicon.org</span>). Use "Test Payment" for local testing.
+                    Secure payment via Razorpay.
                 </p>
             </CardContent>
         </Card>

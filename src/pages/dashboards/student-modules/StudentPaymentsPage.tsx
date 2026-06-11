@@ -59,8 +59,8 @@ export default function StudentPaymentsPage() {
             // Note: Since 'payments' table just logs transactions, we default the event name/type.
             const mapped: PaymentItem[] = data.map((p: any) => ({
                 id: p.id,
-                eventName: p.amount === 1030 ? "Delegate Registration Fee" : "Event Registration Fee",
-                eventType: p.amount === 1030 ? "REGISTRATION" : "EVENT",
+                eventName: p.amount === 1 ? "Delegate Registration Fee" : "Event Registration Fee",
+                eventType: p.amount === 1 ? "REGISTRATION" : "EVENT",
                 amount: p.amount,
                 status: p.status,
                 transactionId: p.transactionId || p.paymentGatewayId || p.id,
@@ -74,7 +74,7 @@ export default function StudentPaymentsPage() {
                     id: "pending_reg",
                     eventName: "Delegate Registration Fee",
                     eventType: "REGISTRATION",
-                    amount: 1030,
+                    amount: 1,
                     status: "PENDING",
                     transactionId: null,
                     paymentDate: null
@@ -98,7 +98,7 @@ export default function StudentPaymentsPage() {
                 id: "pending_reg",
                 eventName: "Delegate Registration Fee",
                 eventType: "REGISTRATION",
-                amount: 1030,
+                amount: 1,
                 status: "PENDING",
                 transactionId: null,
                 paymentDate: null
@@ -109,97 +109,19 @@ export default function StudentPaymentsPage() {
     const totalPaid = displayPayments.filter(p => p.status === "PAID").reduce((s, p) => s + p.amount, 0);
     const totalPending = displayPayments.filter(p => p.status === "PENDING").reduce((s, p) => s + p.amount, 0);
 
-    const handlePayNow = (payment: PaymentItem, isTest: boolean = false) => {
+    const handlePayNow = (payment: PaymentItem) => {
         const razorpayKey = import.meta.env.VITE_RAZORPAY_LIVE_KEY;
         if (!razorpayKey) {
             toast.error("Payment configuration error. Please contact admin.");
             return;
         }
 
-        if (isTest) {
-            // Bypass Razorpay for test payment
-            setPayments(prev => prev.map(p => p.id === payment.id ? {
-                ...p, status: "PAID" as const, transactionId: `pay_test_${Date.now()}`, paymentDate: new Date().toISOString()
-            } : p));
-
-            if (payment.id === "pending_reg") {
-                import("@/lib/supabaseClient").then(async ({ supabase }) => {
-                    try {
-                        // 1. Generate Program ID and QR Code now that payment is successful
-                        const latestId = await getLatestMidasId(currentProgram);
-                        const midasId = generateMidasId(latestId || 0, currentProgram);
-                        const collegeName = user?.college || "Dental College";
-                        const participantName = user?.name || "Delegate";
-                        const qrCodeUrl = generateQRCodeUrl(midasId, participantName, collegeName, 300, currentProgram);
-
-                        console.log(`Payment successful. Assigning ${isIcon ? 'ICON' : 'MIDAS'} ID:`, midasId);
-
-                        await supabase.from("payments").insert({
-                            eventStudentId: user?.id,
-                            amount: payment.amount,
-                            currency: "INR",
-                            status: "PAID",
-                            paymentGatewayId: `pay_test_${Date.now()}`,
-                            transactionId: `pay_test_${Date.now()}`,
-                        });
-
-                        // Also update the student record to PAID and save the ID + QR
-                        await supabase.from("event_students").update({
-                            paymentStatus: "PAID",
-                            paymentId: `pay_test_${Date.now()}`,
-                            midasId: midasId,
-                            qrCodeUrl: qrCodeUrl,
-                        }).eq("id", user?.id);
-
-                        // Send official registration confirmation email
-                        try {
-                            await sendRegistrationEmail({
-                                student_name: participantName,
-                                student_email: user?.email || '',
-                                midas_id: midasId,
-                                college_name: collegeName,
-                                event_type: isIcon ? "Professional Delegate" : "UG Delegate",
-                                mode: "Offline",
-                                qr_code_url: qrCodeUrl,
-                                registration_date: new Date().toLocaleDateString("en-IN"),
-                            });
-                        } catch (emailErr) {
-                            console.warn("Email sending error after payment:", emailErr);
-                        }
-
-                        toast.success(`Test Payment Successful! ${isIcon ? 'ICON' : 'MIDAS'} ID assigned: ` + midasId);
-                        await refreshUser(); // Reload context
-                    } catch (err) {
-                        console.error("Payment update error:", err);
-                        toast.error("Payment succeeded but database update failed. Please contact admin.");
-                    }
-                });
-            } else {
-                import("@/lib/supabaseClient").then(({ supabase }) => {
-                    supabase.from("payments").insert({
-                        eventStudentId: user?.id,
-                        amount: payment.amount,
-                        currency: "INR",
-                        status: "PAID",
-                        paymentGatewayId: `pay_test_${Date.now()}`,
-                        transactionId: `pay_test_${Date.now()}`,
-                    }).then(() => {
-                        refreshUser(); // Reload context
-                    });
-                });
-            }
-
-            setPaying(null);
-            toast.success(`Test Payment of ₹${payment.amount} successful!`);
-            return;
-        }
-
         const options = {
             key: razorpayKey,
-            amount: isTest ? 100 : payment.amount * 100, // Convert to paise
+            amount: payment.amount * 100, // Convert to paise
             currency: "INR",
             name: isIcon ? "Madras ICON" : "MIDAS Scientific Event",
-            description: isTest ? `TEST - ${payment.eventName}` : payment.eventName,
+            description: payment.eventName,
             handler: function (response: any) {
                 setPayments(prev => prev.map(p => p.id === payment.id ? {
                     ...p, status: "PAID" as const, transactionId: response.razorpay_payment_id, paymentDate: new Date().toISOString()
@@ -391,17 +313,8 @@ export default function StudentPaymentsPage() {
                                                         <div className="flex gap-2 justify-end">
                                                             <Button
                                                                 size="sm"
-                                                                variant="outline"
-                                                                className="h-8 rounded-lg border-amber-300 text-amber-700 hover:bg-amber-100 font-bold border-dashed text-xs"
-                                                                onClick={() => handlePayNow(p, true)}
-                                                                disabled={paying === p.id}
-                                                            >
-                                                                Test
-                                                            </Button>
-                                                            <Button
-                                                                size="sm"
                                                                 className="h-8 rounded-lg bg-[#004d40] hover:bg-[#003d33] text-xs font-bold"
-                                                                onClick={() => handlePayNow(p, false)}
+                                                                onClick={() => handlePayNow(p)}
                                                                 disabled={paying === p.id}
                                                             >
                                                                 {paying === p.id ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : <CreditCard className="w-3 h-3 mr-1" />}
@@ -437,12 +350,8 @@ export default function StudentPaymentsPage() {
                                             <span className="font-bold text-slate-900">₹{p.amount}</span>
                                             {p.status === "PENDING" && (
                                                 <div className="flex gap-2">
-                                                    <Button size="sm" variant="outline" className="h-8 rounded-lg border-amber-300 text-amber-700 hover:bg-amber-100 font-bold border-dashed text-xs"
-                                                        onClick={() => handlePayNow(p, true)} disabled={paying === p.id}>
-                                                        Test
-                                                    </Button>
                                                     <Button size="sm" className="h-8 rounded-lg bg-[#004d40] hover:bg-[#003d33] text-xs"
-                                                        onClick={() => handlePayNow(p, false)} disabled={paying === p.id}>
+                                                        onClick={() => handlePayNow(p)} disabled={paying === p.id}>
                                                         {paying === p.id ? "Processing..." : "Pay"}
                                                     </Button>
                                                 </div>

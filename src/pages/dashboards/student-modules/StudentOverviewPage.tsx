@@ -177,7 +177,7 @@ export default function StudentOverviewPage() {
         }
     };
 
-    const handlePayment = async (amount: number, isTest: boolean = false) => {
+    const handlePayment = async (amount: number) => {
         setLoadingPayment(true);
 
         const processSuccess = async (paymentId: string) => {
@@ -246,12 +246,6 @@ export default function StudentOverviewPage() {
                 setLoadingPayment(false);
             }
         };
-
-        if (isTest) {
-            // Bypass Razorpay for test payment
-            await processSuccess(`pay_test_${Date.now()}`);
-            return;
-        }
 
         const res = await loadRazorpayScript();
         if (!res) {
@@ -353,7 +347,7 @@ export default function StudentOverviewPage() {
                                         ? "Your registration has been rejected by the staff coordinator."
                                         : !isApproved
                                             ? "Your staff coordinator is reviewing your registration. Please check back later. Event access will remain locked until approved and paid."
-                                            : "Your registration is approved! Please complete the payment of ₹1030 to unlock the event dashboard and abstract submissions."}
+                                            : "Your registration is approved! Please complete the payment of ₹1 to unlock the event dashboard and abstract submissions."}
                                 </p>
                             </div>
                         </div>
@@ -361,20 +355,12 @@ export default function StudentOverviewPage() {
                         {isApproved && !isPaid && (
                             <div className="flex flex-col gap-2 shrink-0 w-full md:w-auto">
                                 <Button
-                                    onClick={() => handlePayment(1030, false)}
+                                    onClick={() => handlePayment(1, false)}
                                     disabled={loadingPayment}
                                     className={`${themeColor} text-white font-bold h-12 px-8 rounded-xl shadow-lg`}
                                 >
                                     {loadingPayment ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <CreditCard className="w-4 h-4 mr-2" />}
-                                    Pay Now — ₹1030
-                                </Button>
-                                <Button
-                                    onClick={() => handlePayment(1, true)}
-                                    disabled={loadingPayment}
-                                    variant="outline"
-                                    className="h-10 rounded-xl border-amber-300 text-amber-700 hover:bg-amber-100 font-bold border-dashed"
-                                >
-                                    Test Payment — ₹1
+                                    Pay Now — ₹1
                                 </Button>
                             </div>
                         )}
