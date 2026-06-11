@@ -24,8 +24,66 @@ export function PaymentComponent({ onPaymentComplete }: { onPaymentComplete: (us
     
     const isIcon = currentProgram === 'ICON';
 
-    const handlePayment = async () => {
+    const handlePayment = async (isTest: boolean = false) => {
         if (!user) return;
+
+        const processSuccess = async (paymentId: string) => {
+            setIsProcessing(true);
+            try {
+                // 1. Generate Program ID and QR Code now that payment is successful
+                const latestId = await getLatestMidasId(currentProgram);
+                const midasId = generateMidasId(latestId || 0, currentProgram);
+                const collegeName = user.college || "Dental College";
+                const participantName = user.name || user.participantName || "Delegate";
+                const qrCodeUrl = generateQRCodeUrl(midasId, participantName, collegeName, 300, currentProgram);
+
+                console.log(`Payment successful. Assigning ${isIcon ? 'ICON' : 'MIDAS'} ID:`, midasId);
+
+                // 2. Update student payment status AND assign MIDAS ID in Supabase
+                const { error: studentError, data: updatedStudent } = await supabase
+                    .from("event_students")
+                    .update({
+                        paymentStatus: "PAID",
+                        paymentId: paymentId,
+                        midasId: midasId,
+                        qrCodeUrl: qrCodeUrl,
+                    })
+                    .eq("id", user.id)
+                    .select()
+                    .single();
+
+                if (studentError) throw studentError;
+
+                // Record payment in payments table
+                await supabase.from("payments").insert({
+                    eventStudentId: user.id,
+                    amount: 1030,
+                    currency: "INR",
+                    status: "PAID",
+                    paymentGatewayId: paymentId,
+                    transactionId: paymentId,
+                });
+
+                // Registration email is not sent after payment to avoid duplicate emails
+                toast.success(`Payment Successful! Your ${isIcon ? 'ICON' : 'MIDAS'} ID is ` + midasId);
+                onPaymentComplete({
+                    ...(updatedStudent || user as Student),
+                    registrationStatus: "completed",
+                    paymentStatus: "completed",
+                });
+
+            } catch (error) {
+                console.error("Payment Error:", error);
+                toast.error("Payment received but update failed. Contact admin with payment ID: " + paymentId);
+            } finally {
+                setIsProcessing(false);
+            }
+        };
+
+        if (isTest) {
+            await processSuccess(`pay_test_${Date.now()}`);
+            return;
+        }
 
         const razorpayKey = import.meta.env.VITE_RAZORPAY_LIVE_KEY;
         if (!razorpayKey) {
@@ -40,57 +98,7 @@ export function PaymentComponent({ onPaymentComplete }: { onPaymentComplete: (us
             name: isIcon ? "Madras ICON" : "MIDAS Scientific Event",
             description: isIcon ? "Professional Registration Fee" : "Registration Fee — Conference Kit, Lunch, Certificate",
             handler: async function (response: any) {
-                setIsProcessing(true);
-                try {
-                    // 1. Generate Program ID and QR Code now that payment is successful
-                    const latestId = await getLatestMidasId(currentProgram);
-                    const midasId = generateMidasId(latestId || 0, currentProgram);
-                    const collegeName = user.college || "Dental College";
-                    const participantName = user.name || user.participantName || "Delegate";
-                    const qrCodeUrl = generateQRCodeUrl(midasId, participantName, collegeName, 300, currentProgram);
-
-                    console.log(`Payment successful. Assigning ${isIcon ? 'ICON' : 'MIDAS'} ID:`, midasId);
-
-                    // 2. Update student payment status AND assign MIDAS ID in Supabase
-                    const { error: studentError, data: updatedStudent } = await supabase
-                        .from("event_students")
-                        .update({
-                            paymentStatus: "PAID",
-                            paymentId: response.razorpay_payment_id,
-                            midasId: midasId,
-                            qrCodeUrl: qrCodeUrl,
-                        })
-                        .eq("id", user.id)
-                        .select()
-                        .single();
-
-
-                    if (studentError) throw studentError;
-
-                    // Record payment in payments table
-                    await supabase.from("payments").insert({
-                        eventStudentId: user.id,
-                        amount: 1030,
-                        currency: "INR",
-                        status: "PAID",
-                        paymentGatewayId: response.razorpay_payment_id,
-                        transactionId: response.razorpay_payment_id,
-                    });
-
-                    // Registration email is not sent after payment to avoid duplicate emails
-                    toast.success(`Payment Successful! Your ${isIcon ? 'ICON' : 'MIDAS'} ID is ` + midasId);
-                    onPaymentComplete({
-                        ...(updatedStudent || user as Student),
-                        registrationStatus: "completed",
-                        paymentStatus: "completed",
-                    });
-
-                } catch (error) {
-                    console.error("Payment Error:", error);
-                    toast.error("Payment received but update failed. Contact admin with payment ID: " + response.razorpay_payment_id);
-                } finally {
-                    setIsProcessing(false);
-                }
+                await processSuccess(response.razorpay_payment_id);
             },
             prefill: {
                 name: user.name || user.participantName || "",
@@ -135,24 +143,37 @@ export function PaymentComponent({ onPaymentComplete }: { onPaymentComplete: (us
                     </div>
                 </div>
 
-                <Button
-                    onClick={handlePayment}
-                    className="w-full bg-green-600 hover:bg-green-700 font-bold"
-                    size="lg"
-                    disabled={isProcessing}
-                >
-                    {isProcessing ? (
-                        <>
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Processing...
-                        </>
-                    ) : (
-                        <>
-                            <CreditCard className="mr-2 h-4 w-4" /> Pay ₹1,030
-                        </>
-                    )}
-                </Button>
+                <div className="flex flex-col gap-2">
+                    <Button
+                        onClick={() => handlePayment(false)}
+                        className="w-full bg-green-600 hover:bg-green-700 font-bold"
+                        size="lg"
+                        disabled={isProcessing}
+                    >
+                        {isProcessing ? (
+                            <>
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Processing...
+                            </>
+                        ) : (
+                            <>
+                                <CreditCard className="mr-2 h-4 w-4" /> Pay ₹1,030
+                            </>
+                        )}
+                    </Button>
+
+                    <Button
+                        onClick={() => handlePayment(true)}
+                        variant="outline"
+                        className="w-full border-dashed border-amber-300 text-amber-700 hover:bg-amber-100 font-bold"
+                        size="lg"
+                        disabled={isProcessing}
+                    >
+                        Test Payment (Bypass)
+                    </Button>
+                </div>
+                
                 <p className="text-xs text-center text-muted-foreground">
-                    Secure payment via Razorpay
+                    Secure payment via Razorpay. Live keys only function when hosted on the approved domain (<span className="font-mono">https://www.midicon.org</span>). Use "Test Payment" for local testing.
                 </p>
             </CardContent>
         </Card>
