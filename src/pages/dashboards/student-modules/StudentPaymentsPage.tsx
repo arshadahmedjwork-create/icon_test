@@ -59,8 +59,8 @@ export default function StudentPaymentsPage() {
             // Note: Since 'payments' table just logs transactions, we default the event name/type.
             const mapped: PaymentItem[] = data.map((p: any) => ({
                 id: p.id,
-                eventName: p.amount === 1 ? "Delegate Registration Fee" : "Event Registration Fee",
-                eventType: p.amount === 1 ? "REGISTRATION" : "EVENT",
+                eventName: p.amount === 1030 ? "Delegate Registration Fee" : "Event Registration Fee",
+                eventType: p.amount === 1030 ? "REGISTRATION" : "EVENT",
                 amount: p.amount,
                 status: p.status,
                 transactionId: p.transactionId || p.paymentGatewayId || p.id,
@@ -74,7 +74,7 @@ export default function StudentPaymentsPage() {
                     id: "pending_reg",
                     eventName: "Delegate Registration Fee",
                     eventType: "REGISTRATION",
-                    amount: 1,
+                    amount: 1030,
                     status: "PENDING",
                     transactionId: null,
                     paymentDate: null
@@ -98,7 +98,7 @@ export default function StudentPaymentsPage() {
                 id: "pending_reg",
                 eventName: "Delegate Registration Fee",
                 eventType: "REGISTRATION",
-                amount: 1,
+                amount: 1030,
                 status: "PENDING",
                 transactionId: null,
                 paymentDate: null

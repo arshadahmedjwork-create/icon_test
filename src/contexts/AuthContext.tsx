@@ -134,6 +134,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         };
         persistSession(sessionToken, authUser);
 
+        // Record admin/staff login session
+        if (member.role === 'ADMIN' || member.role === 'STAFF' || member.role === 'CORE_TEAM') {
+            try {
+                const { recordAdminLogin } = await import("@/services/adminAuditService");
+                await recordAdminLogin(member.name || member.email, member.email);
+            } catch (err) {
+                console.error("Failed to record admin login:", err);
+            }
+        }
+
         // Return the actual role so the UI knows where to navigate
         return actualFrontendRole;
     };
@@ -331,6 +341,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
 
     const logout = () => {
+        // Record admin/staff logout session
+        if (user && (user.role === 'admin' || user.role === 'staff' || user.role === 'core team')) {
+            import("@/services/adminAuditService").then(({ recordAdminLogout }) => {
+                recordAdminLogout();
+            }).catch(err => console.error("Failed to record admin logout:", err));
+        }
+
         setUser(null);
         setToken(null);
         localStorage.removeItem("midas_token");

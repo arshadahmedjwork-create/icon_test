@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import {
-    getUsers,
+    getEventStudents,
     getAbstracts,
     getSessions
 } from "@/services/supabaseService";
@@ -26,19 +26,17 @@ export default function Reports() {
     useEffect(() => {
         const loadStats = async () => {
             try {
-                const [users, abstracts, sessions] = await Promise.all([
-                    getUsers(currentProgram),
+                const [students, abstracts, sessions] = await Promise.all([
+                    getEventStudents(currentProgram),
                     getAbstracts(currentProgram),
                     getSessions(currentProgram)
                 ]);
 
-                const students = users.filter(u => u.role === "student") as Student[];
-
                 setStats({
-                    totalUsers: users.length,
+                    totalUsers: students.length,
                     students: students.length,
-                    registered: students.filter(s => s.registrationStatus === "completed" || s.registrationStatus === "approved").length,
-                    paid: students.filter(s => s.paymentStatus === "completed").length,
+                    registered: students.filter((s: any) => s.approvalStatus === "APPROVED" || s.paymentStatus === "PAID").length,
+                    paid: students.filter((s: any) => s.paymentStatus === "PAID").length,
                     abstracts: abstracts.length,
                     sessions: sessions.length
                 });
