@@ -17,6 +17,7 @@ import NotFound from "./pages/NotFound";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { ProgramProvider } from "@/contexts/ProgramContext";
 import ChangePasswordModal from "./components/ChangePasswordModal";
+import CompleteProfileModal from "./components/CompleteProfileModal";
 import ProtectedRoute from "./components/ProtectedRoute";
 
 const AuthModalWrapper = () => {
@@ -24,6 +25,15 @@ const AuthModalWrapper = () => {
   if (user?.mustChangePassword) {
     return <ChangePasswordModal />;
   }
+  
+  if (user && user.role === 'student') {
+    const isMissingCollege = !user.college || user.college.trim() === "";
+    const isMissingYear = !user.year || user.year.trim() === "";
+    if (isMissingCollege || isMissingYear) {
+      return <CompleteProfileModal />;
+    }
+  }
+
   return null;
 };
 

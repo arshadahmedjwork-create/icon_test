@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
     Table,
     TableBody,
@@ -17,9 +17,10 @@ import {
     SelectTrigger,
     SelectValue
 } from "@/components/ui/select";
-import { CheckCircle2, Search, XCircle, FileSpreadsheet, ExternalLink, RefreshCw, Pencil } from "lucide-react";
-import { getEventStudents, updateEventStudent, addEventStudent, getCollegesList } from "@/services/supabaseService";
+import { CheckCircle2, Search, XCircle, FileSpreadsheet, ExternalLink, RefreshCw, Pencil, Upload, AlertTriangle } from "lucide-react";
+import { getEventStudents, updateEventStudent, addEventStudent, getCollegesList, bulkAddEventStudents } from "@/services/supabaseService";
 import { sendApprovalEmail, sendAccountCreationEmail } from "@/services/emailService";
+import * as XLSX from "xlsx";
 import bcrypt from "bcryptjs";
 import { Student } from "@/types";
 import { useToast } from "@/hooks/use-toast";
@@ -58,6 +59,7 @@ export default function AdminRegistrations() {
         delegateType: "",
         paymentStatus: "PENDING",
         approvalStatus: "PENDING",
+        registrationId: "",
     });
 
     const [addDialogOpen, setAddDialogOpen] = useState(false);
@@ -86,7 +88,132 @@ export default function AdminRegistrations() {
         dciNumber: "",
         speciality: "",
         state: "",
+        registrationId: "",
     });
+
+    const fileInputRef = useRef<HTMLInputElement>(null);
+    const [bulkUploadDialogOpen, setBulkUploadDialogOpen] = useState(false);
+    const [bulkValidData, setBulkValidData] = useState<any[]>([]);
+    const [bulkErrors, setBulkErrors] = useState<{ rowNum: number; name: string; missingFields: string[] }[]>([]);
+    const [bulkTotalCount, setBulkTotalCount] = useState(0);
+    const [isUploadingBulk, setIsUploadingBulk] = useState(false);
+
+    const handleBulkUploadClick = () => {
+        if (fileInputRef.current) {
+            fileInputRef.current.value = "";
+        }
+        fileInputRef.current?.click();
+    };
+
+    const handleFileSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = async (evt) => {
+            try {
+                const bstr = evt.target?.result;
+                const workbook = XLSX.read(bstr, { type: "binary" });
+                const firstSheetName = workbook.SheetNames[0];
+                const worksheet = workbook.Sheets[firstSheetName];
+                const rows = XLSX.utils.sheet_to_json(worksheet) as any[];
+
+                if (rows.length === 0) {
+                    toast({ title: "Empty File", description: "No records found in the selected file.", variant: "destructive" });
+                    return;
+                }
+
+                const findKey = (row: any, candidates: string[]) => {
+                    const keys = Object.keys(row);
+                    for (const cand of candidates) {
+                        const found = keys.find(k => k.toLowerCase().replace(/[\s_\-]/g, "") === cand.toLowerCase().replace(/[\s_\-]/g, ""));
+                        if (found) return found;
+                    }
+                    return null;
+                };
+
+                const validRecords: any[] = [];
+                const errorsList: typeof bulkErrors = [];
+
+                rows.forEach((row, index) => {
+                    const nameKey = findKey(row, ["name", "participantname", "fullname"]);
+                    const emailKey = findKey(row, ["email", "emailaddress"]);
+                    const mobileKey = findKey(row, ["mobile", "mobilenumber", "phone", "phonenumber"]);
+                    const collegeKey = findKey(row, ["college", "institution", "collegename"]);
+                    const yearKey = findKey(row, ["year", "yearofstudy", "mdsyear", "currentyear"]);
+                    const regIdKey = findKey(row, ["registrationid", "regid", "id", "registrationno", "regno"]);
+
+                    const nameVal = nameKey ? String(row[nameKey] || "").trim() : "";
+                    const emailVal = emailKey ? String(row[emailKey] || "").trim() : "";
+                    const mobileVal = mobileKey ? String(row[mobileKey] || "").trim() : "";
+                    const collegeVal = collegeKey ? String(row[collegeKey] || "").trim() : "";
+                    const yearVal = yearKey ? String(row[yearKey] || "").trim() : "";
+                    const regIdVal = regIdKey ? String(row[regIdKey] || "").trim() : "";
+
+                    const missing: string[] = [];
+                    if (!nameVal) missing.push("Name");
+                    if (!emailVal) missing.push("Email");
+                    if (!mobileVal) missing.push("Mobile");
+                    if (!collegeVal) missing.push("College");
+                    if (!yearVal) missing.push("Year");
+
+                    const rowNumber = index + 2;
+
+                    if (missing.length > 0) {
+                        errorsList.push({
+                            rowNum: rowNumber,
+                            name: nameVal || "Unnamed Profile",
+                            missingFields: missing,
+                        });
+                    } else {
+                        validRecords.push({
+                            participantName: nameVal,
+                            email: emailVal,
+                            mobile: mobileVal,
+                            college: collegeVal,
+                            year: yearVal,
+                            registrationId: regIdVal || null,
+                            program: currentProgram,
+                        });
+                    }
+                });
+
+                setBulkTotalCount(rows.length);
+                setBulkValidData(validRecords);
+                setBulkErrors(errorsList);
+                setBulkUploadDialogOpen(true);
+
+            } catch (err) {
+                console.error("Error reading file:", err);
+                toast({ title: "Error", description: "Failed to parse CSV/Excel file.", variant: "destructive" });
+            }
+        };
+
+        reader.readAsBinaryString(file);
+    };
+
+    const handleConfirmBulkUpload = async () => {
+        if (bulkValidData.length === 0) return;
+        setIsUploadingBulk(true);
+        try {
+            const res = await bulkAddEventStudents(bulkValidData);
+            toast({
+                title: "Upload Successful",
+                description: `Successfully imported ${res.count} registrations.`,
+            });
+            setBulkUploadDialogOpen(false);
+            loadData();
+        } catch (err: any) {
+            console.error("Failed bulk uploading:", err);
+            toast({
+                title: "Upload Failed",
+                description: err.message || "An error occurred during bulk upload.",
+                variant: "destructive"
+            });
+        } finally {
+            setIsUploadingBulk(false);
+        }
+    };
 
     const handleAddStudent = async () => {
         if (!newStudentForm.participantName.trim() || !newStudentForm.email.trim() || !newStudentForm.mobile.trim() || !newStudentForm.college.trim()) {
@@ -124,6 +251,7 @@ export default function AdminRegistrations() {
                 dciNumber: "",
                 speciality: "",
                 state: "",
+                registrationId: "",
             });
             loadData();
         } catch (error: any) {
@@ -145,6 +273,7 @@ export default function AdminRegistrations() {
             delegateType: student.delegateType || "",
             paymentStatus: student.paymentStatus || "PENDING",
             approvalStatus: student.approvalStatus || "PENDING",
+            registrationId: student.registrationId || "",
         });
     };
 
@@ -161,6 +290,7 @@ export default function AdminRegistrations() {
                 delegateType: editForm.delegateType,
                 paymentStatus: editForm.paymentStatus,
                 approvalStatus: editForm.approvalStatus,
+                registrationId: editForm.registrationId || null,
             });
 
             toast({ title: "Updated", description: "Student registration updated successfully." });
@@ -301,6 +431,16 @@ export default function AdminRegistrations() {
                     <p className="text-muted-foreground">View and approve student registrations.</p>
                 </div>
                 <div className="flex gap-2">
+                    <input
+                        type="file"
+                        ref={fileInputRef}
+                        onChange={handleFileSelected}
+                        className="hidden"
+                        accept=".csv, .xlsx, .xls"
+                    />
+                    <Button variant="outline" size="sm" onClick={handleBulkUploadClick}>
+                        <Upload className="w-4 h-4 mr-2" /> Bulk Upload
+                    </Button>
                     <Button variant="outline" size="sm" onClick={handleExport}>
                         <FileSpreadsheet className="w-4 h-4 mr-2" /> Export CSV
                     </Button>
@@ -378,6 +518,9 @@ export default function AdminRegistrations() {
                                     <TableCell>
                                         <div className="font-medium">{student.name}</div>
                                         <div className="text-xs text-muted-foreground">{student.midasId || "No ID yet"}</div>
+                                        {student.registrationId && (
+                                            <div className="text-[10px] text-primary/70 font-semibold mt-0.5">Reg ID: {student.registrationId}</div>
+                                        )}
                                     </TableCell>
                                     <TableCell>
                                         <div className="text-sm">{student.email}</div>
@@ -485,6 +628,14 @@ export default function AdminRegistrations() {
                     </DialogHeader>
 
                     <div className="space-y-4 my-4 max-h-[60vh] overflow-y-auto px-1">
+                        <div className="space-y-1.5">
+                            <Label htmlFor="edit-reg-id">Registration ID (Optional)</Label>
+                            <Input
+                                id="edit-reg-id"
+                                value={editForm.registrationId}
+                                onChange={(e) => setEditForm({ ...editForm, registrationId: e.target.value })}
+                            />
+                        </div>
                         <div className="space-y-1.5">
                             <Label htmlFor="edit-name">Participant Name</Label>
                             <Input
@@ -608,6 +759,15 @@ export default function AdminRegistrations() {
                     </DialogHeader>
 
                     <div className="space-y-4 my-4 max-h-[60vh] overflow-y-auto px-1">
+                        <div className="space-y-1.5">
+                            <Label htmlFor="add-reg-id">Registration ID (Optional)</Label>
+                            <Input
+                                id="add-reg-id"
+                                value={newStudentForm.registrationId}
+                                onChange={(e) => setNewStudentForm({ ...newStudentForm, registrationId: e.target.value })}
+                                placeholder="e.g. PD001"
+                            />
+                        </div>
                         <div className="space-y-1.5">
                             <Label htmlFor="add-name">Participant Name *</Label>
                             <Input
@@ -755,6 +915,97 @@ export default function AdminRegistrations() {
                         </Button>
                         <Button onClick={handleAddStudent} disabled={saving} className="rounded-xl">
                             {saving ? "Registering..." : "Add & Approve"}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* Bulk Upload Summary Dialog */}
+            <Dialog open={bulkUploadDialogOpen} onOpenChange={setBulkUploadDialogOpen}>
+                <DialogContent className="sm:max-w-2xl rounded-3xl p-6">
+                    <DialogHeader>
+                        <DialogTitle className="text-xl font-bold flex items-center gap-2">
+                            <Upload className="w-5 h-5 text-primary" />
+                            Bulk Upload Summary
+                        </DialogTitle>
+                    </DialogHeader>
+
+                    <div className="space-y-6 my-4">
+                        <div className="grid grid-cols-3 gap-4">
+                            <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 text-center">
+                                <div className="text-2xl font-bold text-slate-800">{bulkTotalCount}</div>
+                                <div className="text-xs text-muted-foreground mt-1">Total Found</div>
+                            </div>
+                            <div className="bg-green-50/50 p-4 rounded-2xl border border-green-100 text-center">
+                                <div className="text-2xl font-bold text-green-600">{bulkValidData.length}</div>
+                                <div className="text-xs text-green-700 mt-1">Valid (Ready)</div>
+                            </div>
+                            <div className="bg-red-50/50 p-4 rounded-2xl border border-red-100 text-center">
+                                <div className="text-2xl font-bold text-red-600">{bulkErrors.length}</div>
+                                <div className="text-xs text-red-700 mt-1">Missing Data</div>
+                            </div>
+                        </div>
+
+                        {bulkErrors.length > 0 && (
+                            <div className="space-y-3">
+                                <div className="flex items-center gap-2 text-amber-600 font-semibold text-sm">
+                                    <AlertTriangle className="w-4 h-4" />
+                                    <span>Validation Alerts: Missing Required Data</span>
+                                </div>
+                                <div className="border border-red-100 rounded-2xl overflow-hidden max-h-[200px] overflow-y-auto bg-red-50/10">
+                                    <table className="w-full text-left text-xs border-collapse">
+                                        <thead>
+                                            <tr className="bg-red-50 border-b border-red-100 text-red-800 font-semibold">
+                                                <th className="p-2.5">Row</th>
+                                                <th className="p-2.5">User Name</th>
+                                                <th className="p-2.5">Missing Fields</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {bulkErrors.map((err, i) => (
+                                                <tr key={i} className="border-b border-red-50/50 text-slate-700 hover:bg-red-50/20">
+                                                    <td className="p-2.5 font-medium">Row {err.rowNum}</td>
+                                                    <td className="p-2.5 font-medium">{err.name}</td>
+                                                    <td className="p-2.5">
+                                                        <div className="flex flex-wrap gap-1">
+                                                            {err.missingFields.map((f, fi) => (
+                                                                <Badge key={fi} variant="destructive" className="text-[10px] py-0 px-1.5 uppercase font-bold">{f}</Badge>
+                                                            ))}
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        )}
+
+                        {bulkValidData.length === 0 ? (
+                            <div className="bg-red-50 text-red-800 p-4 rounded-2xl border border-red-100 text-center text-sm font-medium">
+                                No valid records found to import. Please correct the fields in your file and try again.
+                            </div>
+                        ) : bulkErrors.length > 0 ? (
+                            <div className="bg-amber-50 text-amber-800 p-4 rounded-2xl border border-amber-100 text-sm">
+                                Some rows have missing required data. You can proceed to upload only the <strong>{bulkValidData.length} valid rows</strong>, or cancel to fix your file.
+                            </div>
+                        ) : (
+                            <div className="bg-green-50 text-green-800 p-4 rounded-2xl border border-green-100 text-sm text-center font-medium">
+                                All {bulkTotalCount} records are fully valid and ready to import!
+                            </div>
+                        )}
+                    </div>
+
+                    <DialogFooter className="flex gap-2">
+                        <Button variant="outline" onClick={() => setBulkUploadDialogOpen(false)} className="rounded-xl">
+                            Cancel
+                        </Button>
+                        <Button
+                            onClick={handleConfirmBulkUpload}
+                            disabled={bulkValidData.length === 0 || isUploadingBulk}
+                            className="rounded-xl"
+                        >
+                            {isUploadingBulk ? "Importing..." : `Proceed with ${bulkValidData.length} Uploads`}
                         </Button>
                     </DialogFooter>
                 </DialogContent>

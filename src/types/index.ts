@@ -20,6 +20,7 @@ export interface User {
     paymentStatus?: string | "pending" | "completed" | "PAID";
     midasId?: string;
     iconId?: string; // Added for ICON
+    registrationId?: string;
     idProofUrl?: string;
     selectedEvents?: {
         subject: string;
@@ -99,6 +100,7 @@ export interface Student extends User {
     approvalStatus?: string | "PENDING" | "APPROVED" | "REJECTED";
     midasId?: string;
     iconId?: string; // Added for ICON
+    registrationId?: string;
     idProofUrl?: string;
     mustChangePassword?: boolean;
     selectedEvents?: {

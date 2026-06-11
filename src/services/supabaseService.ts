@@ -365,6 +365,7 @@ export const addEventStudent = async (studentData: {
     yearsOfPractice?: number;
     academicPosition?: string;
     teachingExperience?: string;
+    registrationId?: string;
 }) => {
     // 1. Generate a random temporary password
     const tempPassword = Math.random().toString(36).slice(-8);
@@ -390,6 +391,7 @@ export const addEventStudent = async (studentData: {
         qrCodeData: qrCodeUrl,
         password: hashedPassword,
         mustChangePassword: true,
+        registrationId: studentData.registrationId || null,
         delegateType: studentData.delegateType || null,
         dciNumber: studentData.dciNumber || null,
         speciality: studentData.speciality || null,
@@ -427,6 +429,93 @@ export const addEventStudent = async (studentData: {
     await logAction('CREATE_STUDENT', 'event_students', student.id, { email: student.email });
 
     return { student, tempPassword };
+};
+
+export const bulkAddEventStudents = async (studentsData: {
+    participantName: string;
+    email: string;
+    mobile: string;
+    college: string;
+    year: string;
+    program: string;
+    delegateType?: string;
+    registrationId?: string;
+}[]) => {
+    if (studentsData.length === 0) return { success: true, count: 0 };
+
+    const program = studentsData[0].program;
+    const latestId = await getLatestMidasId(program);
+    
+    let baseSeq = 0;
+    if (latestId) {
+        const parts = latestId.split('-');
+        if (parts.length === 3) {
+            const seq = parseInt(parts[2], 10);
+            if (!isNaN(seq)) {
+                baseSeq = seq;
+            }
+        }
+    }
+
+    const payloads = await Promise.all(studentsData.map(async (student, index) => {
+        const tempPassword = student.mobile || Math.random().toString(36).slice(-8);
+        const hashedPassword = await bcrypt.hash(tempPassword, 10);
+
+        const studentSeq = baseSeq + index;
+        const midasId = generateMidasId(studentSeq, program);
+        const qrCodeUrl = generateQRCodeUrl(midasId, student.participantName, student.college, 300, program);
+
+        return {
+            participantName: student.participantName,
+            email: student.email,
+            mobile: student.mobile,
+            college: student.college,
+            year: student.year || 'N/A',
+            program: program,
+            paymentStatus: "PAID",
+            approvalStatus: "APPROVED",
+            midasId: midasId,
+            qrCodeData: qrCodeUrl,
+            password: hashedPassword,
+            mustChangePassword: true,
+            registrationId: student.registrationId || null,
+            delegateType: student.delegateType || (program === 'ICON' ? 'PG' : 'UG'),
+            registeredAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+        };
+    }));
+
+    const { data: insertedStudents, error: insertError } = await supabase
+        .from('event_students')
+        .insert(payloads)
+        .select('id, email');
+
+    if (insertError) throw insertError;
+
+    if (insertedStudents && insertedStudents.length > 0) {
+        const paymentPayloads = insertedStudents.map((student: any) => ({
+            eventStudentId: student.id,
+            amount: 1030,
+            currency: 'INR',
+            status: 'PAID',
+            paymentGatewayId: `manual_bulk_${Date.now()}`,
+            transactionId: `manual_bulk_${Date.now()}`,
+        }));
+
+        const { error: payError } = await supabase
+            .from('payments')
+            .insert(paymentPayloads);
+
+        if (payError) {
+            console.error("Bulk payment registration failed:", payError);
+        }
+
+        for (const s of insertedStudents) {
+            await logAction('CREATE_STUDENT', 'event_students', s.id, { email: s.email, note: 'BULK_UPLOAD' });
+        }
+    }
+
+    return { success: true, count: insertedStudents?.length || 0 };
 };
 
 // --- JUDGES ---
