@@ -2,7 +2,7 @@ import { supabase } from '../lib/supabaseClient';
 // import { Database } from '../types/supabase'; // We might need to generate types, but for now we'll use 'any' or manual types
 import { User, Judge, EventConfig, Event, Deadline, Registration, Abstract, Session, Evaluation, Certificate, EvaluationCriteria } from '../types';
 import bcrypt from 'bcryptjs';
-import { sendAccountCreationEmail } from './emailService';
+import { sendAccountCreationEmail, generateMidasId, generateQRCodeUrl } from './emailService';
 import { logAction } from './adminAuditService';
 import { triggerCertificateDistribution } from './certificateEmailWorker';
 
@@ -346,6 +346,85 @@ export const updateEventStudent = async (id: string, updates: Record<string, any
         .eq('id', id);
     if (error) throw error;
 };
+
+export const addEventStudent = async (studentData: {
+    participantName: string;
+    email: string;
+    mobile: string;
+    college: string;
+    course?: string;
+    year?: string;
+    program: string;
+    delegateType?: string;
+    dciNumber?: string;
+    speciality?: string;
+    state?: string;
+    qualification?: string;
+    yearsOfPractice?: number;
+    academicPosition?: string;
+    teachingExperience?: string;
+}) => {
+    // 1. Generate a random temporary password
+    const tempPassword = Math.random().toString(36).slice(-8);
+    const hashedPassword = await bcrypt.hash(tempPassword, 10);
+
+    // 2. Generate MIDAS/ICON ID
+    const latestId = await getLatestMidasId(studentData.program);
+    const midasId = generateMidasId(latestId || 0, studentData.program);
+    const qrCodeUrl = generateQRCodeUrl(midasId, studentData.participantName, studentData.college, 300, studentData.program);
+
+    // 3. Insert into event_students
+    const payload: any = {
+        participantName: studentData.participantName,
+        email: studentData.email,
+        mobile: studentData.mobile,
+        college: studentData.college,
+        course: studentData.course || null,
+        year: studentData.year || 'N/A',
+        program: studentData.program,
+        paymentStatus: "PAID",
+        approvalStatus: "APPROVED",
+        midasId: midasId,
+        qrCodeData: qrCodeUrl,
+        password: hashedPassword,
+        mustChangePassword: true,
+        delegateType: studentData.delegateType || null,
+        dciNumber: studentData.dciNumber || null,
+        speciality: studentData.speciality || null,
+        state: studentData.state || null,
+        qualification: studentData.qualification || null,
+        yearsOfPractice: studentData.yearsOfPractice || null,
+        academicPosition: studentData.academicPosition || null,
+        teachingExperience: studentData.teachingExperience || null,
+        registeredAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+    };
+
+    const { data: student, error } = await supabase
+        .from('event_students')
+        .insert(payload)
+        .select()
+        .single();
+
+    if (error) throw error;
+
+    // 4. Create a payment record
+    const { error: payError } = await supabase
+        .from('payments')
+        .insert({
+            eventStudentId: student.id,
+            amount: 1030,
+            currency: 'INR',
+            status: 'PAID',
+            paymentGatewayId: `manual_${Date.now()}`,
+            transactionId: `manual_${Date.now()}`,
+        });
+
+    if (payError) console.error("Manual registration payment record failed:", payError);
+
+    return { student, tempPassword };
+};
+
 // --- JUDGES ---
 export const getJudges = async (program?: string): Promise<Judge[]> => {
     let query = supabase.from('judges').select('*, members!memberId(email)');

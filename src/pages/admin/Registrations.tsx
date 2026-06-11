@@ -18,8 +18,8 @@ import {
     SelectValue
 } from "@/components/ui/select";
 import { CheckCircle2, Search, XCircle, FileSpreadsheet, ExternalLink, RefreshCw, Pencil } from "lucide-react";
-import { getEventStudents, updateEventStudent } from "@/services/supabaseService";
-import { sendApprovalEmail } from "@/services/emailService";
+import { getEventStudents, updateEventStudent, addEventStudent, getCollegesList } from "@/services/supabaseService";
+import { sendApprovalEmail, sendAccountCreationEmail } from "@/services/emailService";
 import bcrypt from "bcryptjs";
 import { Student } from "@/types";
 import { useToast } from "@/hooks/use-toast";
@@ -28,6 +28,15 @@ import { supabase } from "@/lib/supabaseClient";
 import { verifyDciCertificate } from "@/services/dciService";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
+const indianStates = [
+    "Andhra Pradesh", "Arunachal Pradesh", "Assam", "Bihar", "Chhattisgarh", "Goa", "Gujarat",
+    "Haryana", "Himachal Pradesh", "Jharkhand", "Karnataka", "Kerala", "Madhya Pradesh",
+    "Maharashtra", "Manipur", "Meghalaya", "Mizoram", "Nagaland", "Odisha", "Punjab",
+    "Rajasthan", "Sikkim", "Tamil Nadu", "Telangana", "Tripura", "Uttar Pradesh",
+    "Uttarakhand", "West Bengal", "Andaman and Nicobar Islands", "Chandigarh",
+    "Dadra and Nagar Haveli and Daman and Diu", "Delhi", "Jammu and Kashmir",
+    "Ladakh", "Lakshadweep", "Puducherry"
+];
 
 export default function AdminRegistrations() {
     const [students, setStudents] = useState<Student[]>([]);
@@ -38,7 +47,7 @@ export default function AdminRegistrations() {
     const { currentProgram } = useProgram();
     const isIcon = currentProgram === 'ICON';
 
-    const [editingStudent, setEditingStudent] = useState<Student | null>(null);
+        const [editingStudent, setEditingStudent] = useState<Student | null>(null);
     const [saving, setSaving] = useState(false);
     const [editForm, setEditForm] = useState({
         participantName: "",
@@ -50,6 +59,80 @@ export default function AdminRegistrations() {
         paymentStatus: "PENDING",
         approvalStatus: "PENDING",
     });
+
+    const [addDialogOpen, setAddDialogOpen] = useState(false);
+    const [collegesList, setCollegesList] = useState<{ value: string, label: string }[]>([]);
+
+    useEffect(() => {
+        const fetchColleges = async () => {
+            try {
+                const list = await getCollegesList();
+                setCollegesList(list);
+            } catch (err) {
+                console.error("Failed to load colleges list", err);
+            }
+        };
+        fetchColleges();
+    }, []);
+
+    const [newStudentForm, setNewStudentForm] = useState({
+        participantName: "",
+        email: "",
+        mobile: "",
+        college: "",
+        course: "",
+        year: "",
+        delegateType: "",
+        dciNumber: "",
+        speciality: "",
+        state: "",
+    });
+
+    const handleAddStudent = async () => {
+        if (!newStudentForm.participantName.trim() || !newStudentForm.email.trim() || !newStudentForm.mobile.trim() || !newStudentForm.college.trim()) {
+            toast({ title: "Validation Error", description: "Name, email, mobile, and college are required.", variant: "destructive" });
+            return;
+        }
+        setSaving(true);
+        try {
+            const { student, tempPassword } = await addEventStudent({
+                ...newStudentForm,
+                program: currentProgram,
+            });
+
+            try {
+                await sendAccountCreationEmail({
+                    user_name: student.participantName,
+                    user_email: student.email,
+                    temp_password: tempPassword,
+                    login_url: window.location.origin + "/member-login"
+                });
+            } catch (emailErr) {
+                console.error("Manual registration email failed:", emailErr);
+            }
+
+            toast({ title: "Student Added", description: "Registered successfully. An email with login credentials has been sent to the student." });
+            setAddDialogOpen(false);
+            setNewStudentForm({
+                participantName: "",
+                email: "",
+                mobile: "",
+                college: "",
+                course: "",
+                year: "",
+                delegateType: "",
+                dciNumber: "",
+                speciality: "",
+                state: "",
+            });
+            loadData();
+        } catch (error: any) {
+            console.error(error);
+            toast({ title: "Error", description: error.message || "Failed to add student.", variant: "destructive" });
+        } finally {
+            setSaving(false);
+        }
+    };
 
     const handleOpenEdit = (student: Student) => {
         setEditingStudent(student);
@@ -217,9 +300,14 @@ export default function AdminRegistrations() {
                     <h2 className="text-2xl font-bold font-display">{isIcon ? 'ICON' : 'MIDAS'} Registration Management</h2>
                     <p className="text-muted-foreground">View and approve student registrations.</p>
                 </div>
-                <Button variant="outline" size="sm" onClick={handleExport}>
-                    <FileSpreadsheet className="w-4 h-4 mr-2" /> Export CSV
-                </Button>
+                <div className="flex gap-2">
+                    <Button variant="outline" size="sm" onClick={handleExport}>
+                        <FileSpreadsheet className="w-4 h-4 mr-2" /> Export CSV
+                    </Button>
+                    <Button size="sm" onClick={() => setAddDialogOpen(true)} className="bg-primary hover:bg-primary/95 text-white">
+                        Add Student
+                    </Button>
+                </div>
             </div>
 
             <div className="flex flex-col sm:flex-row gap-4">
@@ -507,6 +595,166 @@ export default function AdminRegistrations() {
                         </Button>
                         <Button onClick={handleSaveEdit} disabled={saving} className="rounded-xl">
                             {saving ? "Saving..." : "Save Changes"}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* Add Student Dialog */}
+            <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
+                <DialogContent className="sm:max-w-lg rounded-3xl p-6">
+                    <DialogHeader>
+                        <DialogTitle className="text-xl font-bold">Add Student (Paid & Approved)</DialogTitle>
+                    </DialogHeader>
+
+                    <div className="space-y-4 my-4 max-h-[60vh] overflow-y-auto px-1">
+                        <div className="space-y-1.5">
+                            <Label htmlFor="add-name">Participant Name *</Label>
+                            <Input
+                                id="add-name"
+                                value={newStudentForm.participantName}
+                                onChange={(e) => setNewStudentForm({ ...newStudentForm, participantName: e.target.value })}
+                                placeholder="Enter full name"
+                            />
+                        </div>
+
+                        <div className="space-y-1.5">
+                            <Label htmlFor="add-email">Email Address *</Label>
+                            <Input
+                                id="add-email"
+                                type="email"
+                                value={newStudentForm.email}
+                                onChange={(e) => setNewStudentForm({ ...newStudentForm, email: e.target.value })}
+                                placeholder="Enter email"
+                            />
+                        </div>
+
+                        <div className="space-y-1.5">
+                            <Label htmlFor="add-mobile">Mobile Number *</Label>
+                            <Input
+                                id="add-mobile"
+                                value={newStudentForm.mobile}
+                                onChange={(e) => setNewStudentForm({ ...newStudentForm, mobile: e.target.value })}
+                                placeholder="Enter 10-digit mobile"
+                            />
+                        </div>
+
+                        <div className="space-y-1.5">
+                            <Label htmlFor="add-college">College / Institution *</Label>
+                            <Select 
+                                value={newStudentForm.college} 
+                                onValueChange={(val) => setNewStudentForm({ ...newStudentForm, college: val })}
+                            >
+                                <SelectTrigger id="add-college">
+                                    <SelectValue placeholder="Select College" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {collegesList.map((c) => (
+                                        <SelectItem key={c.value} value={c.label}>
+                                            {c.label}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+
+                        {isIcon ? (
+                            <>
+                                <div className="space-y-1.5">
+                                    <Label htmlFor="add-delegate-type">Delegate Type</Label>
+                                    <Select 
+                                        value={newStudentForm.delegateType} 
+                                        onValueChange={(val) => setNewStudentForm({ ...newStudentForm, delegateType: val })}
+                                    >
+                                        <SelectTrigger id="add-delegate-type">
+                                            <SelectValue placeholder="Select Type" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="PG">Postgraduate (PG)</SelectItem>
+                                            <SelectItem value="Academician">Academician</SelectItem>
+                                            <SelectItem value="Clinician">Clinician</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+
+                                <div className="space-y-1.5">
+                                    <Label htmlFor="add-dci">DCI Number</Label>
+                                    <Input
+                                        id="add-dci"
+                                        value={newStudentForm.dciNumber}
+                                        onChange={(e) => setNewStudentForm({ ...newStudentForm, dciNumber: e.target.value })}
+                                        placeholder="Optional DCI number"
+                                    />
+                                </div>
+
+                                <div className="space-y-1.5">
+                                    <Label htmlFor="add-state">State</Label>
+                                    <Select 
+                                        value={newStudentForm.state} 
+                                        onValueChange={(val) => setNewStudentForm({ ...newStudentForm, state: val })}
+                                    >
+                                        <SelectTrigger id="add-state">
+                                            <SelectValue placeholder="Select State" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {indianStates.map((s) => (
+                                                <SelectItem key={s} value={s}>
+                                                    {s}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                            </>
+                        ) : (
+                            <>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="space-y-1.5">
+                                        <Label htmlFor="add-course">Course</Label>
+                                        <Select 
+                                            value={newStudentForm.course} 
+                                            onValueChange={(val) => setNewStudentForm({ ...newStudentForm, course: val })}
+                                        >
+                                            <SelectTrigger id="add-course">
+                                                <SelectValue placeholder="Select Course" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="BDS">BDS</SelectItem>
+                                                <SelectItem value="MDS">MDS</SelectItem>
+                                                <SelectItem value="Other">Other</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+
+                                    <div className="space-y-1.5">
+                                        <Label htmlFor="add-year">Year</Label>
+                                        <Select 
+                                            value={newStudentForm.year} 
+                                            onValueChange={(val) => setNewStudentForm({ ...newStudentForm, year: val })}
+                                        >
+                                            <SelectTrigger id="add-year">
+                                                <SelectValue placeholder="Select Year" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="1st Year">1st Year</SelectItem>
+                                                <SelectItem value="2nd Year">2nd Year</SelectItem>
+                                                <SelectItem value="3rd Year">3rd Year</SelectItem>
+                                                <SelectItem value="4th Year">4th Year</SelectItem>
+                                                <SelectItem value="Intern">Intern</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                </div>
+                            </>
+                        )}
+                    </div>
+
+                    <DialogFooter className="flex gap-2">
+                        <Button variant="outline" onClick={() => setAddDialogOpen(false)} className="rounded-xl">
+                            Cancel
+                        </Button>
+                        <Button onClick={handleAddStudent} disabled={saving} className="rounded-xl">
+                            {saving ? "Registering..." : "Add & Approve"}
                         </Button>
                     </DialogFooter>
                 </DialogContent>

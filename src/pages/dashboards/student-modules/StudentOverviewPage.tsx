@@ -13,10 +13,11 @@ import {
     Upload, CheckCircle2, AlertCircle, Loader2, FileText,
     Calendar, CreditCard, Award, Lock, UserCircle2
 } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { supabase } from "@/lib/supabaseClient";
 import { useProgram } from "@/contexts/ProgramContext";
 import { generateMidasId, generateQRCodeUrl, sendRegistrationEmail } from "@/services/emailService";
-import { getStudentDashboardStats, getLatestMidasId } from "@/services/supabaseService";
+import { getStudentDashboardStats, getLatestMidasId, updateEventStudent, uploadBonafide } from "@/services/supabaseService";
 
 const courses = [
     "BDS", "MDS - Orthodontics", "MDS - Prosthodontics", "MDS - Conservative & Endodontics",
@@ -60,6 +61,121 @@ export default function StudentOverviewPage() {
     const { currentProgram } = useProgram();
     const isIcon = currentProgram === 'ICON';
     const themeColor = isIcon ? "bg-[#b91c1c] hover:bg-[#991b1b]" : "bg-[#004d40] hover:bg-[#003d33]";
+
+    const [submittingMissing, setSubmittingMissing] = useState(false);
+    const [missingForm, setMissingForm] = useState({
+        course: user?.course || "",
+        year: (user?.year === "N/A" ? "" : user?.year) || "",
+        delegateType: (user as any)?.delegateType || "",
+        dciNumber: (user as any)?.dciNumber || "",
+        speciality: (user as any)?.speciality || "",
+        state: (user as any)?.state || "",
+        qualification: (user as any)?.qualification || "",
+        yearsOfPractice: (user as any)?.yearsOfPractice || "",
+        academicPosition: (user as any)?.academicPosition || "",
+        teachingExperience: (user as any)?.teachingExperience || "",
+    });
+
+    const [bonafideFile, setBonafideFile] = useState<File | null>(null);
+    const [dciCertFile, setDciCertFile] = useState<File | null>(null);
+
+    useEffect(() => {
+        if (user) {
+            setMissingForm({
+                course: user.course || "",
+                year: (user.year === "N/A" ? "" : user.year) || "",
+                delegateType: (user as any).delegateType || "",
+                dciNumber: (user as any).dciNumber || "",
+                speciality: (user as any).speciality || "",
+                state: (user as any).state || "",
+                qualification: (user as any).qualification || "",
+                yearsOfPractice: (user as any).yearsOfPractice || "",
+                academicPosition: (user as any).academicPosition || "",
+                teachingExperience: (user as any).teachingExperience || "",
+            });
+        }
+    }, [user]);
+
+    const isMidas = currentProgram === 'MIDAS';
+
+    const getMissingFields = () => {
+        const missing = [];
+        if (!user) return missing;
+        
+        if (!user.name || !user.name.trim()) missing.push("Name");
+        if (!user.mobile || !user.mobile.trim()) missing.push("Mobile");
+        if (!user.college || !user.college.trim()) missing.push("College");
+        
+        if (isMidas) {
+            if (!user.year || user.year === 'N/A' || !user.year.trim()) missing.push("Year of Study");
+            if (!user.course || !user.course.trim()) missing.push("Course");
+        } else {
+            const delegateType = (user as any).delegateType;
+            if (!delegateType) {
+                missing.push("Delegate Type");
+            } else {
+                if (!user.dciNumber || !user.dciNumber.trim()) missing.push("DCI Number");
+                if (!(user as any).dciCertificateUrl) missing.push("DCI Certificate");
+
+                if (delegateType === 'PG' || delegateType === 'Academician') {
+                    if (!user.idProofUrl && !(user as any).bonafideUrl) {
+                        missing.push("Bonafide Certificate");
+                    }
+                }
+            }
+        }
+        return missing;
+    };
+
+    const missingFieldsList = getMissingFields();
+    const showMissingFieldsPopup = !user?.mustChangePassword && missingFieldsList.length > 0;
+
+    const handleSaveMissingFields = async () => {
+        if (!user) return;
+        setSubmittingMissing(true);
+        try {
+            let idProofUrl = user.idProofUrl;
+            let dciCertificateUrl = (user as any).dciCertificateUrl;
+
+            if (bonafideFile) {
+                const url = await uploadBonafide(`${user.mobile || user.id}_bonafide`, bonafideFile);
+                if (url) {
+                    idProofUrl = url;
+                }
+            }
+
+            if (dciCertFile) {
+                const url = await uploadBonafide(`${user.mobile || user.id}_dci`, dciCertFile);
+                if (url) {
+                    dciCertificateUrl = url;
+                }
+            }
+
+            const updates: any = {
+                course: missingForm.course || null,
+                year: missingForm.year || 'N/A',
+                delegateType: missingForm.delegateType || null,
+                dciNumber: missingForm.dciNumber || null,
+                speciality: missingForm.speciality || null,
+                state: missingForm.state || null,
+                qualification: missingForm.qualification || null,
+                yearsOfPractice: missingForm.yearsOfPractice ? parseInt(missingForm.yearsOfPractice, 10) : null,
+                academicPosition: missingForm.academicPosition || null,
+                teachingExperience: missingForm.teachingExperience || null,
+                idProofUrl: idProofUrl || null,
+                dciCertificateUrl: dciCertificateUrl || null,
+            };
+
+            await updateEventStudent(user.id, updates);
+            toast.success("Profile updated successfully!");
+            await refreshUser();
+        } catch (error: any) {
+            console.error(error);
+            toast.error(error.message || "Failed to update profile.");
+        } finally {
+            setSubmittingMissing(false);
+        }
+    };
 
     const handlePayment = async (amount: number, isTest: boolean = false) => {
         setLoadingPayment(true);
@@ -353,6 +469,222 @@ export default function StudentOverviewPage() {
                     </Button>
                 </div>
             </div>
+
+            {/* Complete Profile Popup */}
+            <Dialog open={!!showMissingFieldsPopup}>
+                <DialogContent className="sm:max-w-lg rounded-3xl p-6" onPointerDownOutside={(e) => e.preventDefault()}>
+                    <DialogHeader>
+                        <DialogTitle className="text-xl font-bold flex items-center gap-2 text-amber-600">
+                            <AlertCircle className="w-5 h-5" /> Please Complete Your Profile
+                        </DialogTitle>
+                    </DialogHeader>
+
+                    <div className="space-y-4 my-4 max-h-[60vh] overflow-y-auto px-1">
+                        <p className="text-sm text-slate-500">
+                            Before accessing your dashboard, please fill in the following missing registration details:
+                        </p>
+
+                        {isMidas ? (
+                            <>
+                                <div className="space-y-1.5">
+                                    <Label htmlFor="missing-course">Course *</Label>
+                                    <Select 
+                                        value={missingForm.course} 
+                                        onValueChange={(val) => setMissingForm({ ...missingForm, course: val })}
+                                    >
+                                        <SelectTrigger id="missing-course">
+                                            <SelectValue placeholder="Select Course" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {courses.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+
+                                <div className="space-y-1.5">
+                                    <Label htmlFor="missing-year">Year *</Label>
+                                    <Select 
+                                        value={missingForm.year} 
+                                        onValueChange={(val) => setMissingForm({ ...missingForm, year: val })}
+                                    >
+                                        <SelectTrigger id="missing-year">
+                                            <SelectValue placeholder="Select Year" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {yearOptions.map(y => <SelectItem key={y} value={y}>{y}</SelectItem>)}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+
+                                <div className="space-y-1.5">
+                                    <Label htmlFor="missing-bonafide">ID Proof / Bonafide upload (Optional)</Label>
+                                    <Input
+                                        id="missing-bonafide"
+                                        type="file"
+                                        onChange={(e) => setBonafideFile(e.target.files?.[0] || null)}
+                                    />
+                                    {user?.idProofUrl && (
+                                        <p className="text-xs text-green-600">✓ Bonafide document already uploaded</p>
+                                    )}
+                                </div>
+                            </>
+                        ) : (
+                            <>
+                                <div className="space-y-1.5">
+                                    <Label htmlFor="missing-delegate-type">Delegate Type *</Label>
+                                    <Select 
+                                        value={missingForm.delegateType} 
+                                        onValueChange={(val) => setMissingForm({ ...missingForm, delegateType: val })}
+                                    >
+                                        <SelectTrigger id="missing-delegate-type">
+                                            <SelectValue placeholder="Select Delegate Type" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="PG">Postgraduate (PG)</SelectItem>
+                                            <SelectItem value="Academician">Academician</SelectItem>
+                                            <SelectItem value="Clinician">Clinician</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+
+                                {missingForm.delegateType && (
+                                    <>
+                                        <div className="space-y-1.5">
+                                            <Label htmlFor="missing-dci">DCI Number *</Label>
+                                            <Input
+                                                id="missing-dci"
+                                                value={missingForm.dciNumber}
+                                                onChange={(e) => setMissingForm({ ...missingForm, dciNumber: e.target.value })}
+                                                placeholder="Enter DCI Number"
+                                            />
+                                        </div>
+
+                                        <div className="space-y-1.5">
+                                            <Label htmlFor="missing-dci-cert">DCI Certificate *</Label>
+                                            <Input
+                                                id="missing-dci-cert"
+                                                type="file"
+                                                onChange={(e) => setDciCertFile(e.target.files?.[0] || null)}
+                                            />
+                                            {(user as any)?.dciCertificateUrl && (
+                                                <p className="text-xs text-green-600">✓ DCI certificate already uploaded</p>
+                                            )}
+                                        </div>
+                                    </>
+                                )}
+
+                                {missingForm.delegateType === 'PG' && (
+                                    <>
+                                        <div className="space-y-1.5">
+                                            <Label htmlFor="missing-year">MDS Year (Optional)</Label>
+                                            <Select 
+                                                value={missingForm.year} 
+                                                onValueChange={(val) => setMissingForm({ ...missingForm, year: val })}
+                                            >
+                                                <SelectTrigger id="missing-year">
+                                                    <SelectValue placeholder="Select Year" />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectItem value="1st Year MDS">1st Year MDS</SelectItem>
+                                                    <SelectItem value="2nd Year MDS">2nd Year MDS</SelectItem>
+                                                    <SelectItem value="3rd Year MDS">3rd Year MDS</SelectItem>
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
+                                        <div className="space-y-1.5">
+                                            <Label htmlFor="missing-bonafide-icon">Bonafide Certificate *</Label>
+                                            <Input
+                                                id="missing-bonafide-icon"
+                                                type="file"
+                                                onChange={(e) => setBonafideFile(e.target.files?.[0] || null)}
+                                            />
+                                            {((user as any)?.bonafideUrl || user?.idProofUrl) && (
+                                                <p className="text-xs text-green-600">✓ Bonafide certificate already uploaded</p>
+                                            )}
+                                        </div>
+                                    </>
+                                )}
+
+                                {(missingForm.delegateType === 'Academician' || missingForm.delegateType === 'Clinician') && (
+                                    <>
+                                        <div className="space-y-1.5">
+                                            <Label htmlFor="missing-qualification">Qualification (Optional)</Label>
+                                            <Select 
+                                                value={missingForm.qualification} 
+                                                onValueChange={(val) => setMissingForm({ ...missingForm, qualification: val })}
+                                            >
+                                                <SelectTrigger id="missing-qualification">
+                                                    <SelectValue placeholder="Select Qualification" />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectItem value="BDS">BDS</SelectItem>
+                                                    <SelectItem value="MDS">MDS</SelectItem>
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
+                                    </>
+                                )}
+
+                                {missingForm.delegateType === 'Academician' && (
+                                    <>
+                                        <div className="space-y-1.5">
+                                            <Label htmlFor="missing-academic-pos">Academic Position (Optional)</Label>
+                                            <Input
+                                                id="missing-academic-pos"
+                                                value={missingForm.academicPosition}
+                                                onChange={(e) => setMissingForm({ ...missingForm, academicPosition: e.target.value })}
+                                                placeholder="e.g. Assistant Professor"
+                                            />
+                                        </div>
+                                        <div className="space-y-1.5">
+                                            <Label htmlFor="missing-teaching-exp">Teaching Experience (Years) (Optional)</Label>
+                                            <Input
+                                                id="missing-teaching-exp"
+                                                value={missingForm.teachingExperience}
+                                                onChange={(e) => setMissingForm({ ...missingForm, teachingExperience: e.target.value })}
+                                                placeholder="e.g. 5"
+                                            />
+                                        </div>
+                                        <div className="space-y-1.5">
+                                            <Label htmlFor="missing-bonafide-icon">Bonafide Certificate *</Label>
+                                            <Input
+                                                id="missing-bonafide-icon"
+                                                type="file"
+                                                onChange={(e) => setBonafideFile(e.target.files?.[0] || null)}
+                                            />
+                                            {((user as any)?.bonafideUrl || user?.idProofUrl) && (
+                                                <p className="text-xs text-green-600">✓ Bonafide certificate already uploaded</p>
+                                            )}
+                                        </div>
+                                    </>
+                                )}
+
+                                {missingForm.delegateType === 'Clinician' && (
+                                    <div className="space-y-1.5">
+                                        <Label htmlFor="missing-practice-years">Years of Practice (Optional)</Label>
+                                        <Input
+                                            id="missing-practice-years"
+                                            type="number"
+                                            value={missingForm.yearsOfPractice}
+                                            onChange={(e) => setMissingForm({ ...missingForm, yearsOfPractice: e.target.value })}
+                                            placeholder="e.g. 10"
+                                        />
+                                    </div>
+                                )}
+                            </>
+                        )}
+                    </div>
+
+                    <DialogFooter className="flex gap-2">
+                        <Button onClick={logout} variant="outline" className="rounded-xl border-red-200 text-red-600 hover:bg-red-50">
+                            Sign Out
+                        </Button>
+                        <Button onClick={handleSaveMissingFields} disabled={submittingMissing} className="rounded-xl">
+                            {submittingMissing ? "Saving..." : "Save Details"}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </motion.div>
     );
 }
