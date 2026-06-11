@@ -123,10 +123,12 @@ export default function AdminRegistrations() {
                     return;
                 }
 
-                // Query existing emails in DB to prevent conflicts
-                const { data: dbEmails } = await supabase.from('event_students').select('email');
-                const existingEmails = new Set((dbEmails || []).map(s => String(s.email || "").toLowerCase().trim()));
+                // Query existing emails and mobiles in DB to prevent conflicts
+                const { data: dbStudents } = await supabase.from('event_students').select('email, mobile');
+                const existingEmails = new Set((dbStudents || []).map(s => String(s.email || "").toLowerCase().trim()));
+                const existingMobiles = new Set((dbStudents || []).map(s => String(s.mobile || "").trim()));
                 const seenEmailsInFile = new Set<string>();
+                const seenMobilesInFile = new Set<string>();
 
                 const findKey = (row: any, candidates: string[]) => {
                     const keys = Object.keys(row);
@@ -175,14 +177,27 @@ export default function AdminRegistrations() {
                             name: nameVal,
                             missingFields: ["EMAIL ALREADY EXISTS"],
                         });
+                    } else if (existingMobiles.has(mobileVal)) {
+                        errorsList.push({
+                            rowNum: rowNumber,
+                            name: nameVal,
+                            missingFields: ["MOBILE ALREADY EXISTS"],
+                        });
                     } else if (seenEmailsInFile.has(emailLower)) {
                         errorsList.push({
                             rowNum: rowNumber,
                             name: nameVal,
                             missingFields: ["DUPLICATE EMAIL IN FILE"],
                         });
+                    } else if (seenMobilesInFile.has(mobileVal)) {
+                        errorsList.push({
+                            rowNum: rowNumber,
+                            name: nameVal,
+                            missingFields: ["DUPLICATE MOBILE IN FILE"],
+                        });
                     } else {
                         seenEmailsInFile.add(emailLower);
+                        seenMobilesInFile.add(mobileVal);
                         
                         validRecords.push({
                             participantName: nameVal,
