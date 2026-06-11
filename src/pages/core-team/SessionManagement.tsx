@@ -422,6 +422,25 @@ export default function SessionManagement() {
         !sessions.some(s => s.id !== editingSession?.id && s.abstractIds?.includes(a.id))
     );
 
+    const subjectsOptions = Array.from(new Set([
+        ...(currentProgram === 'ICON' ? abstracts.map(a => a.subject) : events.map(e => e.name)),
+        formData.subject
+    ].filter(Boolean) as string[]));
+
+    const typesOptions = Array.from(new Set([
+        ...events.map(e => e.type),
+        ...abstracts.map(a => a.type),
+        formData.type
+    ].filter(Boolean) as string[]));
+
+    const modesOptions = Array.from(new Set([
+        ...events.map(e => e.mode),
+        ...abstracts.map(a => a.mode),
+        "Online",
+        "Offline",
+        formData.mode
+    ].filter(Boolean) as string[]));
+
     return (
         <div className="space-y-6">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -641,7 +660,7 @@ export default function SessionManagement() {
                                         <SelectValue placeholder="Select Subject" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        {Array.from(new Set(events.map(e => e.name))).map((s: string) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                                        {subjectsOptions.map((s: string) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
                                     </SelectContent>
                                 </Select>
                             </div>
@@ -656,7 +675,7 @@ export default function SessionManagement() {
                                         <SelectValue placeholder="Type" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        {Array.from(new Set(events.map(e => e.type))).map((t: string) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                                        {typesOptions.map((t: string) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
                                     </SelectContent>
                                 </Select>
                             </div>
@@ -671,7 +690,7 @@ export default function SessionManagement() {
                                         <SelectValue placeholder="Mode" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        {Array.from(new Set(events.map(e => e.mode))).map((m: string) => <SelectItem key={m} value={m}>{m}</SelectItem>)}
+                                        {modesOptions.map((m: string) => <SelectItem key={m} value={m}>{m}</SelectItem>)}
                                     </SelectContent>
                                 </Select>
                             </div>
