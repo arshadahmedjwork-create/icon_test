@@ -345,6 +345,8 @@ export const updateEventStudent = async (id: string, updates: Record<string, any
         .update(updates)
         .eq('id', id);
     if (error) throw error;
+
+    await logAction('UPDATE_STUDENT', 'event_students', id, updates);
 };
 
 export const addEventStudent = async (studentData: {
@@ -421,6 +423,8 @@ export const addEventStudent = async (studentData: {
         });
 
     if (payError) console.error("Manual registration payment record failed:", payError);
+
+    await logAction('CREATE_STUDENT', 'event_students', student.id, { email: student.email });
 
     return { student, tempPassword };
 };
@@ -724,6 +728,8 @@ export const getRegistrations = async (): Promise<Registration[]> => {
 export const updateRegistrationStatus = async (id: string, status: "approved" | "rejected") => {
     const { error } = await supabase.from('registrations').update({ status }).eq('id', id);
     if (error) throw error;
+
+    await logAction('UPDATE_REGISTRATION_STATUS', 'registrations', id, { status });
 };
 
 // --- ABSTRACTS ---
@@ -781,6 +787,8 @@ export const updateAbstractStatus = async (id: string, status: Abstract["status"
     const dbStatus = status === "pending" ? "DRAFT" : status === "approved" ? "APPROVED" : status === "rejected" ? "REJECTED" : "STAFF_APPROVED";
     const { error } = await supabase.from('submissions').update({ status: dbStatus, remarks: feedback }).eq('id', id);
     if (error) throw error;
+
+    await logAction('UPDATE_ABSTRACT_STATUS', 'submissions', id, { status: dbStatus, remarks: feedback });
 
     // Send status update email to the student
     try {
@@ -1002,12 +1010,16 @@ export const updateSessionStatus = async (id: string, status: string) => {
 
     const { error } = await supabase.from('sessions').update({ status: status.toUpperCase() }).eq('id', id);
     if (error) throw error;
+
+    await logAction('UPDATE_SESSION_STATUS', 'sessions', id, { status });
 };
 
 export const updateCurrentPresenter = async (id: string, studentId: string | null) => {
     await validateSessionAccess(id, "update presenter");
     const { error } = await supabase.from('sessions').update({ currentPresenterId: studentId }).eq('id', id);
     if (error) throw error;
+
+    await logAction('UPDATE_PRESENTER', 'sessions', id, { presenterId: studentId });
 };
 
 export const addSession = async (session: Omit<Session, "id">) => {
@@ -1219,6 +1231,8 @@ export const updateSessionAttendance = async (sessionId: string, attendedStudent
             throw updateError;
         }
     }
+
+    await logAction('UPDATE_ATTENDANCE', 'sessions', sessionId, { attendedCount: attendedSubmissionIds.length });
 };
 
 // --- EVALUATIONS ---
@@ -1382,6 +1396,8 @@ export const addCertificate = async (cert: Certificate) => {
 // IMPORTANT: This logic mimics the mockDatabase logic but runs client-side fetching data.
 // In a production app, this should be a Postgres Function or Edge Function.
 export const calculateSessionResults = async (sessionId: string) => {
+    await logAction('FINALIZE_SESSION', 'sessions', sessionId);
+
     // 1. Fetch Session
     const { data: session, error: sErr } = await supabase.from('sessions').select('*').eq('id', sessionId).single();
     if (sErr || !session) return null;

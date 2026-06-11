@@ -84,6 +84,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             setUser(JSON.parse(storedUser));
         }
         setIsLoading(false);
+
+        let cleanupFn = () => {};
+
+        import("@/services/adminAuditService").then(({ resumeAdminSession, recordBrowserCloseLogout }) => {
+            resumeAdminSession();
+
+            const handleBeforeUnload = () => {
+                recordBrowserCloseLogout();
+            };
+            window.addEventListener("beforeunload", handleBeforeUnload);
+            cleanupFn = () => {
+                window.removeEventListener("beforeunload", handleBeforeUnload);
+            };
+        }).catch(err => console.error("Failed to load adminAuditService in AuthContext", err));
+
+        return () => {
+            cleanupFn();
+        };
     }, []);
 
     const persistSession = (token: string, user: AuthUser) => {

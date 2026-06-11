@@ -123,7 +123,7 @@ export async function getAdminAuditLog(): Promise<AuditEntry[]> {
         adminEmail: log.admin_email,
         loginTime: log.login_time,
         logoutTime: log.logout_time,
-        sessionDuration: log.duration
+        sessionDuration: log.duration || (log.logout_time ? computeDuration(log.login_time, log.logout_time) : null)
     }));
 }
 
@@ -177,4 +177,56 @@ export async function getActionLogs(): Promise<any[]> {
     }
 
     return data;
+}
+
+/**
+ * Record browser close or tab close logout using keepalive fetch.
+ * Runs in the window beforeunload handler.
+ */
+export function recordBrowserCloseLogout(): void {
+    const dbId = sessionStorage.getItem(DB_UUID_KEY);
+    if (!dbId) return;
+
+    const logoutTime = new Date().toISOString();
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+    const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+    if (!supabaseUrl || !supabaseKey) return;
+
+    const url = `${supabaseUrl}/rest/v1/audit_logs?id=eq.${dbId}`;
+    const headers = {
+        'apikey': supabaseKey,
+        'Authorization': `Bearer ${supabaseKey}`,
+        'Content-Type': 'application/json'
+    };
+
+    const body = JSON.stringify({
+        logout_time: logoutTime
+    });
+
+    // keepalive: true keeps the request alive even after page/tab is closed
+    fetch(url, {
+        method: 'PATCH',
+        headers,
+        body,
+        keepalive: true
+    }).catch(err => console.error("Failed to log browser close:", err));
+}
+
+/**
+ * Resume an active session (e.g. if beforeunload fired due to page refresh).
+ * Resets logout_time and duration.
+ */
+export async function resumeAdminSession(): Promise<void> {
+    const dbId = sessionStorage.getItem(DB_UUID_KEY);
+    if (!dbId) return;
+
+    try {
+        await supabase.from('audit_logs').update({
+            logout_time: null,
+            duration: null
+        }).eq('id', dbId);
+    } catch (err) {
+        console.error("Failed to resume admin session:", err);
+    }
 }
