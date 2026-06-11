@@ -415,9 +415,9 @@ export default function SessionManagement() {
 
     // Filter available abstracts based on selected criteria and check for duplicate scheduling
     const availableAbstracts = abstracts.filter(a =>
-        (!formData.subject || a.subject === formData.subject) &&
-        (!formData.type || a.type === formData.type) &&
-        (!formData.mode || a.mode === formData.mode) &&
+        (!formData.subject || a.subject.toLowerCase() === formData.subject.toLowerCase()) &&
+        (!formData.type || a.type.toLowerCase() === formData.type.toLowerCase()) &&
+        (!formData.mode || a.mode.toLowerCase() === formData.mode.toLowerCase()) &&
         // Exclude if scheduled in a different session
         !sessions.some(s => s.id !== editingSession?.id && s.abstractIds?.includes(a.id))
     );
