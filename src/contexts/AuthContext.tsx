@@ -223,6 +223,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             selectedEvents: student.selectedEvents || [],
         };
         persistSession(sessionToken, authUser);
+
+        // Record student login session in audit logs
+        try {
+            const { recordAdminLogin } = await import("@/services/adminAuditService");
+            await recordAdminLogin(`${student.participantName} (Student)`, student.email);
+        } catch (err) {
+            console.error("Failed to record student login:", err);
+        }
     };
 
     // Student registration
@@ -359,11 +367,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
 
     const logout = () => {
-        // Record admin/staff logout session
-        if (user && (user.role === 'admin' || user.role === 'staff' || user.role === 'core team')) {
+        // Record admin/staff/student logout session
+        if (user && (user.role === 'admin' || user.role === 'staff' || user.role === 'core team' || user.role === 'student')) {
             import("@/services/adminAuditService").then(({ recordAdminLogout }) => {
                 recordAdminLogout();
-            }).catch(err => console.error("Failed to record admin logout:", err));
+            }).catch(err => console.error("Failed to record logout:", err));
         }
 
         setUser(null);

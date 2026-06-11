@@ -79,6 +79,8 @@ export default function StudentOverviewPage() {
     const [bonafideFile, setBonafideFile] = useState<File | null>(null);
     const [dciCertFile, setDciCertFile] = useState<File | null>(null);
 
+    const [manuallyClosed, setManuallyClosed] = useState(false);
+
     useEffect(() => {
         if (user) {
             setMissingForm({
@@ -93,6 +95,7 @@ export default function StudentOverviewPage() {
                 academicPosition: (user as any).academicPosition || "",
                 teachingExperience: (user as any).teachingExperience || "",
             });
+            setManuallyClosed(false);
         }
     }, [user]);
 
@@ -128,7 +131,7 @@ export default function StudentOverviewPage() {
     };
 
     const missingFieldsList = getMissingFields();
-    const showMissingFieldsPopup = !user?.mustChangePassword && missingFieldsList.length > 0;
+    const showMissingFieldsPopup = !user?.mustChangePassword && missingFieldsList.length > 0 && !manuallyClosed;
 
     const handleSaveMissingFields = async () => {
         if (!user) return;
@@ -168,6 +171,7 @@ export default function StudentOverviewPage() {
 
             await updateEventStudent(user.id, updates);
             toast.success("Profile updated successfully!");
+            setManuallyClosed(true);
             await refreshUser();
         } catch (error: any) {
             console.error(error);
