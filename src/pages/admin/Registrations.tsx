@@ -17,7 +17,7 @@ import {
     SelectTrigger,
     SelectValue
 } from "@/components/ui/select";
-import { CheckCircle2, Search, XCircle, FileSpreadsheet, ExternalLink, RefreshCw, Pencil, Upload, AlertTriangle } from "lucide-react";
+import { CheckCircle2, Search, XCircle, FileSpreadsheet, ExternalLink, RefreshCw, Pencil, Upload, AlertTriangle, Mail } from "lucide-react";
 import { getEventStudents, updateEventStudent, addEventStudent, getCollegesList, bulkAddEventStudents } from "@/services/supabaseService";
 import { sendApprovalEmail, sendAccountCreationEmail } from "@/services/emailService";
 import * as XLSX from "xlsx";
@@ -260,6 +260,59 @@ export default function AdminRegistrations() {
         }
     };
 
+    const [sendingEmails, setSendingEmails] = useState(false);
+
+    const handleSendBulkEmails = async () => {
+        const targetStudents = students.filter(s => {
+            const id = s.midasId || "";
+            return id !== "ICON-2026-0001" && id !== "ICON-2026-0002" && s.approvalStatus === "APPROVED";
+        });
+
+        if (targetStudents.length === 0) {
+            toast({ title: "No Eligible Students", description: "No approved students found (excluding ICON-2026-0001 and ICON-2026-0002)." });
+            return;
+        }
+
+        if (!confirm(`Are you sure you want to send credentials emails to ${targetStudents.length} students (excluding ICON-2026-0001 and ICON-2026-0002)?`)) {
+            return;
+        }
+
+        setSendingEmails(true);
+        let successCount = 0;
+        let failCount = 0;
+
+        for (let i = 0; i < targetStudents.length; i++) {
+            const student = targetStudents[i];
+            const tempPassword = student.phone || student.mobile || "";
+            
+            try {
+                toast({
+                    title: `Sending Emails (${i + 1}/${targetStudents.length})`,
+                    description: `Sending to ${student.name} (${student.email})...`,
+                });
+
+                await sendAccountCreationEmail({
+                    user_name: student.name || student.participantName || "",
+                    user_email: student.email,
+                    temp_password: tempPassword,
+                    login_url: window.location.origin + "/member-login"
+                });
+                successCount++;
+            } catch (err) {
+                console.error(`Failed to send email to ${student.email}:`, err);
+                failCount++;
+            }
+
+            await new Promise(resolve => setTimeout(resolve, 300));
+        }
+
+        setSendingEmails(false);
+        toast({
+            title: "Process Completed",
+            description: `Emails sent successfully to ${successCount} students. Failed: ${failCount}.`,
+        });
+    };
+
     const handleAddStudent = async () => {
         if (!newStudentForm.participantName.trim() || !newStudentForm.email.trim() || !newStudentForm.mobile.trim() || !newStudentForm.college.trim()) {
             toast({ title: "Validation Error", description: "Name, email, mobile, and college are required.", variant: "destructive" });
@@ -485,6 +538,9 @@ export default function AdminRegistrations() {
                     />
                     <Button variant="outline" size="sm" onClick={handleBulkUploadClick}>
                         <Upload className="w-4 h-4 mr-2" /> Bulk Upload
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={handleSendBulkEmails} disabled={sendingEmails} className="border-primary/50 text-primary hover:text-primary-foreground hover:bg-primary">
+                        <Mail className="w-4 h-4 mr-2" /> {sendingEmails ? "Sending..." : "Send Welcome Emails"}
                     </Button>
                     <Button variant="outline" size="sm" onClick={handleExport}>
                         <FileSpreadsheet className="w-4 h-4 mr-2" /> Export CSV
