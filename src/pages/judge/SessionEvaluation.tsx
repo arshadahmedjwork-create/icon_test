@@ -55,6 +55,8 @@ export default function SessionEvaluation() {
     const [isStudentAbsent, setIsStudentAbsent] = useState(false);
     const [previewMode, setPreviewMode] = useState(false);
 
+    const [isGuidelinesOpen, setIsGuidelinesOpen] = useState(false);
+
     useEffect(() => {
         const loadData = async () => {
             if (sessionId && user) {
@@ -284,6 +286,8 @@ export default function SessionEvaluation() {
         ? presentAbstracts.every(a => evaluations.some(e => e.studentId === a.studentId))
         : (abstracts.length > 0);
 
+    const isSessionCompleted = session.status === 'SESSION_COMPLETED' || session.status.toLowerCase() === 'completed';
+
     return (
         <div className="space-y-6">
             <div className="flex justify-between items-center flex-wrap gap-4">
@@ -298,11 +302,13 @@ export default function SessionEvaluation() {
                 </div>
 
                 <div className="flex gap-2">
-                    <Button asChild variant="outline" className="rounded-xl border-blue-600/30 text-blue-700 hover:bg-blue-50">
-                        <Link to={`/dashboard/judge/session/${sessionId}/scoreboard`}>
-                            <Trophy className="w-4 h-4 mr-2" /> Scoreboard
-                        </Link>
-                    </Button>
+                    {(finalized || isSessionCompleted) && (
+                        <Button asChild variant="outline" className="rounded-xl border-blue-600/30 text-blue-700 hover:bg-blue-50">
+                            <Link to={`/dashboard/judge/session/${sessionId}/scoreboard`}>
+                                <Trophy className="w-4 h-4 mr-2" /> Scoreboard
+                            </Link>
+                        </Button>
+                    )}
                     <Dialog>
                         <DialogTrigger asChild>
                             <Button variant="outline" className="rounded-xl bg-slate-50 border-slate-200 hover:bg-slate-100">
@@ -456,11 +462,13 @@ export default function SessionEvaluation() {
                                 >
                                     <Eye className="w-4 h-4 mr-2" /> View Abstract Preview
                                 </Button>
-                                {abstract.fileUrl && (
-                                    <Button variant="link" size="sm" className="w-full h-auto mt-1 text-xs text-muted-foreground" onClick={() => window.open(abstract.fileUrl, "_blank")}>
-                                        <FileText className="w-3 h-3 mr-1" /> Open Abstract in New Window
-                                    </Button>
-                                )}
+                                <Button
+                                    variant="outline"
+                                    className="w-full mt-2 rounded-xl font-semibold border-slate-200 text-slate-700 hover:bg-slate-50"
+                                    onClick={() => setIsGuidelinesOpen(true)}
+                                >
+                                    <FileText className="w-4 h-4 mr-2" /> Judge Guidelines
+                                </Button>
                             </CardContent>
                         </Card>
                     );
@@ -667,6 +675,22 @@ export default function SessionEvaluation() {
                             )}
                         </div>
                     </div>
+                </DialogContent>
+            </Dialog>
+
+            <Dialog open={isGuidelinesOpen} onOpenChange={setIsGuidelinesOpen}>
+                <DialogContent className="sm:max-w-[500px] rounded-2xl">
+                    <DialogHeader>
+                        <DialogTitle>Judge Guidelines</DialogTitle>
+                    </DialogHeader>
+                    <div className="py-4 space-y-4">
+                        <div className="whitespace-pre-line text-sm text-slate-700 bg-slate-50 p-4 rounded-xl border border-slate-100 max-h-[350px] overflow-y-auto">
+                            {events.find(e => e.id === session?.eventId)?.judgeInstructions || "No instructions provided for this event."}
+                        </div>
+                    </div>
+                    <DialogFooter>
+                        <Button onClick={() => setIsGuidelinesOpen(false)} className="rounded-xl">Close</Button>
+                    </DialogFooter>
                 </DialogContent>
             </Dialog>
         </div>

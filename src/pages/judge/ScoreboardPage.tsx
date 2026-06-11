@@ -96,6 +96,7 @@ export default function ScoreboardPage() {
     rankings.sort((a, b) => b.score - a.score);
 
     const isNonComp = isNonCompetitiveSession(session);
+    const isCompleted = session.status === 'SESSION_COMPLETED' || session.status.toLowerCase() === 'completed';
 
     return (
         <div className="space-y-6 max-w-4xl mx-auto">
@@ -125,6 +126,12 @@ export default function ScoreboardPage() {
                             This session type (Accommodation / Clinician / Academician) is attendance-only. Ranking is disabled.
                         </CardDescription>
                     </CardHeader>
+                </Card>
+            ) : !isCompleted ? (
+                <Card className="text-center py-12 border-dashed">
+                    <Trophy className="w-12 h-12 text-slate-300 mx-auto mb-4" />
+                    <h3 className="text-lg font-semibold mb-1">Scoreboard Locked</h3>
+                    <p className="text-muted-foreground text-sm">The scoreboard will be visible once all presentations are evaluated and scores are finalized.</p>
                 </Card>
             ) : (
                 <div className="space-y-4">

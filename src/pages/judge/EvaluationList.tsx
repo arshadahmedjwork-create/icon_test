@@ -99,11 +99,13 @@ export default function EvaluationList() {
                                         </div>
                                     </div>
                                     <div className="space-y-2">
-                                        <Button asChild variant="outline" className="w-full border-blue-600/30 text-blue-700 hover:bg-blue-50 rounded-xl font-semibold">
-                                            <Link to={`/dashboard/judge/session/${session.id}/scoreboard`}>
-                                                View Scoreboard
-                                            </Link>
-                                        </Button>
+                                        {isCompleted && (
+                                            <Button asChild variant="outline" className="w-full border-blue-600/30 text-blue-700 hover:bg-blue-50 rounded-xl font-semibold">
+                                                <Link to={`/dashboard/judge/session/${session.id}/scoreboard`}>
+                                                    View Scoreboard
+                                                </Link>
+                                            </Button>
+                                        )}
                                         {isCompleted ? (
                                             <div className="space-y-2">
                                                 <Button disabled className="w-full" variant="secondary">
