@@ -44,14 +44,12 @@ export default function DashboardLayout({ children, roleName, roleColor, navItem
           sidebarOpen ? "translate-x-0" : "-translate-x-full"
         )}
       >
-        <div className="flex items-center gap-2 h-16 px-5 border-b border-sidebar-border shrink-0">
+        <div className="flex flex-col items-center justify-center py-6 px-5 border-b border-sidebar-border shrink-0 gap-2 text-center">
           {currentProgram !== 'MIDAS' ? (
-            <div className="w-8 h-8 rounded-lg overflow-hidden flex items-center justify-center bg-white/10 p-0.5">
-              <img src="/icon_logo.png" alt="Madras ICON Logo" className="w-full h-full object-contain" />
-            </div>
+            <img src="/logo.jpeg" alt="Madras ICON Logo" className="h-16 w-auto object-contain" />
           ) : (
-            <div className="w-8 h-8 rounded-lg bg-gradient-primary flex items-center justify-center">
-              <Stethoscope className="w-4 h-4 text-primary-foreground" />
+            <div className="w-12 h-12 rounded-full bg-gradient-primary flex items-center justify-center">
+              <Stethoscope className="w-6 h-6 text-primary-foreground" />
             </div>
           )}
           <span className="font-display text-lg font-bold tracking-tight">
