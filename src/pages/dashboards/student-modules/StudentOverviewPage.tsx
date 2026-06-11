@@ -17,7 +17,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { supabase } from "@/lib/supabaseClient";
 import { useProgram } from "@/contexts/ProgramContext";
 import { generateMidasId, generateQRCodeUrl, sendRegistrationEmail } from "@/services/emailService";
-import { getStudentDashboardStats, getLatestMidasId, updateEventStudent, uploadBonafide } from "@/services/supabaseService";
+import { getStudentDashboardStats, getLatestMidasId, updateEventStudent, uploadBonafide, getCollegesList } from "@/services/supabaseService";
 
 const courses = [
     "BDS", "MDS - Orthodontics", "MDS - Prosthodontics", "MDS - Conservative & Endodontics",
@@ -43,7 +43,7 @@ const loadRazorpayScript = (): Promise<boolean> => {
 };
 
 export default function StudentOverviewPage() {
-    const { user, logout, refreshUser } = useAuth(); // Assume we can refetch/reload user after payment or we force a reload
+    const { user, logout, refreshUser, completeProfileDismissed, setCompleteProfileDismissed } = useAuth(); // Assume we can refetch/reload user after payment or we force a reload
     const navigate = useNavigate();
     const [loadingPayment, setLoadingPayment] = useState(false);
     const [stats, setStats] = useState({ eventsEnrolled: 0, abstractsSubmitted: 0, paymentsMade: 0, certificates: 0 });
@@ -64,6 +64,7 @@ export default function StudentOverviewPage() {
 
     const [submittingMissing, setSubmittingMissing] = useState(false);
     const [missingForm, setMissingForm] = useState({
+        college: user?.college || "",
         course: user?.course || "",
         year: (user?.year === "N/A" ? "" : user?.year) || "",
         delegateType: (user as any)?.delegateType || "",
@@ -78,12 +79,29 @@ export default function StudentOverviewPage() {
 
     const [bonafideFile, setBonafideFile] = useState<File | null>(null);
     const [dciCertFile, setDciCertFile] = useState<File | null>(null);
+    const [colleges, setColleges] = useState<{ value: string; label: string }[]>([]);
+    const [isLoadingColleges, setIsLoadingColleges] = useState(true);
+
+    useEffect(() => {
+        const loadColleges = async () => {
+            try {
+                const list = await getCollegesList();
+                setColleges(list);
+            } catch (err) {
+                console.error("Failed to load colleges:", err);
+            } finally {
+                setIsLoadingColleges(false);
+            }
+        };
+        loadColleges();
+    }, []);
 
     const [manuallyClosed, setManuallyClosed] = useState(false);
 
     useEffect(() => {
         if (user) {
             setMissingForm({
+                college: user.college || "",
                 course: user.course || "",
                 year: (user.year === "N/A" ? "" : user.year) || "",
                 delegateType: (user as any).delegateType || "",
@@ -131,7 +149,7 @@ export default function StudentOverviewPage() {
     };
 
     const missingFieldsList = getMissingFields();
-    const showMissingFieldsPopup = !user?.mustChangePassword && missingFieldsList.length > 0 && !manuallyClosed;
+    const showMissingFieldsPopup = !user?.mustChangePassword && missingFieldsList.length > 0 && !manuallyClosed && !completeProfileDismissed;
 
     const handleSaveMissingFields = async () => {
         if (!user) return;
@@ -155,6 +173,7 @@ export default function StudentOverviewPage() {
             }
 
             const updates: any = {
+                college: missingForm.college || null,
                 course: missingForm.course || null,
                 year: missingForm.year || 'N/A',
                 delegateType: missingForm.delegateType || null,
@@ -172,6 +191,7 @@ export default function StudentOverviewPage() {
             await updateEventStudent(user.id, updates);
             toast.success("Profile updated successfully!");
             setManuallyClosed(true);
+            setCompleteProfileDismissed(true);
             await refreshUser();
         } catch (error: any) {
             console.error(error);
@@ -474,6 +494,24 @@ export default function StudentOverviewPage() {
                         <p className="text-sm text-slate-500">
                             Before accessing your dashboard, please fill in the following missing registration details:
                         </p>
+
+                        {(!user?.college || user.college.trim() === "" || ((user as any)?.delegateType !== "Clinician" && user.college.trim() === "N/A")) && (
+                            <div className="space-y-1.5">
+                                <Label htmlFor="missing-college">College *</Label>
+                                <Select 
+                                    value={missingForm.college} 
+                                    onValueChange={(val) => setMissingForm({ ...missingForm, college: val })}
+                                    disabled={isLoadingColleges}
+                                >
+                                    <SelectTrigger id="missing-college">
+                                        <SelectValue placeholder={isLoadingColleges ? "Loading colleges..." : "Select College"} />
+                                    </SelectTrigger>
+                                    <SelectContent className="max-h-[200px]">
+                                        {colleges.map(c => <SelectItem key={c.value} value={c.label}>{c.label}</SelectItem>)}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        )}
 
                         {isMidas ? (
                             <>

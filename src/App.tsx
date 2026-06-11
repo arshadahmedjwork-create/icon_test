@@ -21,12 +21,12 @@ import CompleteProfileModal from "./components/CompleteProfileModal";
 import ProtectedRoute from "./components/ProtectedRoute";
 
 const AuthModalWrapper = () => {
-  const { user } = useAuth();
+  const { user, completeProfileDismissed } = useAuth();
   if (user?.mustChangePassword) {
     return <ChangePasswordModal />;
   }
   
-  if (user && user.role === 'student') {
+  if (user && user.role === 'student' && !completeProfileDismissed) {
     const isClinician = user.delegateType === 'Clinician';
     const isMissingCollege = !user.college || user.college.trim() === "" || (!isClinician && user.college.trim() === "N/A");
     const isMissingYear = !user.year || user.year.trim() === "" || (!isClinician && user.year.trim() === "N/A");

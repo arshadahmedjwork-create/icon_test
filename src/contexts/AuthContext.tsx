@@ -66,6 +66,8 @@ interface AuthContextType {
     logout: () => void;
     refreshUser: () => Promise<void>;
     clearMustChangePassword: () => void;
+    completeProfileDismissed: boolean;
+    setCompleteProfileDismissed: (dismissed: boolean) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -74,6 +76,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const [user, setUser] = useState<AuthUser | null>(null);
     const [token, setToken] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(true);
+    const [completeProfileDismissed, setCompleteProfileDismissed] = useState(false);
 
     // Restore session on mount
     useEffect(() => {
@@ -162,6 +165,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             }
         }
 
+        setCompleteProfileDismissed(false);
         // Return the actual role so the UI knows where to navigate
         return actualFrontendRole;
     };
@@ -223,6 +227,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             selectedEvents: student.selectedEvents || [],
         };
         persistSession(sessionToken, authUser);
+        setCompleteProfileDismissed(false);
 
         // Record student login session in audit logs
         try {
@@ -376,6 +381,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         setUser(null);
         setToken(null);
+        setCompleteProfileDismissed(false);
         localStorage.removeItem("midas_token");
         localStorage.removeItem("midas_user");
     };
@@ -384,7 +390,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         <AuthContext.Provider value={{
             user, token, isLoading,
             login, studentLogin, studentRegister, memberRegister,
-            logout, refreshUser, clearMustChangePassword
+            logout, refreshUser, clearMustChangePassword,
+            completeProfileDismissed, setCompleteProfileDismissed
         }}>
             {children}
         </AuthContext.Provider>

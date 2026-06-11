@@ -10,7 +10,7 @@ import { getCollegesList, updateEventStudent } from "@/services/supabaseService"
 import { toast } from "sonner";
 
 export default function CompleteProfileModal() {
-    const { user, refreshUser } = useAuth();
+    const { user, refreshUser, setCompleteProfileDismissed } = useAuth();
     const { currentProgram } = useProgram();
     const [college, setCollege] = useState("");
     const [year, setYear] = useState("");
@@ -60,21 +60,19 @@ export default function CompleteProfileModal() {
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
 
-        if (!college) {
-            toast.error("Please select a college");
-            return;
-        }
-        if (!year) {
-            toast.error("Please select your year");
+        if (delegateType !== "Clinician" && !college && !year) {
+            toast.error("Please select at least one field to save");
             return;
         }
 
         setIsSubmitting(true);
         try {
-            await updateEventStudent(user.id, {
-                college,
-                year,
-            });
+            const updates: any = {};
+            if (college) updates.college = college;
+            if (year) updates.year = year;
+
+            await updateEventStudent(user.id, updates);
+            setCompleteProfileDismissed(true);
             await refreshUser();
             toast.success("Profile updated successfully!");
         } catch (err: any) {

@@ -17,8 +17,8 @@ import {
     SelectTrigger,
     SelectValue
 } from "@/components/ui/select";
-import { CheckCircle2, Search, XCircle, FileSpreadsheet, ExternalLink, RefreshCw, Pencil, Upload, AlertTriangle, Mail } from "lucide-react";
-import { getEventStudents, updateEventStudent, addEventStudent, getCollegesList, bulkAddEventStudents } from "@/services/supabaseService";
+import { CheckCircle2, Search, XCircle, FileSpreadsheet, ExternalLink, RefreshCw, Pencil, Upload, AlertTriangle, Mail, Trash2 } from "lucide-react";
+import { getEventStudents, updateEventStudent, addEventStudent, getCollegesList, bulkAddEventStudents, deleteEventStudent } from "@/services/supabaseService";
 import { sendApprovalEmail, sendAccountCreationEmail } from "@/services/emailService";
 import * as XLSX from "xlsx";
 import bcrypt from "bcryptjs";
@@ -483,6 +483,21 @@ export default function AdminRegistrations() {
         }
     };
 
+    const handleDeleteStudent = async (id: string, name: string) => {
+        if (!window.confirm(`Are you sure you want to delete registration for ${name}? This action cannot be undone.`)) {
+            return;
+        }
+
+        try {
+            await deleteEventStudent(id);
+            toast({ title: "Deleted", description: `Registration for ${name} has been deleted.` });
+            loadData();
+        } catch (error) {
+            console.error(error);
+            toast({ title: "Error", description: "Failed to delete student.", variant: "destructive" });
+        }
+    };
+
     const handleExport = () => {
         const headers = [isIcon ? "ICON ID" : "MIDAS ID", "Name", "Email", "Phone", "College", "Payment Status", "Approval Status", "Date"];
         const csvContent = [
@@ -711,6 +726,14 @@ export default function AdminRegistrations() {
                                                 className="text-red-600 hover:text-red-700 hover:bg-red-50"
                                             >
                                                 <XCircle className="w-4 h-4 mr-1" /> Reject
+                                            </Button>
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                onClick={() => handleDeleteStudent(student.id, student.name)}
+                                                className="text-rose-600 hover:text-rose-700 hover:bg-rose-50"
+                                            >
+                                                <Trash2 className="w-4 h-4 mr-1" /> Delete
                                             </Button>
                                         </div>
                                     </TableCell>

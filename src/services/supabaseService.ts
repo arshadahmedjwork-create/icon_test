@@ -349,6 +349,16 @@ export const updateEventStudent = async (id: string, updates: Record<string, any
     await logAction('UPDATE_STUDENT', 'event_students', id, updates);
 };
 
+export const deleteEventStudent = async (id: string) => {
+    const { error } = await supabase
+        .from('event_students')
+        .delete()
+        .eq('id', id);
+    if (error) throw error;
+
+    await logAction('DELETE_STUDENT', 'event_students', id);
+};
+
 export const addEventStudent = async (studentData: {
     participantName: string;
     email: string;
