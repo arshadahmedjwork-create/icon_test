@@ -69,7 +69,7 @@ export default function EvaluationList() {
                     {mySessions.map(session => {
                         const isCompleted = session.status.toLowerCase() === "completed" || session.status === "SESSION_COMPLETED";
                         const myCert = judgeCertificates.find(c => c.sessionId === session.id);
-                        
+
                         return (
                             <Card key={session.id} className="hover:border-primary/50 transition-colors">
                                 <CardHeader>
@@ -112,7 +112,7 @@ export default function EvaluationList() {
                                                     Event Ended
                                                 </Button>
                                                 {myCert && (
-                                                    <Button 
+                                                    <Button
                                                         className="w-full bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-semibold"
                                                         onClick={async () => {
                                                             try {
@@ -122,7 +122,7 @@ export default function EvaluationList() {
                                                             }
                                                         }}
                                                     >
-                                                        <Download className="w-4 h-4 mr-2" /> Download Participation Certificate
+                                                        <Download className="w-4 h-4 mr-2" /> Download Certificate
                                                     </Button>
                                                 )}
                                             </div>
