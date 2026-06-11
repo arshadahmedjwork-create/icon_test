@@ -104,6 +104,28 @@ export class AutoScheduler {
                     const assignedJudges = isNonComp ? [] : this.assignJudges(subject, bucket, assignmentCounts);
                     const delegateLabel = delegateName && delegateName !== 'UG' ? ` (${delegateName})` : '';
 
+                    const matchedEvent = this.events.find(e => {
+                        const modeMatch = e.mode.toLowerCase() === targetMode.toLowerCase();
+                        const typeMatch = e.type.toLowerCase().startsWith(type.toLowerCase()) || type.toLowerCase().startsWith(e.type.toLowerCase());
+                        
+                        if (this.program === 'ICON') {
+                            const nameLower = e.name.toLowerCase();
+                            let delegateMatch = false;
+                            if (delegateType === 'PG' && nameLower.includes('postgraduate')) delegateMatch = true;
+                            else if ((delegateType === 'Academician' || delegateType === 'Faculty' || delegateType === 'Acadamecian') && nameLower.includes('academician')) delegateMatch = true;
+                            else if (delegateType === 'Clinician' && nameLower.includes('clinician')) delegateMatch = true;
+                            return modeMatch && typeMatch && delegateMatch;
+                        } else {
+                            return modeMatch && typeMatch && e.name.toLowerCase().trim() === subject.toLowerCase().trim();
+                        }
+                    });
+
+                    const defaultCriterias = [
+                        { id: crypto.randomUUID(), name: 'Scientific Content', maxScore: 10, weightage: 40 },
+                        { id: crypto.randomUUID(), name: 'Presentation / Delivery', maxScore: 10, weightage: 30 },
+                        { id: crypto.randomUUID(), name: 'Innovation & Impact', maxScore: 10, weightage: 30 }
+                    ];
+
                     const session: Session = {
                         id: crypto.randomUUID(),
                         name: `${subject} - ${type}${delegateLabel} (${targetMode}) - Session ${index + 1}`,
@@ -115,7 +137,8 @@ export class AutoScheduler {
                         venue: targetMode === "Online" ? "Zoom Link TBD" : "Hall TBD",
                         judges: assignedJudges.map(j => j.id),
                         abstractIds: bucket.map(a => a.id),
-                        eventId: this.events.find(e => e.name === subject && e.type === type && e.mode === targetMode)?.id,
+                        eventId: matchedEvent?.id || null,
+                        criterias: matchedEvent?.criterias || defaultCriterias,
                         status: "scheduled",
                         program: this.program
                     };

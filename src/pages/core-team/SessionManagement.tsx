@@ -165,6 +165,20 @@ export default function SessionManagement() {
             return;
         }
 
+        const matchedEvent = events.find(e => e.id === formData.eventId) ||
+                             events.find(e => {
+                                 const modeMatch = e.mode.toLowerCase() === (formData.mode || "Offline").toLowerCase();
+                                 const typeMatch = e.type.toLowerCase().startsWith((formData.type || "Paper Presentation").toLowerCase()) || 
+                                                   (formData.type || "Paper Presentation").toLowerCase().startsWith(e.type.toLowerCase());
+                                 return modeMatch && typeMatch && e.name.toLowerCase().trim() === (formData.subject || "").toLowerCase().trim();
+                             });
+
+        const defaultCriterias = [
+            { id: crypto.randomUUID(), name: 'Scientific Content', maxScore: 10, weightage: 40 },
+            { id: crypto.randomUUID(), name: 'Presentation / Delivery', maxScore: 10, weightage: 30 },
+            { id: crypto.randomUUID(), name: 'Innovation & Impact', maxScore: 10, weightage: 30 }
+        ];
+
         setIsSubmitting(true);
         const sessionPayload = {
             name: formData.name!,
@@ -176,7 +190,8 @@ export default function SessionManagement() {
             venue: formData.venue || "TBD",
             judges: formData.judges || [],
             abstractIds: formData.abstractIds || [],
-            eventId: formData.eventId,
+            eventId: matchedEvent?.id || formData.eventId || null,
+            criterias: editingSession?.criterias || matchedEvent?.criterias || defaultCriterias,
             program: currentProgram
         };
 
