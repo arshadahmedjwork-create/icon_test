@@ -41,6 +41,15 @@ export interface AuthUser {
     paymentStatus?: string;
     approvalStatus?: string;
     delegateType?: string;
+    dciNumber?: string;
+    dciCertificateUrl?: string;
+    idProofUrl?: string;
+    state?: string;
+    speciality?: string;
+    qualification?: string;
+    yearsOfPractice?: number;
+    academicPosition?: string;
+    teachingExperience?: string;
     // Password change flag
     mustChangePassword?: boolean;
     selectedEvents?: any[];
@@ -173,6 +182,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             paymentStatus: student.paymentStatus,
             approvalStatus: student.approvalStatus,
             delegateType: student.delegateType,
+            dciNumber: student.dciNumber,
+            dciCertificateUrl: student.dciCertificateUrl,
+            idProofUrl: student.idProofUrl,
+            state: student.state,
+            speciality: student.speciality,
+            qualification: student.qualification,
+            yearsOfPractice: student.yearsOfPractice,
+            academicPosition: student.academicPosition,
+            teachingExperience: student.teachingExperience,
             mustChangePassword: student.mustChangePassword ?? false,
             selectedEvents: student.selectedEvents || [],
         };
@@ -270,6 +288,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                         paymentStatus: student.paymentStatus,
                         approvalStatus: student.approvalStatus,
                         delegateType: student.delegateType,
+                        dciNumber: student.dciNumber,
+                        dciCertificateUrl: student.dciCertificateUrl,
+                        idProofUrl: student.idProofUrl,
+                        state: student.state,
+                        speciality: student.speciality,
+                        qualification: student.qualification,
+                        yearsOfPractice: student.yearsOfPractice,
+                        academicPosition: student.academicPosition,
+                        teachingExperience: student.teachingExperience,
                         mustChangePassword: student.mustChangePassword ?? false,
                         selectedEvents: student.selectedEvents || [],
                     };
