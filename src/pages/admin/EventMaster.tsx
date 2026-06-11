@@ -135,16 +135,42 @@ export default function AdminEventMaster() {
         }
     };
 
+    const recalculateWeightages = (list: EvaluationCriteria[]): EvaluationCriteria[] => {
+        const totalMax = list.reduce((sum, c) => sum + (c.maxScore || 0), 0);
+        if (totalMax === 0) {
+            const equalWeight = list.length > 0 ? Math.round(100 / list.length) : 0;
+            return list.map(c => ({ ...c, weightage: equalWeight }));
+        }
+        
+        let allocatedWeight = 0;
+        const updated = list.map((c, idx) => {
+            let weight = Math.round(((c.maxScore || 0) / totalMax) * 100);
+            if (idx === list.length - 1) {
+                weight = 100 - allocatedWeight;
+            } else {
+                allocatedWeight += weight;
+            }
+            return { ...c, weightage: weight };
+        });
+        return updated;
+    };
+
     const addCriteria = () => {
-        setCriterias([...criterias, { id: Date.now().toString(), name: "New Criteria", maxScore: 10, weightage: 0 }]);
+        const newC = [...criterias, { id: Date.now().toString(), name: "New Criteria", maxScore: 10, weightage: 0 }];
+        setCriterias(recalculateWeightages(newC));
     };
     const updateCriteria = (index: number, field: keyof EvaluationCriteria, val: string | number) => {
         const newC = [...criterias];
         newC[index] = { ...newC[index], [field]: val };
-        setCriterias(newC);
+        if (field === 'maxScore') {
+            setCriterias(recalculateWeightages(newC));
+        } else {
+            setCriterias(newC);
+        }
     };
     const removeCriteria = (index: number) => {
-        setCriterias(criterias.filter((_, i) => i !== index));
+        const remaining = criterias.filter((_, i) => i !== index);
+        setCriterias(recalculateWeightages(remaining));
     };
 
     return (
@@ -312,7 +338,7 @@ export default function AdminEventMaster() {
                                     <div key={i} className="flex items-center gap-2 bg-secondary/50 p-2 rounded-md">
                                         <Input className="h-8 text-xs flex-1" placeholder="Criterion Name" value={c.name} onChange={e => updateCriteria(i, 'name', e.target.value)} />
                                         <Input className="h-8 text-xs w-16" type="number" placeholder="Max" value={c.maxScore} onChange={e => updateCriteria(i, 'maxScore', parseInt(e.target.value) || 0)} title="Max Score" />
-                                        <Input className="h-8 text-xs w-16" type="number" placeholder="Wt %" value={c.weightage} onChange={e => updateCriteria(i, 'weightage', parseInt(e.target.value) || 0)} title="Weightage %" />
+                                        <Input className="h-8 text-xs w-16 bg-slate-100 cursor-not-allowed" type="number" placeholder="Wt %" value={c.weightage} readOnly title="Weightage % (Autocalculated)" />
                                         <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive" onClick={() => removeCriteria(i)}><Trash2 className="w-3 h-3" /></Button>
                                     </div>
                                 ))}
