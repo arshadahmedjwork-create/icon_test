@@ -15,7 +15,8 @@ import {
     DialogContent,
     DialogHeader,
     DialogTitle,
-    DialogTrigger
+    DialogTrigger,
+    DialogFooter
 } from "@/components/ui/dialog";
 import {
     Select,
