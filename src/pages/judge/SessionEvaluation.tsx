@@ -599,29 +599,7 @@ export default function SessionEvaluation() {
                                 <div className="space-y-6">
                                     <h3 className="font-bold text-lg border-b pb-2">Scoring Criteria</h3>
                                     
-                                    <div className={cn("p-4 rounded-xl border transition-all duration-200", 
-                                        isStudentAbsent 
-                                            ? "bg-red-50/50 border-red-200 text-red-900" 
-                                            : "bg-slate-50 border-slate-200"
-                                    )}>
-                                        <div className="flex items-center justify-between">
-                                            <div className="space-y-0.5">
-                                                <Label className="font-bold text-sm">Attendance Status</Label>
-                                                <p className="text-xs text-muted-foreground">
-                                                    {isStudentAbsent ? "Student is absent from this session" : "Student is present"}
-                                                </p>
-                                            </div>
-                                            <Button
-                                                variant={isStudentAbsent ? "destructive" : "outline"}
-                                                size="sm"
-                                                disabled={finalized}
-                                                onClick={() => setIsStudentAbsent(!isStudentAbsent)}
-                                                className="rounded-lg font-bold transition-all duration-200"
-                                            >
-                                                {isStudentAbsent ? "Marked Absent ❌" : "Mark Absent"}
-                                            </Button>
-                                        </div>
-                                    </div>
+
 
                                     {!isStudentAbsent && getCriterias().map(criteria => (
                                         <div key={criteria.id} className="space-y-3 p-4 rounded-lg border bg-muted/20">
