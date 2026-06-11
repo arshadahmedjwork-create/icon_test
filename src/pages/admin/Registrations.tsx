@@ -150,31 +150,41 @@ export default function AdminRegistrations() {
                     const yearVal = yearKey ? String(row[yearKey] || "").trim() : "";
                     const regIdVal = regIdKey ? String(row[regIdKey] || "").trim() : "";
 
-                    const missing: string[] = [];
-                    if (!nameVal) missing.push("Name");
-                    if (!emailVal) missing.push("Email");
-                    if (!mobileVal) missing.push("Mobile");
-                    if (!collegeVal) missing.push("College");
-                    if (!yearVal) missing.push("Year");
-
                     const rowNumber = index + 2;
 
-                    if (missing.length > 0) {
+                    const criticalMissing: string[] = [];
+                    if (!nameVal) criticalMissing.push("Name");
+                    if (!emailVal) criticalMissing.push("Email");
+                    if (!mobileVal) criticalMissing.push("Mobile");
+
+                    if (criticalMissing.length > 0) {
                         errorsList.push({
                             rowNum: rowNumber,
                             name: nameVal || "Unnamed Profile",
-                            missingFields: missing,
+                            missingFields: criticalMissing,
                         });
                     } else {
                         validRecords.push({
                             participantName: nameVal,
                             email: emailVal,
                             mobile: mobileVal,
-                            college: collegeVal,
-                            year: yearVal,
+                            college: collegeVal || "",
+                            year: yearVal || "",
                             registrationId: regIdVal || null,
                             program: currentProgram,
                         });
+
+                        const profileMissing: string[] = [];
+                        if (!collegeVal) profileMissing.push("COLLEGE");
+                        if (!yearVal) profileMissing.push("YEAR");
+
+                        if (profileMissing.length > 0) {
+                            errorsList.push({
+                                rowNum: rowNumber,
+                                name: nameVal,
+                                missingFields: profileMissing,
+                            });
+                        }
                     }
                 });
 
@@ -987,7 +997,7 @@ export default function AdminRegistrations() {
                             </div>
                         ) : bulkErrors.length > 0 ? (
                             <div className="bg-amber-50 text-amber-800 p-4 rounded-2xl border border-amber-100 text-sm">
-                                Some rows have missing required data. You can proceed to upload only the <strong>{bulkValidData.length} valid rows</strong>, or cancel to fix your file.
+                                Some rows are missing college or year. We will upload all <strong>{bulkValidData.length} records</strong>. These {bulkErrors.length} users will be prompted to provide missing college/year details upon login.
                             </div>
                         ) : (
                             <div className="bg-green-50 text-green-800 p-4 rounded-2xl border border-green-100 text-sm text-center font-medium">
