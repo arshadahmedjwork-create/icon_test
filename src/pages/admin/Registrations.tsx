@@ -123,6 +123,11 @@ export default function AdminRegistrations() {
                     return;
                 }
 
+                // Query existing emails in DB to prevent conflicts
+                const { data: dbEmails } = await supabase.from('event_students').select('email');
+                const existingEmails = new Set((dbEmails || []).map(s => String(s.email || "").toLowerCase().trim()));
+                const seenEmailsInFile = new Set<string>();
+
                 const findKey = (row: any, candidates: string[]) => {
                     const keys = Object.keys(row);
                     for (const cand of candidates) {
@@ -151,6 +156,7 @@ export default function AdminRegistrations() {
                     const regIdVal = regIdKey ? String(row[regIdKey] || "").trim() : "";
 
                     const rowNumber = index + 2;
+                    const emailLower = emailVal.toLowerCase();
 
                     const criticalMissing: string[] = [];
                     if (!nameVal) criticalMissing.push("Name");
@@ -163,7 +169,21 @@ export default function AdminRegistrations() {
                             name: nameVal || "Unnamed Profile",
                             missingFields: criticalMissing,
                         });
+                    } else if (existingEmails.has(emailLower)) {
+                        errorsList.push({
+                            rowNum: rowNumber,
+                            name: nameVal,
+                            missingFields: ["EMAIL ALREADY EXISTS"],
+                        });
+                    } else if (seenEmailsInFile.has(emailLower)) {
+                        errorsList.push({
+                            rowNum: rowNumber,
+                            name: nameVal,
+                            missingFields: ["DUPLICATE EMAIL IN FILE"],
+                        });
                     } else {
+                        seenEmailsInFile.add(emailLower);
+                        
                         validRecords.push({
                             participantName: nameVal,
                             email: emailVal,
