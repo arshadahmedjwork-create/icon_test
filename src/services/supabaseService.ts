@@ -61,6 +61,8 @@ export const addUser = async (user: User) => {
         staffCoordinatorCollege: user.college || null,
     });
     if (error) throw error;
+
+    await logAction('CREATE_MEMBER', 'members', user.id, { email: user.email, role: user.role });
 };
 
 export const updateUser = async (id: string, updates: Partial<User>) => {
@@ -73,11 +75,15 @@ export const updateUser = async (id: string, updates: Partial<User>) => {
 
     const { error } = await supabase.from('members').update(dbUpdates).eq('id', id);
     if (error) throw error;
+
+    await logAction('UPDATE_MEMBER', 'members', id, dbUpdates);
 };
 
 export const deleteUser = async (id: string) => {
     const { error } = await supabase.from('members').delete().eq('id', id);
     if (error) throw error;
+
+    await logAction('DELETE_MEMBER', 'members', id);
 };
 
 // --- AUTH HELPERS (frontend-only, using members table + bcryptjs) ---
@@ -610,6 +616,8 @@ export const addJudge = async (judge: Omit<Judge, 'id'>) => {
         throw judgeError;
     }
 
+    await logAction('CREATE_JUDGE', 'judges', memberData.id, { email: judge.email, name: judge.name });
+
     // Step 3: Send email with credentials
     try {
         await sendAccountCreationEmail({
@@ -635,6 +643,8 @@ export const updateJudge = async (id: string, updates: Partial<Judge>) => {
 
     const { error } = await supabase.from('judges').update(dbUpdates).eq('id', id);
     if (error) throw error;
+
+    await logAction('UPDATE_JUDGE', 'judges', id, dbUpdates);
 };
 
 export const deleteJudge = async (id: string) => {
@@ -653,6 +663,8 @@ export const deleteJudge = async (id: string) => {
     if (judge?.memberId) {
         await supabase.from('members').delete().eq('id', judge.memberId);
     }
+
+    await logAction('DELETE_JUDGE', 'judges', id);
 };
 
 // --- CONFIG ---
@@ -795,6 +807,8 @@ export const updateEvent = async (id: string, updates: Partial<Event>) => {
 export const deleteEvent = async (id: string) => {
     const { error } = await supabase.from('event_master').delete().eq('id', id);
     if (error) throw error;
+
+    await logAction('DELETE_EVENT', 'event_master', id);
 };
 
 // --- DEADLINES ---
@@ -807,6 +821,8 @@ export const getDeadlines = async (): Promise<Deadline[]> => {
 export const updateDeadline = async (id: string, date: string) => {
     const { error } = await supabase.from('deadlines').update({ date }).eq('id', id);
     if (error) throw error;
+
+    await logAction('UPDATE_DEADLINE', 'deadlines', id, { date });
 };
 
 // --- REGISTRATIONS ---

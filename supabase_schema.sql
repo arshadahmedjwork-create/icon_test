@@ -418,6 +418,19 @@ CREATE INDEX IF NOT EXISTS idx_system_logs_member ON "system_logs"("memberId");
 CREATE INDEX IF NOT EXISTS idx_system_logs_timestamp ON "system_logs"("timestamp" DESC);
 
 
+CREATE TABLE IF NOT EXISTS "action_logs" (
+    "id"            UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    "actor_id"      UUID, 
+    "actor_name"    TEXT,
+    "actor_role"    TEXT,
+    "action"        TEXT NOT NULL, 
+    "resource_type" TEXT NOT NULL, 
+    "resource_id"   UUID,
+    "timestamp"     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    "metadata"      JSONB
+);
+
+
 -- ═══════════════════════════════════════════════════════════
 -- ROW LEVEL SECURITY (RLS) — Disable for now so frontend can read/write
 -- You can enable RLS later with proper policies
@@ -441,6 +454,7 @@ ALTER TABLE "volunteer_assignments" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "results" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "notifications" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "system_logs" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "action_logs" ENABLE ROW LEVEL SECURITY;
 
 -- Allow full access for authenticated and anon users (development only)
 -- IMPORTANT: Restrict these policies before going to production!
@@ -455,7 +469,7 @@ BEGIN
             'payments', 'submissions', 'certificates', 'judges', 'sessions',
             'session_participants', 'session_judges', 'evaluation_criteria',
             'evaluations', 'attendances', 'volunteer_assignments', 'results',
-            'notifications', 'system_logs'
+            'notifications', 'system_logs', 'action_logs'
         ])
     LOOP
         EXECUTE format('DROP POLICY IF EXISTS "Allow full access" ON %I', tbl);
