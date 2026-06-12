@@ -1,4 +1,5 @@
 
+import { useEffect } from "react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { GraduationCap, FileText, CreditCard, Award, Calendar } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
@@ -19,6 +20,10 @@ const navItems = [
 
 export default function StudentEventDashboard() {
     const { user, refreshUser } = useAuth();
+
+    useEffect(() => {
+        refreshUser();
+    }, [refreshUser]);
 
     // In a real app, check if user type is STUDENT_EVENT
     if (!user) return <Navigate to="/member-login" />;

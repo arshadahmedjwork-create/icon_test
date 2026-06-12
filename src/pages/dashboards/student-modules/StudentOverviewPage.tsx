@@ -49,6 +49,10 @@ export default function StudentOverviewPage() {
     const [stats, setStats] = useState({ eventsEnrolled: 0, abstractsSubmitted: 0, paymentsMade: 0, certificates: 0 });
 
     useEffect(() => {
+        refreshUser();
+    }, [refreshUser]);
+
+    useEffect(() => {
         if (user?.id) {
             getStudentDashboardStats(user.id).then(setStats);
         }
