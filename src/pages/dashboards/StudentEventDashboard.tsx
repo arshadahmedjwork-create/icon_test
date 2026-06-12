@@ -93,6 +93,11 @@ function StudentEventOverview({ onPaymentComplete }: { onPaymentComplete: () => 
                     )}>
                         {user.midasId || "WAITING FOR PAYMENT"}
                     </p>
+                    {user.registrationId && (
+                        <p className="text-[10px] text-slate-500 font-mono font-semibold">
+                            Reg ID: {user.registrationId}
+                        </p>
+                    )}
                 </div>
             </div>
 

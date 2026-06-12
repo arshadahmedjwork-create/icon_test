@@ -414,6 +414,11 @@ export default function StudentOverviewPage() {
                                 <div className="bg-slate-100 border border-slate-200 px-4 py-2 rounded-xl">
                                     <span className="font-mono font-bold text-lg text-primary tracking-widest">{user?.midasId}</span>
                                 </div>
+                                {user?.registrationId && (
+                                    <p className="text-[10px] text-slate-500 mt-1 font-mono font-semibold tracking-wider">
+                                        Reg ID: {user.registrationId}
+                                    </p>
+                                )}
                             </div>
                             <div className="bg-white p-2 border border-slate-200 rounded-xl shadow-sm">
                                 <img
@@ -441,8 +446,15 @@ export default function StudentOverviewPage() {
                     </div>
                     {user?.midasId && (
                         <div className="sm:hidden space-y-1">
-                            <span className="text-slate-400 text-xs font-semibold uppercase tracking-wider">MIDAS ID</span>
-                            <span className="font-mono font-bold text-slate-800">{user?.midasId}</span>
+                            <span className="text-slate-400 text-xs font-semibold uppercase tracking-wider">
+                                {isIcon ? "ICON ID" : "MIDAS ID"}
+                            </span>
+                            <span className="font-mono font-bold text-slate-800 block">{user?.midasId}</span>
+                            {user?.registrationId && (
+                                <span className="text-[10px] text-slate-500 font-mono font-semibold block mt-0.5">
+                                    Reg ID: {user.registrationId}
+                                </span>
+                            )}
                         </div>
                     )}
                 </div>

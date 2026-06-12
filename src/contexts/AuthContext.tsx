@@ -31,6 +31,7 @@ export interface AuthUser {
     role: FrontendRole;
     college?: string;
     midasId?: string;
+    registrationId?: string;
     // Student-specific
     participantName?: string;
     mobile?: string;
@@ -210,6 +211,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             course: student.course,
             year: student.year,
             midasId: student.midasId,
+            registrationId: student.registrationId,
             profileStatus: student.profileStatus,
             paymentStatus: student.paymentStatus,
             approvalStatus: student.approvalStatus,
@@ -325,6 +327,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                         course: student.course,
                         year: student.year,
                         midasId: student.midasId,
+                        registrationId: student.registrationId,
                         profileStatus: student.profileStatus,
                         paymentStatus: student.paymentStatus,
                         approvalStatus: student.approvalStatus,
