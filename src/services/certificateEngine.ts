@@ -53,7 +53,7 @@ export async function generateCertificatePDF(details: CertificateDetails): Promi
             throw new Error(`Template image not found at ${imagePath}`);
         }
     } else {
-        const imageUrl = `/${imageName}`;
+        const imageUrl = `/${imageName}?t=${Date.now()}`;
         const response = await fetch(imageUrl);
         if (!response.ok) {
             throw new Error(`Failed to load certificate template image: ${response.statusText}`);
