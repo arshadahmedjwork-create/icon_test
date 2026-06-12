@@ -152,9 +152,21 @@ function certificateDownloadPlugin() {
             const height = isPortrait ? 842 : 595;
             const page = pdfDoc.addPage([width, height]);
 
-            const imageName = isPortrait 
-              ? 'judge_certificate.png' 
-              : (certType === 'winner' ? 'appre_certificate.png' : 'Participation_Certificate.png');
+            let imageName = 'Participation_Certificate.png';
+            if (isPortrait) {
+              imageName = 'judge_certificate.png';
+            } else if (certType === 'winner') {
+              const rankNum = cert.rank ? Number(cert.rank) : 1;
+              if (rankNum === 1) {
+                imageName = 'first_place.png';
+              } else if (rankNum === 2) {
+                imageName = 'second_place.png';
+              } else if (rankNum === 3) {
+                imageName = 'third_place.png';
+              } else {
+                imageName = 'first_place.png';
+              }
+            }
             const imagePath = path.resolve(__dirname, 'public', imageName);
 
             if (!fs.existsSync(imagePath)) {

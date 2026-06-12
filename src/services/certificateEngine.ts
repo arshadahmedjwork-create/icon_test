@@ -11,6 +11,7 @@ export interface CertificateDetails {
     date: string;
     eventName: string;
     type?: string;
+    rank?: number | string;
 }
 
 export async function generateCertificatePDF(details: CertificateDetails): Promise<Uint8Array> {
@@ -26,9 +27,21 @@ export async function generateCertificatePDF(details: CertificateDetails): Promi
     const isNode = typeof window === 'undefined';
     let imageBytes: ArrayBuffer | Buffer;
 
-    const imageName = isPortrait 
-        ? 'judge_certificate.png' 
-        : (certType === 'winner' ? 'appre_certificate.png' : 'Participation_Certificate.png');
+    let imageName = 'Participation_Certificate.png';
+    if (isPortrait) {
+        imageName = 'judge_certificate.png';
+    } else if (certType === 'winner') {
+        const rankNum = details.rank ? Number(details.rank) : 1;
+        if (rankNum === 1) {
+            imageName = 'first_place.png';
+        } else if (rankNum === 2) {
+            imageName = 'second_place.png';
+        } else if (rankNum === 3) {
+            imageName = 'third_place.png';
+        } else {
+            imageName = 'first_place.png'; // default fallback for winner
+        }
+    }
 
     if (isNode) {
         const fs = await import('fs');
@@ -196,7 +209,8 @@ export async function downloadCertificate(certificateId: string): Promise<void> 
         role: role as any,
         date: dateStr,
         eventName: "MADRAS ICON'26",
-        type: role
+        type: role,
+        rank: cert.rank
     });
 
     // Create blob and trigger download
