@@ -23,6 +23,7 @@ import { sendApprovalEmail, sendAccountCreationEmail } from "@/services/emailSer
 import * as XLSX from "xlsx";
 import bcrypt from "bcryptjs";
 import { Student } from "@/types";
+import { downloadIdCard, bulkDownloadIdCards } from "@/services/idCardEngine";
 import { useToast } from "@/hooks/use-toast";
 import { useProgram } from "@/contexts/ProgramContext";
 import { supabase } from "@/lib/supabaseClient";
@@ -551,6 +552,9 @@ export default function AdminRegistrations() {
                         className="hidden"
                         accept=".csv, .xlsx, .xls"
                     />
+                    <Button variant="outline" size="sm" onClick={() => bulkDownloadIdCards(filteredStudents)} className="border-primary/50 text-primary hover:bg-primary hover:text-white">
+                        Bulk Download IDs
+                    </Button>
                     <Button variant="outline" size="sm" onClick={handleBulkUploadClick}>
                         <Upload className="w-4 h-4 mr-2" /> Bulk Upload
                     </Button>
@@ -701,6 +705,15 @@ export default function AdminRegistrations() {
                                     </TableCell>
                                     <TableCell className="text-right">
                                         <div className="flex justify-end gap-2">
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={() => downloadIdCard(student)}
+                                                className="text-xs border-primary/20 text-primary hover:bg-primary hover:text-white px-2 py-1 h-8"
+                                                disabled={!student.midasId}
+                                            >
+                                                ID Card
+                                            </Button>
                                             <Button
                                                 variant="ghost"
                                                 size="sm"

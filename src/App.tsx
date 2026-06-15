@@ -14,6 +14,7 @@ import JudgeDashboard from "./pages/dashboards/JudgeDashboard";
 import VolunteerDashboard from "./pages/dashboards/VolunteerDashboard";
 import CertificateVerification from "./pages/CertificateVerification";
 import NotFound from "./pages/NotFound";
+import IDCardTest from "./pages/IDCardTest";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { ProgramProvider } from "@/contexts/ProgramContext";
 import ChangePasswordModal from "./components/ChangePasswordModal";
@@ -53,6 +54,7 @@ const App = () => (
               <Route path="/" element={<Navigate to="/member-login" replace />} />
               <Route path="/login" element={<Navigate to="/member-login" replace />} />
               <Route path="/member-login" element={<MemberLoginPage />} />
+              <Route path="/id-card-test" element={<IDCardTest />} />
               <Route path="/student-registration" element={<StudentRegistrationPage />} />
               <Route path="/certificate/verify/:certificateId" element={<CertificateVerification />} />
               <Route path="/dashboard/admin/*" element={

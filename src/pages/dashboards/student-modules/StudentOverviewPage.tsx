@@ -18,6 +18,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { useProgram } from "@/contexts/ProgramContext";
 import { generateMidasId, generateQRCodeUrl, sendRegistrationEmail } from "@/services/emailService";
 import { getStudentDashboardStats, getLatestMidasId, updateEventStudent, uploadBonafide, getCollegesList } from "@/services/supabaseService";
+import { downloadIdCard } from "@/services/idCardEngine";
 
 const courses = [
     "BDS", "MDS - Orthodontics", "MDS - Prosthodontics", "MDS - Conservative & Endodontics",
@@ -423,6 +424,14 @@ export default function StudentOverviewPage() {
                                         Reg ID: {user.registrationId}
                                     </p>
                                 )}
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => downloadIdCard(user)}
+                                    className="mt-2 h-7 px-3 text-xs border-primary/20 text-primary hover:bg-primary hover:text-white"
+                                >
+                                    Download ID Card
+                                </Button>
                             </div>
                             <div className="bg-white p-2 border border-slate-200 rounded-xl shadow-sm">
                                 <img
@@ -459,6 +468,14 @@ export default function StudentOverviewPage() {
                                     Reg ID: {user.registrationId}
                                 </span>
                             )}
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => downloadIdCard(user)}
+                                className="mt-2 h-7 px-3 text-xs border-primary/20 text-primary hover:bg-primary hover:text-white w-full"
+                            >
+                                Download ID Card
+                            </Button>
                         </div>
                     )}
                 </div>
