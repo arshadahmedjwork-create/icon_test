@@ -27,7 +27,7 @@ export async function generateCertificatePDF(details: CertificateDetails): Promi
     const isNode = typeof window === 'undefined';
     let imageBytes: ArrayBuffer | Buffer;
 
-    let imageName = 'Participation_Certificate.png';
+    let imageName = 'Participation_Certificate.jpg';
     if (isPortrait) {
         imageName = 'judge_certificate.png';
     } else if (certType === 'winner') {
@@ -61,7 +61,8 @@ export async function generateCertificatePDF(details: CertificateDetails): Promi
         imageBytes = await response.arrayBuffer();
     }
 
-    const backgroundImage = await pdfDoc.embedPng(imageBytes);
+    const isJpg = imageName.toLowerCase().endsWith('.jpg') || imageName.toLowerCase().endsWith('.jpeg');
+    const backgroundImage = isJpg ? await pdfDoc.embedJpg(imageBytes) : await pdfDoc.embedPng(imageBytes);
     firstPage.drawImage(backgroundImage, {
         x: 0,
         y: 0,
@@ -87,16 +88,14 @@ export async function generateCertificatePDF(details: CertificateDetails): Promi
     let nameX = 0;
 
     if (!isPortrait) {
-        // Align to the underline space (X from 280 to 720, center at 500)
-        const minX = 280;
-        const maxX = 720;
-        const maxWidth = maxX - minX;
+        // Landscape certificate: center perfectly on the page
+        const maxWidth = width - 160;
 
         while (nameWidth > maxWidth && nameFontSize > 14) {
             nameFontSize -= 1;
             nameWidth = helveticaBold.widthOfTextAtSize(nameText, nameFontSize);
         }
-        nameX = minX + (maxWidth - nameWidth) / 2;
+        nameX = (width - nameWidth) / 2;
     } else {
         // For portrait, center on the page
         const maxWidth = width - 80;
@@ -107,7 +106,7 @@ export async function generateCertificatePDF(details: CertificateDetails): Promi
         nameX = (width - nameWidth) / 2;
     }
 
-    const nameY = isPortrait ? height * 0.52 : height * 0.545; // Aligns with name lines on templates
+    const nameY = isPortrait ? height * 0.52 : 280; // Adjusted for landscape to sit on the underline
 
     firstPage.drawText(nameText, {
         x: nameX,

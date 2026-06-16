@@ -6,6 +6,7 @@ export interface IDCardDetails {
     iconId: string;
     registrationId?: string;
     qrData?: string; // What the QR code should contain
+    templateName?: string;
 }
 
 // These are coordinates you can adjust when testing locally
@@ -53,7 +54,8 @@ export async function generateIdCardPDF(
     let pdfBytes: ArrayBuffer;
     const isNode = typeof window === 'undefined';
     
-    const templateName = 'Delegate_ID_MadrasIcon.pdf';
+    // Default to the delegates card if no specific one is set
+    const templateName = details.templateName || 'DELIGATES_ID_CARD.pdf';
     
     if (isNode) {
         const fs = await import('fs');
@@ -80,29 +82,32 @@ export async function generateIdCardPDF(
     const pageWidth = firstPage.getWidth();
     const pageHeight = firstPage.getHeight();
 
-    // Available white space (approximate)
-    // Blue bar is on the left. Let's assume it takes ~170px of width.
-    const startX = 170; 
+    // The left sidebar (red/blue) takes about 55 points.
+    const startX = 55;
     const availableWidth = pageWidth - startX;
     const centerX = startX + (availableWidth / 2);
 
     const helveticaBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
     const helvetica = await pdfDoc.embedFont(StandardFonts.Helvetica);
 
-    // Y coordinates (from bottom of page). Adjust these to push content up/down
-    const nameY = 680;
-    const iconIdY = 630;
-    const regIdY = 590;
-    const qrY = 380;
+    // New coordinates for ~269x357 PDF size
+    // Adjusting these to fit neatly into the white area
+    const nameY = 180;
+    const iconIdY = 155;
+    const regIdY = 130;
+    
+    // Make QR smaller and place it between Reg ID and the venue text
+    const qrSize = 55;
+    const qrY = 65;
 
     // 2. Draw Name
     const nameText = details.studentName.toUpperCase();
-    const nameSize = 36;
+    const nameSize = 18; // scaled down from 36
     let nameWidth = helveticaBold.widthOfTextAtSize(nameText, nameSize);
     
     // Scale down name if it's too long
     let finalNameSize = nameSize;
-    while (nameWidth > availableWidth - 40 && finalNameSize > 14) {
+    while (nameWidth > availableWidth - 20 && finalNameSize > 8) {
         finalNameSize -= 1;
         nameWidth = helveticaBold.widthOfTextAtSize(nameText, finalNameSize);
     }
@@ -117,7 +122,7 @@ export async function generateIdCardPDF(
 
     // 3. Draw ICON ID
     const iconIdText = `ICON ID: ${details.iconId}`;
-    const iconIdSize = 24;
+    const iconIdSize = 14;
     const iconIdWidth = helveticaBold.widthOfTextAtSize(iconIdText, iconIdSize);
     firstPage.drawText(iconIdText, {
         x: centerX - (iconIdWidth / 2),
@@ -130,7 +135,7 @@ export async function generateIdCardPDF(
     // 4. Draw Registration ID (if exists)
     if (details.registrationId) {
         const regIdText = `Reg ID: ${details.registrationId}`;
-        const regIdSize = 20;
+        const regIdSize = 12;
         const regIdWidth = helvetica.widthOfTextAtSize(regIdText, regIdSize);
         firstPage.drawText(regIdText, {
             x: centerX - (regIdWidth / 2),
@@ -142,7 +147,6 @@ export async function generateIdCardPDF(
     }
 
     // 5. Draw QR Code
-    const qrSize = 180;
     const qrContent = details.qrData || `ICON ID: ${details.iconId}\nName: ${details.studentName}`;
     const qrDataUrl = await QRCode.toDataURL(qrContent, {
         margin: 1,
@@ -161,11 +165,24 @@ export async function generateIdCardPDF(
 }
 
 export async function downloadIdCard(student: any, coords = defaultCoordinates) {
+    const regNo = student.registrationId || '';
+    const delegateType = student.delegateType || '';
+    const isPG = delegateType === 'PG' || regNo.includes('PG');
+    const isDelegate = regNo.includes('DG') || delegateType === 'Clinician' || delegateType === 'Academician';
+    
+    let templateName = 'DELIGATES_ID_CARD.pdf';
+    if (isPG) {
+        templateName = 'PG_ID.pdf';
+    } else if (isDelegate) {
+        templateName = 'DELIGATES_ID_CARD.pdf';
+    }
+
     const details = {
         studentName: student.name || student.participantName || "Student",
         iconId: student.midasId || "PENDING",
         registrationId: student.registrationId || "",
-        qrData: `ICON ID: ${student.midasId || "N/A"}\nName: ${student.name || student.participantName || "N/A"}`
+        qrData: `ICON ID: ${student.midasId || "N/A"}\nName: ${student.name || student.participantName || "N/A"}`,
+        templateName
     };
     const pdfBytes = await generateIdCardPDF(details, coords);
     const blob = new Blob([pdfBytes], { type: 'application/pdf' });
@@ -184,11 +201,25 @@ export async function bulkDownloadIdCards(students: any[], coords = defaultCoord
 
     for (const student of students) {
         if (!student.midasId) continue; // Skip those without ID
+        
+        const regNo = student.registrationId || '';
+        const delegateType = student.delegateType || '';
+        const isPG = delegateType === 'PG' || regNo.includes('PG');
+        const isDelegate = regNo.includes('DG') || delegateType === 'Clinician' || delegateType === 'Academician';
+        
+        let templateName = 'DELIGATES_ID_CARD.pdf';
+        if (isPG) {
+            templateName = 'PG_ID.pdf';
+        } else if (isDelegate) {
+            templateName = 'DELIGATES_ID_CARD.pdf';
+        }
+
         const details = {
             studentName: student.name || student.participantName || "Student",
             iconId: student.midasId || "PENDING",
             registrationId: student.registrationId || "",
-            qrData: `ICON ID: ${student.midasId || "N/A"}\nName: ${student.name || student.participantName || "N/A"}`
+            qrData: `ICON ID: ${student.midasId || "N/A"}\nName: ${student.name || student.participantName || "N/A"}`,
+            templateName
         };
         try {
             const pdfBytes = await generateIdCardPDF(details, coords);
