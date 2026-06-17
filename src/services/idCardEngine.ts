@@ -167,14 +167,21 @@ export async function generateIdCardPDF(
 export async function downloadIdCard(student: any, coords = defaultCoordinates) {
     const regNo = (student.registrationId || '').toUpperCase();
     const delegateType = student.delegateType || '';
-    const isPG = delegateType === 'PG' || regNo.startsWith('PD');
-    const isDelegate = delegateType === 'Clinician' || delegateType === 'Academician' || regNo.startsWith('DG');
     
     let templateName = 'DELIGATES_ID_CARD.pdf';
-    if (isPG) {
+    
+    // Strictly prioritize registration ID prefix
+    if (regNo.startsWith('PD')) {
         templateName = 'PG_ID.pdf';
-    } else if (isDelegate) {
+    } else if (regNo.startsWith('DG')) {
         templateName = 'DELIGATES_ID_CARD.pdf';
+    } else {
+        // Fallback to delegateType if no valid prefix exists
+        if (delegateType === 'PG') {
+            templateName = 'PG_ID.pdf';
+        } else if (delegateType === 'Clinician' || delegateType === 'Academician') {
+            templateName = 'DELIGATES_ID_CARD.pdf';
+        }
     }
 
     const details = {
@@ -204,14 +211,21 @@ export async function bulkDownloadIdCards(students: any[], coords = defaultCoord
         
         const regNo = (student.registrationId || '').toUpperCase();
         const delegateType = student.delegateType || '';
-        const isPG = delegateType === 'PG' || regNo.startsWith('PD');
-        const isDelegate = delegateType === 'Clinician' || delegateType === 'Academician' || regNo.startsWith('DG');
         
         let templateName = 'DELIGATES_ID_CARD.pdf';
-        if (isPG) {
+        
+        // Strictly prioritize registration ID prefix
+        if (regNo.startsWith('PD')) {
             templateName = 'PG_ID.pdf';
-        } else if (isDelegate) {
+        } else if (regNo.startsWith('DG')) {
             templateName = 'DELIGATES_ID_CARD.pdf';
+        } else {
+            // Fallback to delegateType if no valid prefix exists
+            if (delegateType === 'PG') {
+                templateName = 'PG_ID.pdf';
+            } else if (delegateType === 'Clinician' || delegateType === 'Academician') {
+                templateName = 'DELIGATES_ID_CARD.pdf';
+            }
         }
 
         const details = {
