@@ -165,10 +165,10 @@ export async function generateIdCardPDF(
 }
 
 export async function downloadIdCard(student: any, coords = defaultCoordinates) {
-    const regNo = student.registrationId || '';
+    const regNo = (student.registrationId || '').toUpperCase();
     const delegateType = student.delegateType || '';
-    const isPG = delegateType === 'PG' || regNo.includes('PG');
-    const isDelegate = regNo.includes('DG') || delegateType === 'Clinician' || delegateType === 'Academician';
+    const isPG = delegateType === 'PG' || regNo.startsWith('PD');
+    const isDelegate = delegateType === 'Clinician' || delegateType === 'Academician' || regNo.startsWith('DG');
     
     let templateName = 'DELIGATES_ID_CARD.pdf';
     if (isPG) {
@@ -202,10 +202,10 @@ export async function bulkDownloadIdCards(students: any[], coords = defaultCoord
     for (const student of students) {
         if (!student.midasId) continue; // Skip those without ID
         
-        const regNo = student.registrationId || '';
+        const regNo = (student.registrationId || '').toUpperCase();
         const delegateType = student.delegateType || '';
-        const isPG = delegateType === 'PG' || regNo.includes('PG');
-        const isDelegate = regNo.includes('DG') || delegateType === 'Clinician' || delegateType === 'Academician';
+        const isPG = delegateType === 'PG' || regNo.startsWith('PD');
+        const isDelegate = delegateType === 'Clinician' || delegateType === 'Academician' || regNo.startsWith('DG');
         
         let templateName = 'DELIGATES_ID_CARD.pdf';
         if (isPG) {
