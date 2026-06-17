@@ -88,6 +88,14 @@ export default function AbstractApproval() {
         return users.find(u => u.id === studentId)?.college || "Unknown College";
     };
 
+    const getStudentIconId = (studentId: string) => {
+        return users.find(u => u.id === studentId)?.midasId || "N/A";
+    };
+
+    const getStudentRegId = (studentId: string) => {
+        return users.find(u => u.id === studentId)?.registrationId || "N/A";
+    };
+
     // Get unique subjects for filter
     const subjects = Array.from(new Set(abstracts.map(a => a.subject).filter(Boolean)));
 
@@ -220,6 +228,11 @@ export default function AbstractApproval() {
                                     <TableCell>
                                         <div className="text-sm font-semibold">{getStudentName(abstract.studentId)}</div>
                                         <div className="text-xs text-muted-foreground">{getStudentCollege(abstract.studentId)}</div>
+                                        <div className="text-xs text-muted-foreground mt-1">
+                                            <span className="font-medium text-primary/80">ICON:</span> {getStudentIconId(abstract.studentId)}
+                                            <span className="mx-1">|</span>
+                                            <span className="font-medium text-primary/80">Reg:</span> {getStudentRegId(abstract.studentId)}
+                                        </div>
                                     </TableCell>
                                     <TableCell>
                                         <div className="text-sm">{abstract.type}</div>
@@ -322,6 +335,14 @@ export default function AbstractApproval() {
                                         <div className="flex justify-between items-start gap-4">
                                             <span className="text-xs sm:text-sm text-muted-foreground">Institution:</span>
                                             <span className="text-xs sm:text-sm font-bold text-right">{viewingPdf ? getStudentCollege(viewingPdf.studentId) : "N/A"}</span>
+                                        </div>
+                                        <div className="flex justify-between items-start gap-4">
+                                            <span className="text-xs sm:text-sm text-muted-foreground">ICON ID:</span>
+                                            <span className="text-xs sm:text-sm font-bold text-right">{viewingPdf ? getStudentIconId(viewingPdf.studentId) : "N/A"}</span>
+                                        </div>
+                                        <div className="flex justify-between items-start gap-4">
+                                            <span className="text-xs sm:text-sm text-muted-foreground">Reg ID:</span>
+                                            <span className="text-xs sm:text-sm font-bold text-right">{viewingPdf ? getStudentRegId(viewingPdf.studentId) : "N/A"}</span>
                                         </div>
                                         <div className="flex justify-between items-center">
                                             <span className="text-xs sm:text-sm text-muted-foreground">Category:</span>
