@@ -19,7 +19,7 @@ import {
 } from "@/components/ui/select";
 import { CheckCircle2, Search, XCircle, FileSpreadsheet, ExternalLink, RefreshCw, Pencil, Upload, AlertTriangle, Mail, Trash2 } from "lucide-react";
 import { getEventStudents, updateEventStudent, addEventStudent, getCollegesList, bulkAddEventStudents, deleteEventStudent } from "@/services/supabaseService";
-import { sendApprovalEmail, sendAccountCreationEmail } from "@/services/emailService";
+import { sendApprovalEmail, sendAccountCreationEmail, sendRegistrationEmail } from "@/services/emailService";
 import * as XLSX from "xlsx";
 import bcrypt from "bcryptjs";
 import { Student } from "@/types";
@@ -258,6 +258,28 @@ export default function AdminRegistrations() {
             });
         } finally {
             setIsUploadingBulk(false);
+        }
+    };
+
+    const [selectedDciFile, setSelectedDciFile] = useState<File | null>(null);
+
+    const handleResendMail = async (student: Student) => {
+        try {
+            toast({ title: "Sending Mail", description: `Sending confirmation to ${student.email}...` });
+            await sendRegistrationEmail({
+                student_name: student.name || student.participantName || "Participant",
+                student_email: student.email,
+                midas_id: student.midasId || "PENDING",
+                college_name: student.college || "N/A",
+                event_type: student.delegateType || "Delegate",
+                mode: "Offline",
+                qr_code_url: `${window.location.origin}/certificate/verify/${student.midasId}`,
+                registration_date: new Date(student.createdAt || Date.now()).toLocaleDateString()
+            });
+            toast({ title: "Success", description: `Email sent successfully to ${student.email}!` });
+        } catch (error) {
+            console.error("Failed to send email", error);
+            toast({ title: "Error", description: "Failed to send email.", variant: "destructive" });
         }
     };
 
@@ -713,6 +735,15 @@ export default function AdminRegistrations() {
                                                 disabled={!student.midasId}
                                             >
                                                 ID Card
+                                            </Button>
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={() => handleResendMail(student)}
+                                                className="text-xs border-blue-500/20 text-blue-500 hover:bg-blue-500 hover:text-white px-2 py-1 h-8"
+                                                disabled={!student.midasId}
+                                            >
+                                                <Mail className="w-3 h-3 mr-1" /> Mail
                                             </Button>
                                             <Button
                                                 variant="ghost"
