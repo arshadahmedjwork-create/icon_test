@@ -197,7 +197,7 @@ export default function AttendanceSheet() {
         }
     };
 
-    const handleToggleAttendance = (studentId: string) => {
+    const handleToggleAttendance = async (studentId: string) => {
         if (isCompleted) return;
         const newAttendance = new Set(attendance);
         if (newAttendance.has(studentId)) {
@@ -210,6 +210,14 @@ export default function AttendanceSheet() {
             newAttendance.add(studentId);
         }
         setAttendance(newAttendance);
+
+        if (selectedSessionId) {
+            try {
+                await updateSessionAttendance(selectedSessionId, Array.from(newAttendance));
+            } catch (error) {
+                console.error("Failed to auto-save attendance:", error);
+            }
+        }
     };
 
     const handleToggleCompletionNonComp = async (studentId: string) => {
@@ -242,12 +250,20 @@ export default function AttendanceSheet() {
         }
     };
 
-    const handleBulkMark = () => {
+    const handleBulkMark = async () => {
         if (isCompleted) return;
         const newAttendance = new Set(attendance);
         filteredStudents.forEach(s => newAttendance.add(s.id));
         setAttendance(newAttendance);
-        toast({ title: "Bulk Action", description: "Marked visible students as present." });
+
+        if (selectedSessionId) {
+            try {
+                await updateSessionAttendance(selectedSessionId, Array.from(newAttendance));
+                toast({ title: "Bulk Action", description: "Marked visible students as present." });
+            } catch (error) {
+                console.error("Failed to auto-save attendance:", error);
+            }
+        }
     };
 
     const toggleScanner = () => {
@@ -313,21 +329,10 @@ export default function AttendanceSheet() {
                         </Button>
                     )}
                     
-                    {/* STRICT FINALIZATION: Button is hidden (not displayed) unless canFinalize is true */}
-                    {canFinalize && (
-                        <Button onClick={handleEndSession} className="bg-red-600 hover:bg-red-700 h-10 rounded-lg text-white font-bold animate-bounce">
-                            <CheckCircle2 className="w-4 h-4 mr-2" /> Finalize Session
-                        </Button>
-                    )}
-
-                    {isCompleted ? (
+                    {isCompleted && (
                         <Badge variant="secondary" className="h-10 px-4 text-sm font-bold bg-slate-100 text-slate-700 border-none rounded-lg">
                             Event Ended & Finalized
                         </Badge>
-                    ) : (
-                        <Button onClick={handleSave} disabled={!selectedSessionId} variant="outline" className="h-10 rounded-lg">
-                            <Save className="w-4 h-4 mr-2" /> Save Attendance
-                        </Button>
                     )}
 
                     {selectedSessionId && (
