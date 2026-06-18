@@ -82,6 +82,7 @@ export default function SessionManagement() {
     const [editingVolunteersSession, setEditingVolunteersSession] = useState<Session | null>(null);
     const [allVolunteers, setAllVolunteers] = useState<any[]>([]);
     const [assignedVolunteers, setAssignedVolunteers] = useState<string[]>([]);
+    const [venueFilter, setVenueFilter] = useState<string>("All");
 
     const handleOpenVolunteersEditor = async (session: Session) => {
         setEditingVolunteersSession(session);
@@ -512,6 +513,15 @@ export default function SessionManagement() {
         formData.mode
     ].filter(Boolean) as string[]));
 
+    const uniqueVenues = Array.from(new Set(sessions.map(s => s.venue).filter(Boolean)));
+    const sortedAndFilteredSessions = sessions
+        .filter(s => venueFilter === "All" || s.venue === venueFilter)
+        .sort((a, b) => {
+            const dateA = new Date(`${a.date || '2099-01-01'}T${a.time || '00:00'}`);
+            const dateB = new Date(`${b.date || '2099-01-01'}T${b.time || '00:00'}`);
+            return dateA.getTime() - dateB.getTime();
+        });
+
     return (
         <div className="space-y-6">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -519,7 +529,18 @@ export default function SessionManagement() {
                     <h2 className="text-xl font-bold font-display">Session Scheduling</h2>
                     <p className="text-muted-foreground text-sm">Create and manage scientific sessions.</p>
                 </div>
-                <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+                <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto items-center">
+                    <Select value={venueFilter} onValueChange={setVenueFilter}>
+                        <SelectTrigger className="w-[180px]">
+                            <SelectValue placeholder="Filter by Venue" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="All">All Venues</SelectItem>
+                            {uniqueVenues.map(venue => (
+                                <SelectItem key={venue} value={venue}>{venue}</SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
                     <Button variant="outline" onClick={handleAutoScheduleClick} className="w-full sm:w-auto">
                         <Users className="w-4 h-4 mr-2" /> Auto-Schedule
                     </Button>
@@ -643,7 +664,7 @@ export default function SessionManagement() {
             </Dialog>
 
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                {sessions.map(session => (
+                {sortedAndFilteredSessions.map(session => (
                     <Card key={session.id}>
                         <CardHeader>
                             <div className="flex justify-between items-start">
