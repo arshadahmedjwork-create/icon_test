@@ -325,7 +325,8 @@ export default function SessionEvaluation() {
 
     const isSessionCompleted = session.status === 'SESSION_COMPLETED' || session.status.toLowerCase() === 'completed';
 
-    const isAcademicianOrClinician = isNonCompetitiveSession(session);
+    const sessionEvent = events.find(e => e.id === session?.eventId);
+    const isAcademicianOrClinician = isNonCompetitiveSession(session) || (sessionEvent && isNonCompetitiveSession({ name: sessionEvent.name, type: sessionEvent.type, subject: '' }));
 
     return (
         <div className="space-y-6">
