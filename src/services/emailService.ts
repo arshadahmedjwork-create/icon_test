@@ -25,6 +25,8 @@ const EMAILJS_CONFIG = {
         acceptance: 'template_midas_accpt',  // Provisional acceptance
         approval: 'template_rt3pe6e',    // Staff Approval with Temp Password
         account_creation: 'template_rt3pe6e', // For Judges, Core Team, etc.
+        student_session: 'template_student_session', // Add real template ID
+        judge_session: 'template_judge_session', // Add real template ID
     },
 };
 
@@ -64,6 +66,26 @@ export interface AccountCreationEmailData {
     role?: string;
 }
 
+export interface SessionStudentEmailData {
+    student_name: string;
+    student_email: string;
+    session_name: string;
+    session_date: string;
+    session_time: string;
+    session_venue: string;
+}
+
+export interface SessionJudgeEmailData {
+    judge_name: string;
+    judge_email: string;
+    session_name: string;
+    session_date: string;
+    session_time: string;
+    session_venue: string;
+    abstract_topics_html: string;
+    login_url: string;
+}
+
 export async function sendAccountCreationEmail(data: AccountCreationEmailData) {
     console.log('[EmailService] Sending account creation credentials to:', data.user_email);
     
@@ -87,6 +109,32 @@ export async function sendAccountCreationEmail(data: AccountCreationEmailData) {
     };
     
     return sendEmailJS(templateId, templateParams);
+}
+
+export async function sendSessionStudentEmail(data: SessionStudentEmailData) {
+    console.log('[EmailService] Sending Session Notification to student:', data.student_email);
+    return sendEmailJS(EMAILJS_CONFIG.templates.student_session, {
+        to_email: data.student_email,
+        student_name: data.student_name,
+        session_name: data.session_name,
+        session_date: data.session_date,
+        session_time: data.session_time,
+        session_venue: data.session_venue,
+    });
+}
+
+export async function sendSessionJudgeEmail(data: SessionJudgeEmailData) {
+    console.log('[EmailService] Sending Session Notification to judge:', data.judge_email);
+    return sendEmailJS(EMAILJS_CONFIG.templates.judge_session, {
+        to_email: data.judge_email,
+        judge_name: data.judge_name,
+        session_name: data.session_name,
+        session_date: data.session_date,
+        session_time: data.session_time,
+        session_venue: data.session_venue,
+        abstract_topics_html: data.abstract_topics_html,
+        login_url: data.login_url,
+    });
 }
 
 export interface AllocationEmailData {
