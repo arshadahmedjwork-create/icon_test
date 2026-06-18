@@ -892,21 +892,7 @@ export default function SessionManagement() {
                                     </SelectContent>
                                 </Select>
                             </div>
-                            <div className="space-y-2">
-                                <Label>Delegate Type Filter</Label>
-                                <Select value={formData.delegateTypeFilter || "All"} onValueChange={(val) => updateForm("delegateTypeFilter", val)}>
-                                    <SelectTrigger>
-                                        <SelectValue placeholder="All Delegate Types" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="All">All Delegate Types</SelectItem>
-                                        <SelectItem value="UG">UG</SelectItem>
-                                        <SelectItem value="PG">PG</SelectItem>
-                                        <SelectItem value="Academician">Academician</SelectItem>
-                                        <SelectItem value="Clinician">Clinician</SelectItem>
-                                    </SelectContent>
-                                </Select>
-                            </div>
+
                             <div className="space-y-2">
                                 <Label>Date</Label>
                                 <Input type="date" value={formData.date || ""} onChange={e => updateForm("date", e.target.value)} />
