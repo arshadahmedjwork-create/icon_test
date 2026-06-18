@@ -85,6 +85,10 @@ export default function SessionManagement() {
     const [venueFilter, setVenueFilter] = useState<string>("All");
     const [isSendingEmails, setIsSendingEmails] = useState<string | null>(null);
 
+    // Individual Session Email State
+    const [mailSessionTarget, setMailSessionTarget] = useState<Session | null>(null);
+    const [mailOptions, setMailOptions] = useState({ students: true, judges: true });
+
     const handleOpenVolunteersEditor = async (session: Session) => {
         setEditingVolunteersSession(session);
         try {
@@ -164,58 +168,64 @@ export default function SessionManagement() {
         }
     };
 
-    const handleSendEmails = async (session: Session) => {
-        if (!confirm("Send session assignment emails to all students and judges for this session?")) return;
+    const executeSendEmails = async () => {
+        const session = mailSessionTarget;
+        if (!session) return;
         
         setIsSendingEmails(session.id);
+        setMailSessionTarget(null); // Close the dialog immediately
         let successCount = 0;
         let failCount = 0;
         
         try {
-            // 1. Send to Judges
             const sessionJudges = judges.filter(j => session.judges.includes(j.id));
             const sessionAbstracts = abstracts.filter(a => session.abstractIds.includes(a.id));
             
             const abstractTopicsHtml = `<ul>${sessionAbstracts.map(a => `<li style="margin-bottom: 5px;">${a.title || 'Untitled Abstract'}</li>`).join('')}</ul>`;
             
-            for (const judge of sessionJudges) {
-                if (judge.email) {
-                    try {
-                        await sendSessionJudgeEmail({
-                            judge_name: judge.name,
-                            judge_email: judge.email,
-                            session_name: session.name,
-                            session_date: session.date || "TBD",
-                            session_time: session.time || "TBD",
-                            session_venue: session.venue,
-                            abstract_topics_html: abstractTopicsHtml,
-                            login_url: window.location.origin + "/member-login"
-                        });
-                        successCount++;
-                    } catch (err) {
-                        console.error(`Failed sending to judge ${judge.email}`, err);
-                        failCount++;
+            // 1. Send to Judges
+            if (mailOptions.judges) {
+                for (const judge of sessionJudges) {
+                    if (judge.email) {
+                        try {
+                            await sendSessionJudgeEmail({
+                                judge_name: judge.name,
+                                judge_email: judge.email,
+                                session_name: session.name,
+                                session_date: session.date || "TBD",
+                                session_time: session.time || "TBD",
+                                session_venue: session.venue,
+                                abstract_topics_html: abstractTopicsHtml,
+                                login_url: window.location.origin + "/member-login"
+                            });
+                            successCount++;
+                        } catch (err) {
+                            console.error(`Failed sending to judge ${judge.email}`, err);
+                            failCount++;
+                        }
                     }
                 }
             }
             
             // 2. Send to Students
-            for (const abstract of sessionAbstracts) {
-                const student = students.find(s => s.id === abstract.studentId);
-                if (student && student.email) {
-                    try {
-                        await sendSessionStudentEmail({
-                            student_name: student.name,
-                            student_email: student.email,
-                            session_name: session.name,
-                            session_date: session.date || "TBD",
-                            session_time: session.time || "TBD",
-                            session_venue: session.venue
-                        });
-                        successCount++;
-                    } catch (err) {
-                        console.error(`Failed sending to student ${student.email}`, err);
-                        failCount++;
+            if (mailOptions.students) {
+                for (const abstract of sessionAbstracts) {
+                    const student = students.find(s => s.id === abstract.studentId);
+                    if (student && student.email) {
+                        try {
+                            await sendSessionStudentEmail({
+                                student_name: student.name,
+                                student_email: student.email,
+                                session_name: session.name,
+                                session_date: session.date || "TBD",
+                                session_time: session.time || "TBD",
+                                session_venue: session.venue
+                            });
+                            successCount++;
+                        } catch (err) {
+                            console.error(`Failed sending to student ${student.email}`, err);
+                            failCount++;
+                        }
                     }
                 }
             }
@@ -775,23 +785,25 @@ export default function SessionManagement() {
                                         </Button>
                                     ) : (
                                         <>
-                                            <Button variant="outline" size="sm" className="flex-1 text-[10px] px-1" onClick={() => handleEdit(session)}>
-                                                <Edit className="w-3 h-3 mr-1 shrink-0" /> Edit
-                                            </Button>
-                                            <Button variant="outline" size="sm" className="flex-1 text-[10px] px-1" onClick={() => handleDownloadPDF(session)}>
-                                                <Download className="w-3 h-3 mr-1 shrink-0" /> PDF
-                                            </Button>
-                                            <Button variant="outline" size="sm" className="flex-1 text-[10px] px-1" onClick={() => handleOpenCriteriaEditor(session)}>
-                                                <FileText className="w-3 h-3 mr-1 shrink-0" /> Criteria
-                                            </Button>
-                                            <Button variant="outline" size="sm" className="flex-1 text-[10px] px-1" onClick={() => setViewingStatusSession(session)}>
-                                                <Users className="w-3 h-3 mr-1 shrink-0" /> Status
-                                            </Button>
-                                            <Button variant="outline" size="sm" className="flex-1 text-[10px] px-1" onClick={() => handleOpenVolunteersEditor(session)}>
-                                                <Users className="w-3 h-3 mr-1 shrink-0" /> Assign
-                                            </Button>
-                                            <Button variant="outline" size="sm" className="flex-1 text-[10px] px-1" onClick={() => handleSendEmails(session)} disabled={isSendingEmails === session.id}>
-                                                {isSendingEmails === session.id ? <Loader2 className="w-3 h-3 mr-1 shrink-0 animate-spin" /> : <Mail className="w-3 h-3 mr-1 shrink-0" />} Mail
+                                            <div className="flex w-full gap-2">
+                                                <Button variant="outline" size="sm" className="flex-1 text-[10px] px-1" onClick={() => handleEdit(session)}>
+                                                    <Edit className="w-3 h-3 mr-1 shrink-0" /> Edit
+                                                </Button>
+                                                <Button variant="outline" size="sm" className="flex-1 text-[10px] px-1" onClick={() => handleDownloadPDF(session)}>
+                                                    <Download className="w-3 h-3 mr-1 shrink-0" /> PDF
+                                                </Button>
+                                                <Button variant="outline" size="sm" className="flex-1 text-[10px] px-1" onClick={() => handleOpenCriteriaEditor(session)}>
+                                                    <FileText className="w-3 h-3 mr-1 shrink-0" /> Criteria
+                                                </Button>
+                                                <Button variant="outline" size="sm" className="flex-1 text-[10px] px-1" onClick={() => setViewingStatusSession(session)}>
+                                                    <Users className="w-3 h-3 mr-1 shrink-0" /> Status
+                                                </Button>
+                                                <Button variant="outline" size="sm" className="flex-1 text-[10px] px-1" onClick={() => handleOpenVolunteersEditor(session)}>
+                                                    <Users className="w-3 h-3 mr-1 shrink-0" /> Assign
+                                                </Button>
+                                            </div>
+                                            <Button variant="outline" size="sm" className="w-full text-xs mt-2" onClick={() => setMailSessionTarget(session)} disabled={isSendingEmails === session.id}>
+                                                {isSendingEmails === session.id ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Mail className="w-4 h-4 mr-2" />} Send Emails
                                             </Button>
                                         </>
                                     )}
@@ -1141,6 +1153,34 @@ export default function SessionManagement() {
                     <DialogFooter>
                         <Button variant="outline" onClick={() => setEditingVolunteersSession(null)}>Cancel</Button>
                         <Button onClick={handleSaveVolunteers}>Save Assignments</Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* Email Selection Dialog */}
+            <Dialog open={!!mailSessionTarget} onOpenChange={(val) => !val && setMailSessionTarget(null)}>
+                <DialogContent className="max-w-sm">
+                    <DialogHeader>
+                        <DialogTitle>Send Session Emails</DialogTitle>
+                        <DialogDescription>
+                            Select who should receive the assignment emails for "{mailSessionTarget?.name}".
+                        </DialogDescription>
+                    </DialogHeader>
+                    
+                    <div className="py-4 space-y-4">
+                        <div className="flex items-center space-x-2">
+                            <Checkbox id="mail-students" checked={mailOptions.students} onCheckedChange={(c) => setMailOptions(prev => ({...prev, students: !!c}))} />
+                            <label htmlFor="mail-students" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">Students / Delegates</label>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                            <Checkbox id="mail-judges" checked={mailOptions.judges} onCheckedChange={(c) => setMailOptions(prev => ({...prev, judges: !!c}))} />
+                            <label htmlFor="mail-judges" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">Judges</label>
+                        </div>
+                    </div>
+
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setMailSessionTarget(null)}>Cancel</Button>
+                        <Button onClick={executeSendEmails} disabled={!mailOptions.students && !mailOptions.judges}>Send Mails</Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
