@@ -16,7 +16,7 @@ import {
     assignVolunteerToSession,
     removeVolunteerFromSession
 } from "@/services/supabaseService";
-import { sendAllocationEmail } from "@/services/emailService";
+import { sendAllocationEmail, sendSessionStudentEmail, sendSessionJudgeEmail } from "@/services/emailService";
 import { AutoScheduler } from "@/services/autoScheduler";
 import { Session, Judge, Abstract, Student, Event } from "@/types";
 import { Button } from "@/components/ui/button";
@@ -35,7 +35,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Trash2, Calendar, MapPin, Users, FileText, Trophy, Edit, Loader2, Download } from "lucide-react";
+import { Plus, Trash2, Calendar, MapPin, Users, FileText, Trophy, Edit, Loader2, Download, Mail } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useProgram } from "@/contexts/ProgramContext";
 
@@ -83,6 +83,7 @@ export default function SessionManagement() {
     const [allVolunteers, setAllVolunteers] = useState<any[]>([]);
     const [assignedVolunteers, setAssignedVolunteers] = useState<string[]>([]);
     const [venueFilter, setVenueFilter] = useState<string>("All");
+    const [isSendingEmails, setIsSendingEmails] = useState<string | null>(null);
 
     const handleOpenVolunteersEditor = async (session: Session) => {
         setEditingVolunteersSession(session);
@@ -160,6 +161,75 @@ export default function SessionManagement() {
                 console.error(error);
                 toast({ title: "Error", description: "Failed to delete session.", variant: "destructive" });
             }
+        }
+    };
+
+    const handleSendEmails = async (session: Session) => {
+        if (!confirm("Send session assignment emails to all students and judges for this session?")) return;
+        
+        setIsSendingEmails(session.id);
+        let successCount = 0;
+        let failCount = 0;
+        
+        try {
+            // 1. Send to Judges
+            const sessionJudges = judges.filter(j => session.judges.includes(j.id));
+            const sessionAbstracts = abstracts.filter(a => session.abstractIds.includes(a.id));
+            
+            const abstractTopicsHtml = `<ul>${sessionAbstracts.map(a => `<li style="margin-bottom: 5px;">${a.title || 'Untitled Abstract'}</li>`).join('')}</ul>`;
+            
+            for (const judge of sessionJudges) {
+                if (judge.email) {
+                    try {
+                        await sendSessionJudgeEmail({
+                            judge_name: judge.name,
+                            judge_email: judge.email,
+                            session_name: session.name,
+                            session_date: session.date || "TBD",
+                            session_time: session.time || "TBD",
+                            session_venue: session.venue,
+                            abstract_topics_html: abstractTopicsHtml,
+                            login_url: window.location.origin + "/member-login"
+                        });
+                        successCount++;
+                    } catch (err) {
+                        console.error(`Failed sending to judge ${judge.email}`, err);
+                        failCount++;
+                    }
+                }
+            }
+            
+            // 2. Send to Students
+            for (const abstract of sessionAbstracts) {
+                const student = students.find(s => s.id === abstract.studentId);
+                if (student && student.email) {
+                    try {
+                        await sendSessionStudentEmail({
+                            student_name: student.name,
+                            student_email: student.email,
+                            session_name: session.name,
+                            session_date: session.date || "TBD",
+                            session_time: session.time || "TBD",
+                            session_venue: session.venue
+                        });
+                        successCount++;
+                    } catch (err) {
+                        console.error(`Failed sending to student ${student.email}`, err);
+                        failCount++;
+                    }
+                }
+            }
+            
+            toast({
+                title: "Emails Sent",
+                description: `Successfully sent ${successCount} emails. ${failCount > 0 ? `${failCount} failed.` : ''}`
+            });
+            
+        } catch (error) {
+            console.error(error);
+            toast({ title: "Error", description: "Failed to dispatch emails.", variant: "destructive" });
+        } finally {
+            setIsSendingEmails(null);
         }
     };
 
@@ -719,6 +789,9 @@ export default function SessionManagement() {
                                             </Button>
                                             <Button variant="outline" size="sm" className="flex-1 text-[10px] px-1" onClick={() => handleOpenVolunteersEditor(session)}>
                                                 <Users className="w-3 h-3 mr-1 shrink-0" /> Assign
+                                            </Button>
+                                            <Button variant="outline" size="sm" className="flex-1 text-[10px] px-1" onClick={() => handleSendEmails(session)} disabled={isSendingEmails === session.id}>
+                                                {isSendingEmails === session.id ? <Loader2 className="w-3 h-3 mr-1 shrink-0 animate-spin" /> : <Mail className="w-3 h-3 mr-1 shrink-0" />} Mail
                                             </Button>
                                         </>
                                     )}
