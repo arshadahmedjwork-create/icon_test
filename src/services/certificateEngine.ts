@@ -106,7 +106,11 @@ export async function generateCertificatePDF(details: CertificateDetails): Promi
         nameX = (width - nameWidth) / 2;
     }
 
-    const nameY = isPortrait ? height * 0.52 : 280; // Adjusted for landscape to sit on the underline
+    let nameY = isPortrait ? height * 0.52 : 280; // Adjusted for landscape to sit on the underline
+    if (certType === 'winner') {
+        nameY = 345; // Winner templates have the name line higher up
+        nameX += 60; // Shift right to center over the underline
+    }
 
     firstPage.drawText(nameText, {
         x: nameX,
