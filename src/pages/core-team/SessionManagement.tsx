@@ -33,7 +33,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Trash2, Calendar, MapPin, Users, FileText, Trophy, Edit, Loader2 } from "lucide-react";
+import { Plus, Trash2, Calendar, MapPin, Users, FileText, Trophy, Edit, Loader2, Download } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useProgram } from "@/contexts/ProgramContext";
 
@@ -158,6 +158,69 @@ export default function SessionManagement() {
                 toast({ title: "Error", description: "Failed to delete session.", variant: "destructive" });
             }
         }
+    };
+
+    const handleDownloadPDF = (session: Session) => {
+        import("jspdf").then(({ default: jsPDF }) => {
+            import("jspdf-autotable").then(() => {
+                const doc = new jsPDF();
+                
+                doc.setFont("helvetica");
+
+                const dateStr = session.date ? new Date(session.date).toLocaleDateString() : "TBD";
+                const timeStr = session.time || "TBD";
+                const isIcon = currentProgram === 'ICON';
+                const idLabel = isIcon ? 'ICON ID' : 'MIDAS ID';
+                
+                doc.setFontSize(11);
+                doc.text(`Date: ${dateStr}`, 14, 20);
+                doc.text(`Time: ${timeStr}`, 140, 20);
+                
+                doc.setFontSize(14);
+                doc.setFont("helvetica", "bold");
+                doc.text(`VENUE: ${session.name.toUpperCase()}`, 14, 30);
+                
+                doc.setFontSize(12);
+                doc.setFont("helvetica", "normal");
+                doc.text(`LECTURE HALL - ${session.venue.toUpperCase()}`, 14, 38);
+
+                const sessionAbstracts = abstracts.filter(a => session.abstractIds.includes(a.id));
+                const tableData = sessionAbstracts.map((ab, index) => {
+                    const student = students.find(s => s.id === ab.studentId);
+                    return [
+                        (index + 1).toString(),
+                        student?.name || "Unknown",
+                        student?.midasId || "N/A",
+                        ab.title || "No Topic"
+                    ];
+                });
+
+                if (tableData.length < 5) {
+                    for (let i = tableData.length; i < 5; i++) {
+                        tableData.push([(i + 1).toString(), "", "", ""]);
+                    }
+                }
+
+                (doc as any).autoTable({
+                    startY: 45,
+                    head: [["S.No.", "NAME OF STUDENT", idLabel, "TOPIC"]],
+                    body: tableData,
+                    theme: "grid",
+                    headStyles: { fillColor: [240, 240, 240], textColor: [0, 0, 0], fontStyle: "bold", lineWidth: 0.1, lineColor: [0, 0, 0] },
+                    bodyStyles: { textColor: [0, 0, 0], lineWidth: 0.1, lineColor: [0, 0, 0] },
+                    styles: { fontSize: 10, cellPadding: 3 },
+                    columnStyles: {
+                        0: { cellWidth: 15 },
+                        1: { cellWidth: 50 },
+                        2: { cellWidth: 40 },
+                        3: { cellWidth: 'auto' }
+                    }
+                });
+
+                const filename = `${session.name.replace(/[^a-zA-Z0-9-]/g, '_')}.pdf`;
+                doc.save(filename);
+            });
+        });
     };
 
     const handleSaveSession = async () => {
@@ -620,6 +683,9 @@ export default function SessionManagement() {
                                         <>
                                             <Button variant="outline" size="sm" className="flex-1 text-[10px] px-1" onClick={() => handleEdit(session)}>
                                                 <Edit className="w-3 h-3 mr-1 shrink-0" /> Edit
+                                            </Button>
+                                            <Button variant="outline" size="sm" className="flex-1 text-[10px] px-1" onClick={() => handleDownloadPDF(session)}>
+                                                <Download className="w-3 h-3 mr-1 shrink-0" /> PDF
                                             </Button>
                                             <Button variant="outline" size="sm" className="flex-1 text-[10px] px-1" onClick={() => handleOpenCriteriaEditor(session)}>
                                                 <FileText className="w-3 h-3 mr-1 shrink-0" /> Criteria
