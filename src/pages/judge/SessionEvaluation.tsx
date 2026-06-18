@@ -646,6 +646,7 @@ export default function SessionEvaluation() {
                                         <Button variant="outline" className="w-full h-11 rounded-xl font-semibold" onClick={() => setEvaluating(null)}>
                                             Close Preview
                                         </Button>
+                                    </div>
                                 </div>
                             ) : (
                                 <div className="space-y-6">
@@ -721,7 +722,7 @@ export default function SessionEvaluation() {
                                             </div>
                                         </>
                                     )}
-                                </div>                    </div>
+                                </div>
                             )}
                         </div>
                     </div>
