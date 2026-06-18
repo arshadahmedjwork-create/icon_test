@@ -919,6 +919,21 @@ export default function SessionManagement() {
                                 <Label>Venue / Link</Label>
                                 <Input placeholder="e.g. Hall 1 or Zoom Link" value={formData.venue || ""} onChange={e => updateForm("venue", e.target.value)} />
                             </div>
+                            <div className="space-y-2 col-span-1 sm:col-span-2">
+                                <Label>Linked Event (Optional)</Label>
+                                <Select value={formData.eventId || "none"} onValueChange={(val) => updateForm("eventId", val === "none" ? null : val)}>
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="Select Event to Link" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="none">-- Auto Match or No Event --</SelectItem>
+                                        {events.map((e) => (
+                                            <SelectItem key={e.id} value={e.id}>{e.name} ({e.type} - {e.mode})</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                                <p className="text-xs text-muted-foreground">Linking an event enforces its specific judge criteria and guidelines for evaluation.</p>
+                            </div>
                         </div>
 
                         <div className="space-y-2">
