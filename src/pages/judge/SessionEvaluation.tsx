@@ -646,9 +646,9 @@ export default function SessionEvaluation() {
                                         <Button variant="outline" className="w-full h-11 rounded-xl font-semibold" onClick={() => setEvaluating(null)}>
                                             Close Preview
                                         </Button>
-                                    </div>
                                 </div>
-                                         <div className="space-y-6">
+                            ) : (
+                                <div className="space-y-6">
                                     <h3 className="font-bold text-lg border-b pb-2">Scoring Criteria</h3>
                                     
                                     {isAcademicianOrClinician ? (
