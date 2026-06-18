@@ -170,7 +170,8 @@ export default function SessionManagement() {
                                  const modeMatch = e.mode.toLowerCase() === (formData.mode || "Offline").toLowerCase();
                                  const typeMatch = e.type.toLowerCase().startsWith((formData.type || "Paper Presentation").toLowerCase()) || 
                                                    (formData.type || "Paper Presentation").toLowerCase().startsWith(e.type.toLowerCase());
-                                 return modeMatch && typeMatch && e.name.toLowerCase().trim() === (formData.subject || "").toLowerCase().trim();
+                                 const selectedSubjects = (formData.subject || "").split(',').map(s=>s.trim().toLowerCase());
+                                 return modeMatch && typeMatch && selectedSubjects.includes(e.name.toLowerCase().trim());
                              });
 
         const defaultCriterias = [
@@ -415,7 +416,7 @@ export default function SessionManagement() {
 
     // Filter available abstracts based on selected criteria and check for duplicate scheduling
     const availableAbstracts = abstracts.filter(a =>
-        (!formData.subject || a.subject.toLowerCase() === formData.subject.toLowerCase()) &&
+        (!formData.subject || formData.subject.split(',').map(s => s.trim().toLowerCase()).includes(a.subject.toLowerCase())) &&
         (!formData.type || a.type.toLowerCase() === formData.type.toLowerCase()) &&
         (!formData.mode || a.mode.toLowerCase() === formData.mode.toLowerCase()) &&
         // Exclude if scheduled in a different session
@@ -424,7 +425,7 @@ export default function SessionManagement() {
 
     const subjectsOptions = Array.from(new Set([
         ...(currentProgram === 'ICON' ? abstracts.map(a => a.subject) : events.map(e => e.name)),
-        formData.subject
+        ...(formData.subject ? formData.subject.split(',').map(s => s.trim()) : [])
     ].filter(Boolean) as string[]));
 
     const typesOptions = Array.from(new Set([
@@ -650,19 +651,33 @@ export default function SessionManagement() {
                             </div>
                             <div className="space-y-2">
                                 <Label>Subject</Label>
-                                <Select value={formData.subject || ""} onValueChange={(val) => {
-                                    updateForm("subject", val);
-                                    // Also try to find the event configuration to auto-link
-                                    const event = events.find(e => e.name === val && e.type === formData.type && e.mode === formData.mode);
-                                    if (event) updateForm("eventId", event.id);
-                                }}>
-                                    <SelectTrigger>
-                                        <SelectValue placeholder="Select Subject" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {subjectsOptions.map((s: string) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-                                    </SelectContent>
-                                </Select>
+                                <div className="border rounded p-3 max-h-32 overflow-y-auto space-y-2 bg-background">
+                                    {subjectsOptions.map((s: string) => (
+                                        <div key={s} className="flex items-center space-x-2">
+                                            <Checkbox
+                                                id={`subject-${s}`}
+                                                checked={formData.subject?.split(",").map(sub => sub.trim()).includes(s)}
+                                                onCheckedChange={(checked) => {
+                                                    let current = formData.subject ? formData.subject.split(",").map(sub => sub.trim()).filter(Boolean) : [];
+                                                    if (checked) {
+                                                        current.push(s);
+                                                    } else {
+                                                        current = current.filter(sub => sub !== s);
+                                                    }
+                                                    const newVal = current.join(", ");
+                                                    updateForm("subject", newVal);
+                                                    if (current.length > 0) {
+                                                        const event = events.find(e => e.name === current[0] && e.type === formData.type && e.mode === formData.mode);
+                                                        if (event) updateForm("eventId", event.id);
+                                                    }
+                                                }}
+                                            />
+                                            <label htmlFor={`subject-${s}`} className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                                                {s}
+                                            </label>
+                                        </div>
+                                    ))}
+                                </div>
                             </div>
                             <div className="space-y-2">
                                 <Label>Type</Label>
