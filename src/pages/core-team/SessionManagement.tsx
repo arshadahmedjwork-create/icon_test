@@ -323,9 +323,11 @@ export default function SessionManagement() {
                              });
 
         const defaultCriterias = [
-            { id: crypto.randomUUID(), name: 'Scientific Content', maxScore: 10, weightage: 40 },
-            { id: crypto.randomUUID(), name: 'Presentation / Delivery', maxScore: 10, weightage: 30 },
-            { id: crypto.randomUUID(), name: 'Innovation & Impact', maxScore: 10, weightage: 30 }
+            { id: crypto.randomUUID(), name: 'Relevance and originality of the topic', maxScore: 10, weightage: 20 },
+            { id: crypto.randomUUID(), name: 'Scientific content and methodology', maxScore: 10, weightage: 20 },
+            { id: crypto.randomUUID(), name: 'Quality of presentation and time management', maxScore: 10, weightage: 20 },
+            { id: crypto.randomUUID(), name: 'Understanding of the subject and response to questions', maxScore: 10, weightage: 20 },
+            { id: crypto.randomUUID(), name: 'Overall impression and clinical/research significance', maxScore: 10, weightage: 20 }
         ];
 
         setIsSubmitting(true);
@@ -517,9 +519,11 @@ export default function SessionManagement() {
         if (initialCriterias.length === 0) {
             const event = events.find(e => e.id === session.eventId);
             initialCriterias = event?.criterias || [
-                { id: crypto.randomUUID(), name: 'Scientific Content', maxScore: 10, weightage: 40 },
-                { id: crypto.randomUUID(), name: 'Presentation / Delivery', maxScore: 10, weightage: 30 },
-                { id: crypto.randomUUID(), name: 'Innovation & Impact', maxScore: 10, weightage: 30 }
+                { id: crypto.randomUUID(), name: 'Relevance and originality of the topic', maxScore: 10, weightage: 20 },
+                { id: crypto.randomUUID(), name: 'Scientific content and methodology', maxScore: 10, weightage: 20 },
+                { id: crypto.randomUUID(), name: 'Quality of presentation and time management', maxScore: 10, weightage: 20 },
+                { id: crypto.randomUUID(), name: 'Understanding of the subject and response to questions', maxScore: 10, weightage: 20 },
+                { id: crypto.randomUUID(), name: 'Overall impression and clinical/research significance', maxScore: 10, weightage: 20 }
             ];
         }
         setTempCriterias([...initialCriterias]);
