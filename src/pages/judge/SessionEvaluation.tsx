@@ -8,7 +8,8 @@ import {
     getEvaluations,
     getJudges,
     getEventStudents,
-    finalizeJudgeScores
+    finalizeJudgeScores,
+    isNonCompetitiveSession
 } from "@/services/supabaseService";
 import { Session, Abstract, Evaluation, Event, Student } from "@/types";
 import { useAuth } from "@/contexts/AuthContext";
@@ -324,10 +325,7 @@ export default function SessionEvaluation() {
 
     const isSessionCompleted = session.status === 'SESSION_COMPLETED' || session.status.toLowerCase() === 'completed';
 
-    const isAcademicianOrClinician = session.type?.toUpperCase().includes("ACADEMICIAN") || 
-                                     session.type?.toUpperCase().includes("CLINICIAN") || 
-                                     session.delegateTypeFilter?.toUpperCase().includes("ACADEMICIAN") || 
-                                     session.delegateTypeFilter?.toUpperCase().includes("CLINICIAN");
+    const isAcademicianOrClinician = isNonCompetitiveSession(session);
 
     return (
         <div className="space-y-6">
