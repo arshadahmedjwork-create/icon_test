@@ -1560,6 +1560,27 @@ export const calculateSessionResults = async (sessionId: string) => {
                 downloadUrl: `/api/certificate/download`
             });
         }
+
+        // Judges: For all judges assigned to this session
+        const { data: sessionJudges } = await supabase
+            .from('session_judges')
+            .select('judgeId')
+            .eq('sessionId', sessionId);
+
+        if (sessionJudges) {
+            for (const sj of sessionJudges) {
+                await addCertificate({
+                    id: crypto.randomUUID(),
+                    userId: sj.judgeId,
+                    sessionId: sessionId,
+                    type: "judge",
+                    generatedAt: new Date().toISOString(),
+                    emailSent: false,
+                    downloadUrl: `/api/certificate/download`
+                });
+            }
+        }
+
         return [];
     }
 
