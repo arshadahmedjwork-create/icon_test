@@ -941,7 +941,12 @@ export default function SessionManagement() {
                         </div>
 
                         <div className="space-y-2">
-                            <Label>Select Presentations (Approved Abstracts)</Label>
+                            <div className="flex flex-col gap-1">
+                                <Label>Select Presentations (Approved Abstracts)</Label>
+                                <span className="text-[11px] font-medium text-amber-600 bg-amber-50 px-2 py-1 rounded w-fit border border-amber-100">
+                                    🏆 Prizes: 1-3 presentations (1 prize) | 4-6 presentations (2 prizes) | 7+ presentations (3 prizes)
+                                </span>
+                            </div>
                             <div className="border rounded p-3 h-48 overflow-y-auto space-y-2">
                                 {availableAbstracts.length === 0 ? (
                                     <p className="text-sm text-muted-foreground">No approved abstracts match the selected criteria.</p>

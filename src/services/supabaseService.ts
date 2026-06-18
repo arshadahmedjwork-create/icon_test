@@ -1534,7 +1534,15 @@ export const calculateSessionResults = async (sessionId: string) => {
     const { data: session, error: sErr } = await supabase.from('sessions').select('*').eq('id', sessionId).single();
     if (sErr || !session) return null;
 
-    if (isNonCompetitiveSession(session)) {
+    let isNonComp = isNonCompetitiveSession(session);
+    if (!isNonComp && session.eventId) {
+        const { data: eventMaster } = await supabase.from('event_master').select('name, type').eq('id', session.eventId).single();
+        if (eventMaster) {
+            isNonComp = isNonCompetitiveSession({ name: eventMaster.name, type: eventMaster.type, subject: '' });
+        }
+    }
+
+    if (isNonComp) {
         const { error: uErr } = await supabase.from('sessions').update({
             status: 'SESSION_COMPLETED',
             session_status: 'CLOSED',
@@ -1667,7 +1675,7 @@ export const calculateSessionResults = async (sessionId: string) => {
     let winnerLimit = 3;
     if (finalScores.length <= 3) {
         winnerLimit = 1;
-    } else if (finalScores.length <= 7) {
+    } else if (finalScores.length <= 6) {
         winnerLimit = 2;
     }
 
