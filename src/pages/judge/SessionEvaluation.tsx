@@ -421,7 +421,7 @@ export default function SessionEvaluation() {
                     <Badge className="bg-emerald-100 text-emerald-800 border-none px-3 py-1 text-xs font-bold">LOCKED & FINALIZED</Badge>
                 </div>
             ) : (
-                allEvaluated && (
+                (session.status?.toUpperCase() === "SESSION_LIVE" || isSessionCompleted) && allEvaluated && (
                     <div className="bg-amber-50 border border-amber-200 text-amber-800 p-5 rounded-2xl flex items-center justify-between shadow-sm animate-pulse">
                         <div className="flex items-center gap-3">
                             <AlertTriangle className="w-6 h-6 text-amber-600 shrink-0" />
