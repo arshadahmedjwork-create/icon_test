@@ -252,6 +252,42 @@ export default function SessionEvaluation() {
         }
     };
 
+    const handlePresentationComplete = async () => {
+        if (!evaluating || !judgeId) return;
+
+        const activeCriterias = getCriterias();
+        const maxScores: Record<string, number> = {};
+        activeCriterias.forEach(c => maxScores[c.id] = c.maxScore);
+
+        // Assume total weightage is usually 100 or calculate it
+        const total = activeCriterias.reduce((acc, c) => acc + c.weightage, 0); 
+
+        try {
+            const payload = {
+                sessionId: sessionId!,
+                judgeId: judgeId,
+                studentId: evaluating.studentId,
+                scores: maxScores,
+                totalScore: total,
+                feedback: "Presentation Complete (Academician/Clinician)",
+                program: currentProgram,
+                isAbsent: false
+            };
+            console.log("Submitting Academician/Clinician Evaluation:", payload);
+
+            await addEvaluation(payload);
+
+            toast({ title: "Presentation Complete", description: "Successfully marked as complete." });
+            
+            const allEvaluations = await getEvaluations(currentProgram);
+            setEvaluations(allEvaluations.filter(e => e.sessionId === sessionId && e.judgeId === judgeId));
+            setEvaluating(null);
+        } catch (error: any) {
+            console.error("Evaluation Error Details:", error);
+            toast({ title: "Error", description: `Failed to save: ${error.message || "Unknown error"}`, variant: "destructive" });
+        }
+    };
+
     const handleFinalizeSession = async () => {
         if (!sessionId || !judgeId) return;
         try {
@@ -287,6 +323,11 @@ export default function SessionEvaluation() {
         : (abstracts.length > 0);
 
     const isSessionCompleted = session.status === 'SESSION_COMPLETED' || session.status.toLowerCase() === 'completed';
+
+    const isAcademicianOrClinician = session.type?.toUpperCase().includes("ACADEMICIAN") || 
+                                     session.type?.toUpperCase().includes("CLINICIAN") || 
+                                     session.delegateTypeFilter?.toUpperCase().includes("ACADEMICIAN") || 
+                                     session.delegateTypeFilter?.toUpperCase().includes("CLINICIAN");
 
     return (
         <div className="space-y-6">
@@ -607,61 +648,80 @@ export default function SessionEvaluation() {
                                         </Button>
                                     </div>
                                 </div>
-                            ) : (
-                                <div className="space-y-6">
+                                         <div className="space-y-6">
                                     <h3 className="font-bold text-lg border-b pb-2">Scoring Criteria</h3>
                                     
-
-
-                                    {!isStudentAbsent && getCriterias().map(criteria => (
-                                        <div key={criteria.id} className="space-y-3 p-4 rounded-lg border bg-muted/20">
-                                            <div className="flex justify-between">
-                                                    <Label className="font-semibold text-sm">{criteria.name}</Label>
-                                                    <span className="font-bold text-primary">{scores[criteria.id] || 0} / {criteria.maxScore}</span>
-                                                </div>
-                                                <Slider
-                                                    value={[scores[criteria.id] || 0]}
-                                                    max={criteria.maxScore}
-                                                    step={1}
-                                                    disabled={finalized}
-                                                    onValueChange={(val) => handleScoreChange(criteria.id, val[0])}
-                                                    className="py-2"
-                                                />
-                                                <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Weightage: {criteria.weightage}%</p>
+                                    {isAcademicianOrClinician ? (
+                                        <div className="space-y-4 pt-4">
+                                            <div className="bg-blue-50 border border-blue-200 p-4 rounded-lg text-blue-800">
+                                                <p className="font-semibold text-base mb-1">Academician/Clinician Presentation</p>
+                                                <p className="text-sm">For this presentation type, rubric scoring is not required. Simply mark the presentation as complete once done.</p>
                                             </div>
-                                        ))}
-
-                                    <div className="pt-4 border-t sticky bottom-0 bg-background pb-2">
-                                        <div className="flex justify-between items-center mb-4 p-3 bg-primary/5 rounded-lg border border-primary/10">
-                                            <span className="text-base font-bold">Total Weighted Score</span>
-                                            <span className="text-2xl font-black text-primary">
-                                                {isStudentAbsent ? "0.00% (Absent)" : `${calculateTotal().toFixed(2)}%`}
-                                            </span>
+                                            
+                                            <div className="flex gap-3 mt-8">
+                                                <Button variant="outline" className="flex-1" onClick={() => setEvaluating(null)}>Cancel</Button>
+                                                {finalized ? (
+                                                    <Button className="flex-[2] bg-slate-400 cursor-not-allowed text-white font-bold" disabled>Evaluation Locked</Button>
+                                                ) : (
+                                                    <Button className="flex-[2] bg-blue-600 hover:bg-blue-700 text-white" onClick={handlePresentationComplete}>
+                                                        Mark Presentation Complete
+                                                    </Button>
+                                                )}
+                                            </div>
                                         </div>
+                                    ) : (
+                                        <>
+                                            {!isStudentAbsent && getCriterias().map(criteria => (
+                                                <div key={criteria.id} className="space-y-3 p-4 rounded-lg border bg-muted/20">
+                                                    <div className="flex justify-between">
+                                                            <Label className="font-semibold text-sm">{criteria.name}</Label>
+                                                            <span className="font-bold text-primary">{scores[criteria.id] || 0} / {criteria.maxScore}</span>
+                                                        </div>
+                                                        <Slider
+                                                            value={[scores[criteria.id] || 0]}
+                                                            max={criteria.maxScore}
+                                                            step={1}
+                                                            disabled={finalized}
+                                                            onValueChange={(val) => handleScoreChange(criteria.id, val[0])}
+                                                            className="py-2"
+                                                        />
+                                                        <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Weightage: {criteria.weightage}%</p>
+                                                    </div>
+                                                ))}
 
-                                        <div className="space-y-2 mb-6">
-                                            <Label className="text-sm font-semibold">Feedback (Optional)</Label>
-                                            <Textarea
-                                                placeholder={finalized ? "No feedback submitted." : isStudentAbsent ? "Absent student - feedback disabled." : "Constructive feedback..."}
-                                                value={isStudentAbsent ? "" : feedback}
-                                                disabled={finalized || isStudentAbsent}
-                                                onChange={(e) => setFeedback(e.target.value)}
-                                                className="min-h-[100px] resize-none"
-                                            />
-                                        </div>
+                                            <div className="pt-4 border-t sticky bottom-0 bg-background pb-2">
+                                                <div className="flex justify-between items-center mb-4 p-3 bg-primary/5 rounded-lg border border-primary/10">
+                                                    <span className="text-base font-bold">Total Weighted Score</span>
+                                                    <span className="text-2xl font-black text-primary">
+                                                        {isStudentAbsent ? "0.00% (Absent)" : `${calculateTotal().toFixed(2)}%`}
+                                                    </span>
+                                                </div>
 
-                                        <div className="flex gap-3">
-                                            <Button variant="outline" className="flex-1" onClick={() => setEvaluating(null)}>Cancel</Button>
-                                            {finalized ? (
-                                                <Button className="flex-[2] bg-slate-400 cursor-not-allowed text-white font-bold" disabled>Evaluation Locked</Button>
-                                            ) : (
-                                                <Button className="flex-[2]" onClick={handleSubmitEvaluation}>
-                                                    {isStudentAbsent ? "Submit as Absent" : "Submit Evaluation"}
-                                                </Button>
-                                            )}
-                                        </div>
-                                    </div>
-                                </div>
+                                                <div className="space-y-2 mb-6">
+                                                    <Label className="text-sm font-semibold">Feedback (Optional)</Label>
+                                                    <Textarea
+                                                        placeholder={finalized ? "No feedback submitted." : isStudentAbsent ? "Absent student - feedback disabled." : "Constructive feedback..."}
+                                                        value={isStudentAbsent ? "" : feedback}
+                                                        disabled={finalized || isStudentAbsent}
+                                                        onChange={(e) => setFeedback(e.target.value)}
+                                                        className="min-h-[100px] resize-none"
+                                                    />
+                                                </div>
+
+                                                <div className="flex gap-3">
+                                                    <Button variant="outline" className="flex-1" onClick={() => setEvaluating(null)}>Cancel</Button>
+                                                    {finalized ? (
+                                                        <Button className="flex-[2] bg-slate-400 cursor-not-allowed text-white font-bold" disabled>Evaluation Locked</Button>
+                                                    ) : (
+                                                        <Button className="flex-[2]" onClick={handleSubmitEvaluation}>
+                                                            {isStudentAbsent ? "Submit as Absent" : "Submit Evaluation"}
+                                                        </Button>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </>
+                                    )}
+                                </div>                    </div>
                             )}
                         </div>
                     </div>
