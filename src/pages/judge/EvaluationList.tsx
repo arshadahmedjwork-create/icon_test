@@ -3,9 +3,11 @@ import { Link } from "react-router-dom";
 import {
     getSessions,
     getJudges,
-    getCertificates
+    getCertificates,
+    getEvents,
+    isNonCompetitiveSession
 } from "@/services/supabaseService";
-import { Session, Judge, Certificate } from "@/types";
+import { Session, Judge, Certificate, Event } from "@/types";
 import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -19,15 +21,17 @@ export default function EvaluationList() {
     const { currentProgram } = useProgram();
     const [mySessions, setMySessions] = useState<Session[]>([]);
     const [judgeCertificates, setJudgeCertificates] = useState<Certificate[]>([]);
+    const [events, setEvents] = useState<Event[]>([]);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
         const loadData = async () => {
             if (user?.email) {
-                const [allJudges, allSessions, allCerts] = await Promise.all([
+                const [allJudges, allSessions, allCerts, allEvents] = await Promise.all([
                     getJudges(currentProgram),
                     getSessions(currentProgram),
-                    getCertificates()
+                    getCertificates(),
+                    getEvents(currentProgram)
                 ]);
 
                 const me = allJudges.find(j => j.email === user.email);
@@ -38,6 +42,7 @@ export default function EvaluationList() {
 
                     const myCerts = allCerts.filter(c => c.userId === me.id && c.type === 'judge');
                     setJudgeCertificates(myCerts);
+                    setEvents(allEvents);
                 }
             }
             setLoading(false);
@@ -69,6 +74,8 @@ export default function EvaluationList() {
                     {mySessions.map(session => {
                         const isCompleted = session.status.toLowerCase() === "completed" || session.status === "SESSION_COMPLETED";
                         const myCert = judgeCertificates.find(c => c.sessionId === session.id);
+                        const sessionEvent = events.find(e => e.id === session.eventId);
+                        const isNonCompetitive = isNonCompetitiveSession(session) || (sessionEvent && isNonCompetitiveSession({ name: sessionEvent.name, type: sessionEvent.type, subject: '' }));
 
                         return (
                             <Card key={session.id} className="hover:border-primary/50 transition-colors">
@@ -99,7 +106,7 @@ export default function EvaluationList() {
                                         </div>
                                     </div>
                                     <div className="space-y-2">
-                                        {isCompleted && (
+                                        {isCompleted && !isNonCompetitive && (
                                             <Button asChild variant="outline" className="w-full border-blue-600/30 text-blue-700 hover:bg-blue-50 rounded-xl font-semibold">
                                                 <Link to={`/dashboard/judge/session/${session.id}/scoreboard`}>
                                                     View Scoreboard
