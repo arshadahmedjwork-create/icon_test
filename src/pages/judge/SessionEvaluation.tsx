@@ -342,7 +342,7 @@ export default function SessionEvaluation() {
                 </div>
 
                 <div className="flex gap-2">
-                    {(finalized || isSessionCompleted) && (
+                    {(finalized || isSessionCompleted) && !isAcademicianOrClinician && (
                         <Button asChild variant="outline" className="rounded-xl border-blue-600/30 text-blue-700 hover:bg-blue-50">
                             <Link to={`/dashboard/judge/session/${sessionId}/scoreboard`}>
                                 <Trophy className="w-4 h-4 mr-2" /> Scoreboard
@@ -465,7 +465,7 @@ export default function SessionEvaluation() {
                                         </Badge>
                                     ) : isEvaluated ? (
                                         <Badge variant="secondary" className="bg-green-100 text-green-800 flex gap-1 items-center">
-                                            <CheckCircle className="w-3 h-3" /> Score: {score?.toFixed(2)}
+                                            <CheckCircle className="w-3 h-3" /> {isAcademicianOrClinician ? "Completed" : `Score: ${score?.toFixed(2)}`}
                                         </Badge>
                                     ) : isCurrentPresenter ? (
                                         <Badge variant="secondary" className="bg-accent text-accent-foreground animate-pulse font-bold flex gap-1 items-center">
