@@ -59,7 +59,8 @@ export default function SessionManagement() {
         time: "",
         venue: "",
         judges: [],
-        abstractIds: []
+        abstractIds: [],
+        delegateTypeFilter: "All"
     });
 
     // Auto-Schedule State
@@ -220,7 +221,8 @@ export default function SessionManagement() {
                 time: "",
                 venue: "",
                 judges: [],
-                abstractIds: []
+                abstractIds: [],
+                delegateTypeFilter: "All"
             });
         } catch (error: any) {
             console.error(error);
@@ -242,7 +244,8 @@ export default function SessionManagement() {
             venue: session.venue,
             judges: session.judges,
             abstractIds: session.abstractIds,
-            eventId: session.eventId
+            eventId: session.eventId,
+            delegateTypeFilter: "All"
         });
         setIsDialogOpen(true);
     };
@@ -419,6 +422,7 @@ export default function SessionManagement() {
         (!formData.subject || formData.subject.split(',').map(s => s.trim().toLowerCase()).includes(a.subject.toLowerCase())) &&
         (!formData.type || a.type.toLowerCase() === formData.type.toLowerCase()) &&
         (!formData.mode || a.mode.toLowerCase() === formData.mode.toLowerCase()) &&
+        (!formData.delegateTypeFilter || formData.delegateTypeFilter === "All" || (students.find(s => s.id === a.studentId)?.delegateType || 'UG') === formData.delegateTypeFilter) &&
         // Exclude if scheduled in a different session
         !sessions.some(s => s.id !== editingSession?.id && s.abstractIds?.includes(a.id))
     );
@@ -453,7 +457,7 @@ export default function SessionManagement() {
                     <Button variant="outline" onClick={handleAutoScheduleClick} className="w-full sm:w-auto">
                         <Users className="w-4 h-4 mr-2" /> Auto-Schedule
                     </Button>
-                    <Button onClick={() => { setEditingSession(null); setFormData({ name: "", subject: "", type: "", mode: "", date: "", time: "", venue: "", judges: [], abstractIds: [] }); setIsDialogOpen(true); }} className="w-full sm:w-auto">
+                    <Button onClick={() => { setEditingSession(null); setFormData({ name: "", subject: "", type: "", mode: "", date: "", time: "", venue: "", judges: [], abstractIds: [], delegateTypeFilter: "All" }); setIsDialogOpen(true); }} className="w-full sm:w-auto">
                         <Plus className="w-4 h-4 mr-2" /> Schedule Session
                     </Button>
                 </div>
@@ -710,6 +714,21 @@ export default function SessionManagement() {
                                 </Select>
                             </div>
                             <div className="space-y-2">
+                                <Label>Delegate Type Filter</Label>
+                                <Select value={formData.delegateTypeFilter || "All"} onValueChange={(val) => updateForm("delegateTypeFilter", val)}>
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="All Delegate Types" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="All">All Delegate Types</SelectItem>
+                                        <SelectItem value="UG">UG</SelectItem>
+                                        <SelectItem value="PG">PG</SelectItem>
+                                        <SelectItem value="Academician">Academician</SelectItem>
+                                        <SelectItem value="Clinician">Clinician</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                            <div className="space-y-2">
                                 <Label>Date</Label>
                                 <Input type="date" value={formData.date || ""} onChange={e => updateForm("date", e.target.value)} />
                             </div>
@@ -760,7 +779,7 @@ export default function SessionManagement() {
                                                     {abs.title}
                                                 </label>
                                                 <p className="text-xs text-muted-foreground">
-                                                    {abs.studentId} | {abs.subject}
+                                                    {students.find(s => s.id === abs.studentId)?.name || abs.studentId} | {abs.subject} | {students.find(s => s.id === abs.studentId)?.delegateType || 'UG'}
                                                 </p>
                                             </div>
                                         </div>
