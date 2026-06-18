@@ -1185,8 +1185,8 @@ export const addSession = async (session: Omit<Session, "id">) => {
     if (sessionError) throw sessionError;
     const sessionId = newSession.id;
 
-    // 2. Insert Judges if any (only for competitive sessions)
-    if (!isNonComp && session.judges && session.judges.length > 0) {
+    // 2. Insert Judges if any
+    if (session.judges && session.judges.length > 0) {
         for (const judgeId of session.judges) {
             const { count, error: countError } = await supabase
                 .from('session_judges')
@@ -1278,7 +1278,7 @@ export const updateSession = async (id: string, updates: Partial<Session>) => {
 
     // Update Judges
     if (updates.judges !== undefined) {
-        if (!isNonComp && updates.judges.length > 0) {
+        if (updates.judges.length > 0) {
             for (const judgeId of updates.judges) {
                 const { count, error: countError } = await supabase
                     .from('session_judges')
@@ -1294,7 +1294,7 @@ export const updateSession = async (id: string, updates: Partial<Session>) => {
             }
         }
         await supabase.from('session_judges').delete().eq('sessionId', id);
-        if (!isNonComp && updates.judges.length > 0) {
+        if (updates.judges.length > 0) {
             const judgePayloads = updates.judges.map(judgeId => ({
                 sessionId: id,
                 judgeId,
