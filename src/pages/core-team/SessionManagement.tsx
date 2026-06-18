@@ -1,5 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 import {
     getSessions,
     addSession,
@@ -161,66 +163,67 @@ export default function SessionManagement() {
     };
 
     const handleDownloadPDF = (session: Session) => {
-        import("jspdf").then(({ default: jsPDF }) => {
-            import("jspdf-autotable").then(() => {
-                const doc = new jsPDF();
-                
-                doc.setFont("helvetica");
+        try {
+            const doc = new jsPDF();
+            
+            doc.setFont("helvetica");
 
-                const dateStr = session.date ? new Date(session.date).toLocaleDateString() : "TBD";
-                const timeStr = session.time || "TBD";
-                const isIcon = currentProgram === 'ICON';
-                const idLabel = isIcon ? 'ICON ID' : 'MIDAS ID';
-                
-                doc.setFontSize(11);
-                doc.text(`Date: ${dateStr}`, 14, 20);
-                doc.text(`Time: ${timeStr}`, 140, 20);
-                
-                doc.setFontSize(14);
-                doc.setFont("helvetica", "bold");
-                doc.text(`VENUE: ${session.name.toUpperCase()}`, 14, 30);
-                
-                doc.setFontSize(12);
-                doc.setFont("helvetica", "normal");
-                doc.text(`LECTURE HALL - ${session.venue.toUpperCase()}`, 14, 38);
+            const dateStr = session.date ? new Date(session.date).toLocaleDateString() : "TBD";
+            const timeStr = session.time || "TBD";
+            const isIcon = currentProgram === 'ICON';
+            const idLabel = isIcon ? 'ICON ID' : 'MIDAS ID';
+            
+            doc.setFontSize(11);
+            doc.text(`Date: ${dateStr}`, 14, 20);
+            doc.text(`Time: ${timeStr}`, 140, 20);
+            
+            doc.setFontSize(14);
+            doc.setFont("helvetica", "bold");
+            doc.text(`VENUE: ${session.name.toUpperCase()}`, 14, 30);
+            
+            doc.setFontSize(12);
+            doc.setFont("helvetica", "normal");
+            doc.text(`LECTURE HALL - ${session.venue.toUpperCase()}`, 14, 38);
 
-                const sessionAbstracts = abstracts.filter(a => session.abstractIds.includes(a.id));
-                const tableData = sessionAbstracts.map((ab, index) => {
-                    const student = students.find(s => s.id === ab.studentId);
-                    return [
-                        (index + 1).toString(),
-                        student?.name || "Unknown",
-                        student?.midasId || "N/A",
-                        ab.title || "No Topic"
-                    ];
-                });
-
-                if (tableData.length < 5) {
-                    for (let i = tableData.length; i < 5; i++) {
-                        tableData.push([(i + 1).toString(), "", "", ""]);
-                    }
-                }
-
-                (doc as any).autoTable({
-                    startY: 45,
-                    head: [["S.No.", "NAME OF STUDENT", idLabel, "TOPIC"]],
-                    body: tableData,
-                    theme: "grid",
-                    headStyles: { fillColor: [240, 240, 240], textColor: [0, 0, 0], fontStyle: "bold", lineWidth: 0.1, lineColor: [0, 0, 0] },
-                    bodyStyles: { textColor: [0, 0, 0], lineWidth: 0.1, lineColor: [0, 0, 0] },
-                    styles: { fontSize: 10, cellPadding: 3 },
-                    columnStyles: {
-                        0: { cellWidth: 15 },
-                        1: { cellWidth: 50 },
-                        2: { cellWidth: 40 },
-                        3: { cellWidth: 'auto' }
-                    }
-                });
-
-                const filename = `${session.name.replace(/[^a-zA-Z0-9-]/g, '_')}.pdf`;
-                doc.save(filename);
+            const sessionAbstracts = abstracts.filter(a => session.abstractIds.includes(a.id));
+            const tableData = sessionAbstracts.map((ab, index) => {
+                const student = students.find(s => s.id === ab.studentId);
+                return [
+                    (index + 1).toString(),
+                    student?.name || "Unknown",
+                    student?.midasId || "N/A",
+                    ab.title || "No Topic"
+                ];
             });
-        });
+
+            if (tableData.length < 5) {
+                for (let i = tableData.length; i < 5; i++) {
+                    tableData.push([(i + 1).toString(), "", "", ""]);
+                }
+            }
+
+            autoTable(doc, {
+                startY: 45,
+                head: [["S.No.", "NAME OF STUDENT", idLabel, "TOPIC"]],
+                body: tableData,
+                theme: "grid",
+                headStyles: { fillColor: [240, 240, 240], textColor: [0, 0, 0], fontStyle: "bold", lineWidth: 0.1, lineColor: [0, 0, 0] },
+                bodyStyles: { textColor: [0, 0, 0], lineWidth: 0.1, lineColor: [0, 0, 0] },
+                styles: { fontSize: 10, cellPadding: 3 },
+                columnStyles: {
+                    0: { cellWidth: 15 },
+                    1: { cellWidth: 50 },
+                    2: { cellWidth: 40 },
+                    3: { cellWidth: 'auto' }
+                }
+            });
+
+            const filename = `${session.name.replace(/[^a-zA-Z0-9-]/g, '_')}.pdf`;
+            doc.save(filename);
+        } catch (error) {
+            console.error("Failed to generate PDF:", error);
+            toast({ title: "Error", description: "Failed to generate PDF.", variant: "destructive" });
+        }
     };
 
     const handleSaveSession = async () => {
