@@ -773,7 +773,7 @@ export default function SessionManagement() {
                                 <span>{session.abstractIds.length} Presentations</span>
                             </div>
                             <div className="flex flex-col gap-2 mt-3">
-                                <div className="flex gap-2">
+                                <div className="flex flex-col gap-2">
                                     {session.status === "completed" ? (
                                         <Button 
                                             variant="default" 
