@@ -27,8 +27,10 @@ import {
     SelectValue
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
-import { Plus, Search, Trash2, Edit, FileSpreadsheet } from "lucide-react";
-import { getJudges, addJudge, updateJudge, deleteJudge, getCollegesList } from "@/services/supabaseService";
+import { Plus, Search, Trash2, Edit, FileSpreadsheet, Upload, Mail } from "lucide-react";
+import { useRef } from "react";
+import { getJudges, addJudge, updateJudge, deleteJudge, getCollegesList, resetUserPassword } from "@/services/supabaseService";
+import { sendAccountCreationEmail } from "@/services/emailService";
 import { Judge, JudgeType } from "@/types";
 import { useToast } from "@/hooks/use-toast";
 import { useProgram } from "@/contexts/ProgramContext";
@@ -55,6 +57,7 @@ export default function AdminJudges() {
     const [collegesList, setCollegesList] = useState<{ value: string, label: string }[]>([]);
     const { toast } = useToast();
     const { currentProgram } = useProgram();
+    const fileInputRef = useRef<HTMLInputElement>(null);
 
     const [formData, setFormData] = useState<Partial<Judge>>({
         name: "",
@@ -143,6 +146,28 @@ export default function AdminJudges() {
         }
     };
 
+    const handleSendMail = async (judge: Judge) => {
+        if (!judge.email) {
+            toast({ title: "Error", description: "Judge has no email address.", variant: "destructive" });
+            return;
+        }
+        try {
+            toast({ title: "Sending Mail", description: "Generating new password and sending email..." });
+            const tempPassword = await resetUserPassword(judge.email);
+            await sendAccountCreationEmail({
+                user_name: judge.name,
+                user_email: judge.email,
+                temp_password: tempPassword,
+                login_url: window.location.origin + "/member-login",
+                role: "judge"
+            });
+            toast({ title: "Mail Sent", description: `Login details sent to ${judge.email}.` });
+        } catch (error) {
+            console.error(error);
+            toast({ title: "Error", description: "Failed to send email.", variant: "destructive" });
+        }
+    };
+
     const handleExport = () => {
         const headers = ["Name", "Specialization", "Type", "Affiliation", "Email", "Contact", "Time Slots"];
         const csvContent = [
@@ -170,6 +195,48 @@ export default function AdminJudges() {
         toast({ title: "Exported", description: "Judge list downloaded successfully." });
     };
 
+    const handleBulkUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = async (event) => {
+            const text = event.target?.result as string;
+            const lines = text.split('\n').filter(line => line.trim() !== '');
+            if (lines.length < 2) return;
+            
+            // Assume format: Name,Category,Phone Number,College
+            const parsedJudges = lines.slice(1).map(line => {
+                const parts = line.split(',');
+                return {
+                    name: parts[0]?.trim() || "",
+                    type: parts[1]?.toLowerCase().includes("non") ? "Non-Academic" : "Academic",
+                    contact: parts[2]?.trim() || "",
+                    affiliation: parts[3]?.trim() || "",
+                    email: `${parts[0]?.replace(/[^a-zA-Z]/g, '').toLowerCase() || "judge"}@example.com`,
+                    specialization: "Other",
+                    status: "Available",
+                    program: currentProgram
+                };
+            }).filter(j => j.name);
+
+            try {
+                let successCount = 0;
+                for (const j of parsedJudges) {
+                    await addJudge(j as Judge);
+                    successCount++;
+                }
+                toast({ title: "Bulk Upload Complete", description: `Successfully added ${successCount} judges.` });
+                loadJudges();
+            } catch (err) {
+                console.error(err);
+                toast({ title: "Error", description: "Some judges failed to upload.", variant: "destructive" });
+            }
+            if (fileInputRef.current) fileInputRef.current.value = '';
+        };
+        reader.readAsText(file);
+    };
+
     const filteredJudges = judges.filter(j =>
         j.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         j.specialization.toLowerCase().includes(searchQuery.toLowerCase())
@@ -182,7 +249,17 @@ export default function AdminJudges() {
                     <h2 className="text-2xl font-bold font-display">{currentProgram === 'ICON' ? 'ICON' : 'MIDAS'} Judge Management</h2>
                     <p className="text-muted-foreground">Manage {currentProgram === 'ICON' ? 'Madras ICON' : 'MIDAS'} judge profiles and assignments.</p>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2">
+                    <input 
+                        type="file" 
+                        accept=".csv" 
+                        ref={fileInputRef} 
+                        style={{ display: 'none' }} 
+                        onChange={handleBulkUpload} 
+                    />
+                    <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()}>
+                        <Upload className="w-4 h-4 mr-2" /> Bulk Upload
+                    </Button>
                     <Button variant="outline" size="sm" onClick={handleExport}>
                         <FileSpreadsheet className="w-4 h-4 mr-2" /> Export
                     </Button>
@@ -361,6 +438,9 @@ export default function AdminJudges() {
                                     </TableCell>
                                     <TableCell className="text-right">
                                         <div className="flex justify-end gap-2">
+                                            <Button variant="ghost" size="icon" onClick={() => handleSendMail(judge)} title="Send Login Email">
+                                                <Mail className="w-4 h-4" />
+                                            </Button>
                                             <Button variant="ghost" size="icon" onClick={() => handleEdit(judge)}>
                                                 <Edit className="w-4 h-4" />
                                             </Button>
