@@ -17,6 +17,8 @@ import {
     DialogContent,
     DialogHeader,
     DialogTitle,
+    DialogDescription,
+    DialogFooter,
     DialogTrigger
 } from "@/components/ui/dialog";
 import {
@@ -58,6 +60,8 @@ export default function AdminJudges() {
     const { toast } = useToast();
     const { currentProgram } = useProgram();
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const [bulkJudgesPreview, setBulkJudgesPreview] = useState<Partial<Judge>[] | null>(null);
+    const [isBulkUploading, setIsBulkUploading] = useState(false);
 
     const [formData, setFormData] = useState<Partial<Judge>>({
         name: "",
@@ -205,36 +209,55 @@ export default function AdminJudges() {
             const lines = text.split('\n').filter(line => line.trim() !== '');
             if (lines.length < 2) return;
             
-            // Assume format: Name,Category,Phone Number,College
+            const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+            
+            const getIdx = (matches: string[]) => headers.findIndex(h => matches.some(m => h.includes(m)));
+            
+            const nameIdx = getIdx(['name']);
+            const emailIdx = getIdx(['email']);
+            const specIdx = getIdx(['specialization', 'spec']);
+            const typeIdx = getIdx(['type', 'category']);
+            const affIdx = getIdx(['affiliation', 'college']);
+            const phoneIdx = getIdx(['phone', 'contact']);
+
             const parsedJudges = lines.slice(1).map(line => {
                 const parts = line.split(',');
                 return {
-                    name: parts[0]?.trim() || "",
-                    type: parts[1]?.toLowerCase().includes("non") ? "Non-Academic" : "Academic",
-                    contact: parts[2]?.trim() || "",
-                    affiliation: parts[3]?.trim() || "",
-                    email: `${parts[0]?.replace(/[^a-zA-Z]/g, '').toLowerCase() || "judge"}@example.com`,
-                    specialization: "Other",
+                    name: nameIdx !== -1 ? parts[nameIdx]?.trim() || "" : parts[0]?.trim() || "",
+                    email: emailIdx !== -1 && parts[emailIdx]?.trim() ? parts[emailIdx]?.trim() : `${(nameIdx !== -1 ? parts[nameIdx] : parts[0])?.replace(/[^a-zA-Z]/g, '').toLowerCase() || "judge"}@example.com`,
+                    specialization: specIdx !== -1 ? parts[specIdx]?.trim() || "Other" : "Other",
+                    type: typeIdx !== -1 ? (parts[typeIdx]?.toLowerCase().includes("non") ? "Non-Academic" : "Academic") : "Academic",
+                    affiliation: affIdx !== -1 ? parts[affIdx]?.trim() || "" : "",
+                    contact: phoneIdx !== -1 ? parts[phoneIdx]?.trim() || "" : "",
                     status: "Available",
                     program: currentProgram
                 };
             }).filter(j => j.name);
 
-            try {
-                let successCount = 0;
-                for (const j of parsedJudges) {
-                    await addJudge(j as Judge);
-                    successCount++;
-                }
-                toast({ title: "Bulk Upload Complete", description: `Successfully added ${successCount} judges.` });
-                loadJudges();
-            } catch (err) {
-                console.error(err);
-                toast({ title: "Error", description: "Some judges failed to upload.", variant: "destructive" });
-            }
+            setBulkJudgesPreview(parsedJudges);
             if (fileInputRef.current) fileInputRef.current.value = '';
         };
         reader.readAsText(file);
+    };
+
+    const confirmBulkUpload = async () => {
+        if (!bulkJudgesPreview) return;
+        setIsBulkUploading(true);
+        try {
+            let successCount = 0;
+            for (const j of bulkJudgesPreview) {
+                await addJudge(j as Judge);
+                successCount++;
+            }
+            toast({ title: "Bulk Upload Complete", description: `Successfully added ${successCount} judges.` });
+            loadJudges();
+            setBulkJudgesPreview(null);
+        } catch (err) {
+            console.error(err);
+            toast({ title: "Error", description: "Some judges failed to upload.", variant: "destructive" });
+        } finally {
+            setIsBulkUploading(false);
+        }
     };
 
     const filteredJudges = judges.filter(j =>
@@ -455,6 +478,49 @@ export default function AdminJudges() {
                     </TableBody>
                 </Table>
             </div>
+            <Dialog open={bulkJudgesPreview !== null} onOpenChange={(open) => { if (!open) setBulkJudgesPreview(null); }}>
+                <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+                    <DialogHeader>
+                        <DialogTitle>Confirm Bulk Upload</DialogTitle>
+                        <DialogDescription>
+                            You are about to upload {bulkJudgesPreview?.length} judges. Please review the details below before confirming.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="border rounded-md mt-4 overflow-x-auto">
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>Name</TableHead>
+                                    <TableHead>Email</TableHead>
+                                    <TableHead>Specialization</TableHead>
+                                    <TableHead>Type</TableHead>
+                                    <TableHead>Affiliation</TableHead>
+                                    <TableHead>Contact</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {bulkJudgesPreview?.map((judge, idx) => (
+                                    <TableRow key={idx}>
+                                        <TableCell>{judge.name}</TableCell>
+                                        <TableCell>{judge.email}</TableCell>
+                                        <TableCell>{judge.specialization}</TableCell>
+                                        <TableCell>{judge.type}</TableCell>
+                                        <TableCell>{judge.affiliation}</TableCell>
+                                        <TableCell>{judge.contact}</TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    </div>
+                    <DialogFooter className="mt-4">
+                        <Button variant="outline" onClick={() => setBulkJudgesPreview(null)} disabled={isBulkUploading}>Cancel</Button>
+                        <Button onClick={confirmBulkUpload} disabled={isBulkUploading}>
+                            {isBulkUploading ? "Uploading..." : "Confirm & Upload"}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
         </div>
     );
 }
