@@ -25,8 +25,8 @@ const EMAILJS_CONFIG = {
         acceptance: 'template_midas_accpt',  // Provisional acceptance
         approval: 'template_rt3pe6e',    // Staff Approval with Temp Password
         account_creation: 'template_rt3pe6e', // For Judges, Core Team, etc.
-        student_session: 'template_student_session', // Add real template ID
-        judge_session: 'template_judge_session', // Add real template ID
+        student_session: 'template_yemm6o9', 
+        judge_session: 'template_gtft45t',
     },
 };
 
