@@ -536,7 +536,7 @@ export const bulkAddEventStudents = async (studentsData: {
 
 // --- JUDGES ---
 export const getJudges = async (program?: string): Promise<Judge[]> => {
-    let query = supabase.from('judges').select('*, members!memberId(email)');
+    let query = supabase.from('judges').select('*, members!memberId(email, phone)');
     if (program) query = query.eq('program', program);
     
     const { data, error } = await query;
@@ -566,7 +566,7 @@ export const getJudges = async (program?: string): Promise<Judge[]> => {
         type: (j.isAcademic ?? j.is_academic) ? 'Academic' : 'Non-Academic',
         affiliation: j.college || '',
         email: j.members?.email || '',
-        contact: '',
+        contact: j.members?.phone || j.phone || '',
         status: 'Available',
         timeSlots: j.time_slots || [],
         program: j.program
@@ -588,6 +588,7 @@ export const addJudge = async (judge: Omit<Judge, 'id'>) => {
             email: judge.email,
             password: hashedPassword,
             name: judge.name,
+            phone: judge.contact || null,
             role: 'JUDGE',
             isActive: true,
             program: normalizedProgram,
@@ -641,10 +642,26 @@ export const updateJudge = async (id: string, updates: Partial<Judge>) => {
     if (updates.affiliation !== undefined) dbUpdates.college = updates.affiliation;
     if (updates.timeSlots !== undefined) dbUpdates.time_slots = updates.timeSlots;
 
-    const { error } = await supabase.from('judges').update(dbUpdates).eq('id', id);
-    if (error) throw error;
+    if (Object.keys(dbUpdates).length > 0) {
+        const { error } = await supabase.from('judges').update(dbUpdates).eq('id', id);
+        if (error) throw error;
+    }
 
-    await logAction('UPDATE_JUDGE', 'judges', id, dbUpdates);
+    if (updates.contact !== undefined || updates.name !== undefined || updates.email !== undefined) {
+        const { data: judgeData } = await supabase.from('judges').select('memberId').eq('id', id).single();
+        if (judgeData?.memberId) {
+            const memberUpdates: any = {};
+            if (updates.contact !== undefined) memberUpdates.phone = updates.contact;
+            if (updates.name !== undefined) memberUpdates.name = updates.name;
+            if (updates.email !== undefined) memberUpdates.email = updates.email;
+            
+            if (Object.keys(memberUpdates).length > 0) {
+                await supabase.from('members').update(memberUpdates).eq('id', judgeData.memberId);
+            }
+        }
+    }
+
+    await logAction('UPDATE_JUDGE', 'judges', id, updates);
 };
 
 export const deleteJudge = async (id: string) => {
