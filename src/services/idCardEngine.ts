@@ -82,8 +82,14 @@ export async function generateIdCardPDF(
     const pageWidth = firstPage.getWidth();
     const pageHeight = firstPage.getHeight();
 
-    // The left sidebar (red/blue) takes about 55 points.
-    const startX = 55;
+    const isOrganiser = details.templateName === 'ORGANISER_ID.pdf' || 
+                        details.templateName === 'organiser (1).pdf';
+    
+    const isVendor = details.templateName === 'VENDOR_ID.pdf' || 
+                     details.templateName === 'VENDORS (1).pdf';
+
+    // The left sidebar (red/blue/orange) takes about 55 points.
+    const startX = isOrganiser ? 0 : 55;
     const availableWidth = pageWidth - startX;
     const centerX = startX + (availableWidth / 2);
 
@@ -92,13 +98,24 @@ export async function generateIdCardPDF(
 
     // New coordinates for ~269x357 PDF size
     // Adjusting these to fit neatly into the white area
-    const nameY = 180;
-    const iconIdY = 155;
-    const regIdY = 130;
+    const nameY = 175;
+    const iconIdY = 150;
+    const regIdY = 125;
     
     // Make QR smaller and place it between Reg ID and the venue text
     const qrSize = 55;
-    const qrY = 65;
+    const qrY = isOrganiser ? 75 : 65; // move it up slightly so it doesn't overlap text
+
+    let primaryColor = rgb(0.12, 0.22, 0.4);
+    let secondaryColor = rgb(0.3, 0.3, 0.3);
+
+    if (isOrganiser) {
+        primaryColor = rgb(1, 1, 1);
+        secondaryColor = rgb(0.9, 0.9, 0.9);
+    } else if (isVendor) {
+        primaryColor = rgb(0, 0, 0); // Pure black as requested
+        secondaryColor = rgb(0, 0, 0);
+    }
 
     // 2. Draw Name
     const nameText = details.studentName.toUpperCase();
@@ -117,32 +134,36 @@ export async function generateIdCardPDF(
         y: nameY,
         size: finalNameSize,
         font: helveticaBold,
-        color: rgb(0.12, 0.22, 0.4),
+        color: primaryColor,
     });
 
     // 3. Draw ICON ID
-    const iconIdText = `ICON ID: ${details.iconId}`;
-    const iconIdSize = 14;
-    const iconIdWidth = helveticaBold.widthOfTextAtSize(iconIdText, iconIdSize);
-    firstPage.drawText(iconIdText, {
-        x: centerX - (iconIdWidth / 2),
-        y: iconIdY,
-        size: iconIdSize,
-        font: helveticaBold,
-        color: rgb(0.2, 0.2, 0.2),
-    });
+    if (details.iconId && details.iconId !== 'PENDING') {
+        const iconIdText = `ICON ID: ${details.iconId}`;
+        const iconIdSize = 14;
+        const iconIdWidth = helveticaBold.widthOfTextAtSize(iconIdText, iconIdSize);
+        firstPage.drawText(iconIdText, {
+            x: centerX - (iconIdWidth / 2),
+            y: iconIdY,
+            size: iconIdSize,
+            font: helveticaBold,
+            color: primaryColor,
+        });
+    }
 
     // 4. Draw Registration ID (if exists)
     if (details.registrationId) {
         const regIdText = `Reg ID: ${details.registrationId}`;
-        const regIdSize = 12;
+        const regIdSize = 14; // Making it slightly bigger since it's replacing icon ID
         const regIdWidth = helvetica.widthOfTextAtSize(regIdText, regIdSize);
+        const actualRegIdY = (details.iconId && details.iconId !== 'PENDING') ? regIdY : iconIdY;
+
         firstPage.drawText(regIdText, {
             x: centerX - (regIdWidth / 2),
-            y: regIdY,
+            y: actualRegIdY,
             size: regIdSize,
             font: helvetica,
-            color: rgb(0.3, 0.3, 0.3),
+            color: secondaryColor,
         });
     }
 

@@ -1,0 +1,90 @@
+
+
+S.NoNameReg.IdPCCContactCollege
+1Dr.SUMAIYA FATHIMA TPD008PCC3 6383093878 Chettinad Dental College & Research Institute
+2Dr.Yoshita GuntupalliPD009PCC39789947504 Chettinad Dental College & Research Institute
+3Dr.Divya Raji RPD011PCC3  9962012035 Chettinad Dental College & Research Institute
+4 Dr.Subashree PPD012PCC38056520044 Chettinad Dental College & Research Institute
+5Dr.Gowtham E KPD013PCC36380955157 Chettinad Dental College & Research Institute
+6Dr.Sree lakshmi SudhakaranPD014PCC3 9500956957 Chettinad Dental College & Research Institute
+7Dr. I SHIYAM SUNDHARPD016PCC3 8072504454 Chettinad Dental College & Research Institute
+8Dr.S.SowmiyaPD017PCC36380211507 Chettinad Dental College & Research Institute
+9Dr.Sagaya cyril stegy.sPD018PCC37358496395 Chettinad Dental College & Research Institute
+10Dr.Bharathi RPD019PCC3 9080364273 Chettinad Dental College & Research Institute
+11Dr.Sumaiya banu.sPD020 PCC3 9025307584 Chettinad Dental College & Research Institute
+12Dr.P.Gayathri Sivagama sundari PD022PCC39003562808 Chettinad Dental College & Research Institute
+13Dr.Saranya Aathilingaperumal .PD025PCC47397528722Sree Balaji Dental College and Hospital
+14Dr.SushmaaPD030PCC28248094784 Chettinad Dental College & Research Institute
+15Dr. AMIRTHA VARSHINIPD031PCC28098088955 Chettinad Dental College & Research Institute
+16 Dr.ASWATHI BPD032PCC27871347873 Chettinad Dental College & Research Institute
+17Dr. MANEESHA NALINAKSHANPD033PCC2 7397456944 Chettinad Dental College & Research Institute
+18Dr Divya Bharathi S PD036PCC2 8610731232 Chettinad Dental College & Research Institute
+19 Dr. Akshaya.APD037 PCC26383363208 Chettinad Dental College & Research Institute
+20Dr.Chemmalar NC PD0407395995851Meenakshi Ammal Dental College & Hospital
+21 Dr.Maria Sharon V PD0428124448902 Saveetha Dental College and Hospital
+22Dr.R.VijayalakshmiPD043PCC19710205758Sri Venkateswara Dental College & Hospital
+23Dr.S.Durga Devi SriPD044PCC 18778445775Sri Venkateswara Dental College & Hospital
+24Dr Rangeela MPD045PCC 19952075441Sri Venkateswara Dental College & Hospital
+25Dr.Hazel Susan MathewPD046PCC 19790768239Sri Venkateswara Dental College & Hospital
+26Dr.Divya Darsini Sathiyanarayanan PD047PCC 18925539615Sri Venkateswara Dental College & Hospital
+27Dr.Charumathy RPD048PCC 19952846855Sri Venkateswara Dental College & Hospital
+28Dr.Mano GayathriPD049PCC 17598352616Sri Venkateswara Dental College & Hospital
+29Dr.Iswarya TPD050PCC 16382680630Sri Venkateswara Dental College & Hospital
+30Dr.Nowfiya MPD050 APCC 16385498466Sri Venkateswara Dental College & Hospital
+31 Dr.Padmaja SPD0616379319094Meenakshi Ammal Dental College & Hospital
+32Dr.VARSHINI RPD0629962190409Sri Ramachandra Dental College and Hospital
+33Dr.VANATHI DEVI VPD064PCC26382565131Meenakshi Ammal Dental College & Hospital
+
+34Dr.JAHNNAVI SPD066PCC3 7708336562Meenakshi Ammal Dental College & Hospital
+35Dr.Thana lakshme P SPD067PCC 66385375146Meenakshi Ammal Dental College & Hospital
+36Dr.SRIDEVI RPD070PCC47305302847Meenakshi Ammal Dental College & Hospital
+37Dr.A.KEERTHANAPD071PCC29676491426Meenakshi Ammal Dental College & Hospital
+38Dr.Amizhthan Sammanthane PD072PCC27708249854Indira Gandhi Institute of Dental Science
+39Dr.Roshini GPD0739789899599Meenakshi Ammal Dental College & Hospital
+40Dr. RAJAMADEVI. DPD0756385381241Tagore Dental College & Hospital
+41Dr . L. kopperundevi PD0769597674727Sree Balaji Dental College and Hospital
+42Dr.GAURI VILAS PATILPD0779834124815Meenakshi Ammal Dental College & Hospital
+43 Dr.PAVITHRA D PD0789498313779Meenakshi Ammal Dental College & Hospital
+44 Dr Neelima manojPCC28281853068Meenakshi Ammal Dental College & Hospital
+45Dr.Emerald Blessye TPD080PCC46374057464Sri Venkateswara Dental College & Hospital
+46Dr.K.ThirumagalPD081PCC 67010690970Meenakshi Ammal Dental College & Hospital
+47 Dr K RanjimaPD082PCC16282914406Saveetha Dental College and Hospital
+48 Dr.Kavya YaramapuPD084PCC16305155565SRM Ramapuram Dental College and Hospital
+49Dr.Roselle VasPD086PCC 49834942062SRM Ramapuram Dental College and Hospital
+50 Dr Simon ChouhanPD0889003032474Sree Balaji Dental College and Hospital
+51Dr.Rapati NithyaPD089PCC1 -9573367730Sree Balaji Dental College and Hospital
+52Dr.Bovaz BPD0928939417134Sri Venkateswara Dental College & Hospital
+53Dr.Varsha ViswanathanPD094PCC18939125614Sree Balaji Dental College and Hospital
+54Dr.SNEHHA SPD095PCC1 9361655976Sree Balaji Dental College and Hospital
+55Dr.Rajshri RPD096PCC19884673531Sree Balaji Dental College and Hospital
+56Dr.Swathi K RPD097PCC46369934418Sri Venkateswara Dental College & Hospital
+57Dr.Suvalekha APD099PCC46379842445Sri Venkateswara Dental College & Hospital
+58Dr.VigneshPD100PCC 49444246610Sri Venkateswara Dental College & Hospital
+59Dr. Gladson Samuel Raj APD1019600164944Sree Balaji Dental College and Hospital
+60Dr.Sweetlin Abi PD1049600287563Sree Balaji Dental College and Hospital
+61Dr.Karthik ValliappanPD105PCC 59833947110Sree Balaji Dental College and Hospital
+62Dr. Gayathri SPD106PCC - 6 9791117146Sree Balaji Dental College and Hospital
+63Dr.Sayantani MukherjeePD107PCC - 66205305608Sree Balaji Dental College and Hospital
+64Dr Nandini MPD108PCC - 6 7736619920Sree Balaji Dental College and Hospital
+65Dr. Radha MuraleedharanPD111PCC - 6 :6238551910Sree Balaji Dental College and Hospital
+66Dr.Balasubramaniam.VPD1127904428644Sree Balaji Dental College and Hospital
+67Dr.Raghavendhran SathyanaryananPCC 68220230863Sree Balaji Dental College and Hospital
+
+68Dr.Pranav SocratesPD113 PCC5  9382829999Sree Balaji Dental College and Hospital
+69Dr.Medlyn Marisha X PD1146369490409Sree Balaji Dental College and Hospital
+70Dr.Kaviyavarshini GPD116 PCC - 6 8939539109Sree Balaji Dental College and Hospital
+71Dr.Abarna APD117PCC - 6 6382721187Sree Balaji Dental College and Hospital
+72 Dr. B. YASASWINIPD118PCC5 8921240756Sree Balaji Dental College and Hospital
+73Dr Ramitha ChandranPD119PCC5  9747672886Sree Balaji Dental College and Hospital
+74Dr.Akanksha SharmaPD1209879372282Sree Balaji Dental College and Hospital
+75Dr.Kirthieka SPD1219840181233Sree Balaji Dental College and Hospital
+76Dr. Nivedhita. GPD1227397430896Sree Balaji Dental College and Hospital
+77Dr. Rieshy. VPD1239361437325Sree Balaji Dental College and Hospital
+78Dr Nithan SPD1249994017762Sree Balaji Dental College and Hospital
+79Dr.Sangeetha ArunPD125PCC - 6 :9496052955Sree Balaji Dental College and Hospital
+80Dr.Gopiga V SPD126 PCC57540005118Sree Balaji Dental College and Hospital
+81Dr.Sowndharya NPD127PCC - 69962861299Sree Balaji Dental College and Hospital
+82Dr. Pratheebha CPD128 PCC - 69514922999Sree Balaji Dental College and Hospital
+83Dr.Nandhini SivakumarPD1307904801612Sree Balaji Dental College and Hospital
+84Dr.Trisha RavichandranPD131PCC - 66381345487Sree Balaji Dental College and Hospital
+85Dr.Trinita HPD132PCC58300346367Sree Balaji Dental College and Hospital

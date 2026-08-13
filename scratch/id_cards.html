@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Delegate ID Cards</title>
+    <style>
+        :root {
+            --primary-color: #2c3e50;
+            --secondary-color: #3498db;
+            --accent-color: #e74c3c;
+            --background-color: #ecf0f1;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f0f0f0;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 20px;
+        }
+
+        .id-card {
+            width: 3in;
+            height: 4in;
+            background-color: white;
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            position: relative;
+            box-sizing: border-box;
+            border: 1px solid #ccc;
+            page-break-inside: avoid;
+        }
+
+        .header {
+            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+            color: white;
+            text-align: center;
+            padding: 20px 10px;
+        }
+
+        .header h1 {
+            margin: 0;
+            font-size: 1.2rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .header p {
+            margin: 5px 0 0;
+            font-size: 0.8rem;
+            opacity: 0.8;
+        }
+
+        .photo-placeholder {
+            width: 80px;
+            height: 80px;
+            background-color: var(--background-color);
+            border-radius: 50%;
+            margin: -40px auto 10px;
+            border: 4px solid white;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: #bdc3c7;
+            font-size: 2rem;
+        }
+
+        .content {
+            padding: 10px 20px;
+            text-align: center;
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-start;
+        }
+
+        .name {
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: var(--primary-color);
+            margin: 10px 0 5px;
+            min-height: 2.4rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .role {
+            font-size: 0.9rem;
+            color: var(--accent-color);
+            font-weight: bold;
+            text-transform: uppercase;
+            margin-bottom: 15px;
+        }
+
+        .details {
+            font-size: 0.8rem;
+            color: #555;
+            text-align: left;
+            margin-top: auto;
+            margin-bottom: 20px;
+            width: 100%;
+        }
+
+        .details-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 5px;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 2px;
+        }
+
+        .details-label {
+            font-weight: bold;
+            color: #7f8c8d;
+        }
+
+        .footer {
+            background-color: var(--primary-color);
+            color: white;
+            text-align: center;
+            padding: 10px;
+            font-size: 0.7rem;
+        }
+
+        .qr-placeholder {
+            position: absolute;
+            bottom: 40px;
+            right: 20px;
+            width: 40px;
+            height: 40px;
+            background-color: #eee;
+            border: 1px solid #ccc;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 0.5rem;
+            color: #999;
+        }
+
+        @media print {
+            body {
+                background-color: white;
+                padding: 0;
+            }
+            .id-card {
+                box-shadow: none;
+                border: 1px dashed #ccc;
+            }
+            @page {
+                margin: 0.5in;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<script id="raw-data" type="text/plain">
+1 DG016 Priya lochana Gajendran priyalochana.87@gmail.com 9941413881 PCC4 - Dr.Jabin Thomas:Tilted implants
+2 DG024 Hadis Atajafari hadismoses@gmail.com 9884770377 PCC1 - Dr.Premila and Dr Daya - Beyond the Beam: An Evidence - Based Evaluation of Laser Dentistry and Photobiomodulation in Clinical Practice 
+3 DG026 Dr. Ananthi S doctor.ananthi@gmail.com 8883935186 PCC2 - Dr.Abhishek Laha : Aesthetics Redefined
+4 DG029 Dr.A.R. AkbaR drakbarmds@gmail.com 9283143786 PCC2 - Dr.Abhishek Laha : Aesthetics Redefined
+5 DG034 Fayeez Abdullah drfayeez4u@gmail.com 9941118567 PCC3 - Dr.Arunachalam: Prosthetically Driven Digital Implant Planning and Guided Placement
+6 DG035 Dr Kaushal Kishore drkaush@gmail.com 9840535353 PCC4 - Dr.Jabin Thomas:Tilted implants
+7 DG038 Dr.Sasikala.C drsasikala20@gmail.com 9840125228 PCC4 - Dr.Jabin Thomas:Tilted implants
+8 DG041 Dr.R.BASKAR drbaskarramachandran@gmail.com 6369645927 PCC5 - Dr.Ganesh Jeevanandham Topic : Rotary Pedodontics
+9 DG043 Dr sivaranjani R drsivaranjani@outlook.com 9997797777 PCC4 - Dr.Jabin Thomas:Tilted implants
+10 DG046 Dr Sakthivel Rajendran dr.r.sakthivel@gmail.com 9884249289 PCC3 - Dr.Arunachalam: Prosthetically Driven Digital Implant Planning and Guided Placement
+11 DG047 Ravindra Kumar Jain ravindrakumar@saveetha.com 9884729660 PCC2 - Dr.Abhishek Laha : Aesthetics Redefined
+12 DG048 Malini raja Malini.raja@yahoo.com 8056234822 PCC2 - Dr.Abhishek Laha : Aesthetics Redefined
+13 DG049 Rajasekaran M endoraja@yahoo.com 9841034563 PCC1 - Dr.Premila and Dr Daya - Beyond the Beam: An Evidence - Based Evaluation of Laser Dentistry and Photobiomodulation in Clinical Practice 
+14 DG050 DR.KADHIRESAN drkadhiresan@gmail.com 9962901518 PCC2 - Dr.Abhishek Laha : Aesthetics Redefined
+15 DG051 Dr. Kirthana Devaji Rao drkirthanarao@gmail.com 9841349186 PCC2 - Dr.Abhishek Laha : Aesthetics Redefined
+16 DG052 Deepalakshmi Divakar dr.deepalakshmi@gmail.com 9840861977 PCC1 - Dr.Premila and Dr Daya - Beyond the Beam: An Evidence - Based Evaluation of Laser Dentistry and Photobiomodulation in Clinical Practice 
+17 DG054 Dr. Jones Jayabalan omfsjones@gmail.com 7845619673 PCC4 - Dr.Jabin Thomas:Tilted implants
+18 DG058 Dr. Abirami. V abivaithy5@gmail.com 9655805794 PCC3 - Dr.Arunachalam: Prosthetically Driven Digital Implant Planning and Guided Placement
+19 DG059 Uthejini uthejini5@gmail.com 9677289904 PCC2 - Dr.Abhishek Laha : Aesthetics Redefined
+20 DG060 Dr. Bhavna Rao docbhavna@gmail.com 9884296779 PCC5 - Dr.Ganesh Jeevanandham Topic : Rotary Pedodontics
+21 DG069 Dr.M.A.Mejalla drmejallamds@gmail.com 9884631718 PCC4 - Dr.Jabin Thomas:Tilted implants
+22 DG075 Dr Soma Sindhuja K sindhuhyu@gmail.com 9445560673 PCC1 - Dr.Premila and Dr Daya - Beyond the Beam: An Evidence - Based Evaluation of Laser Dentistry and Photobiomodulation in Clinical Practice 
+23 DG080 Sowmiya Lingeshwaran drsowmiyal@gmail.com 9840569650 PCC2 - Dr.Abhishek Laha : Aesthetics Redefined
+24 DG082 Dr.Vignesh durai vigneshcool41@gmail.com 9941736159 PCC3 - Dr.Arunachalam: Prosthetically Driven Digital Implant Planning and Guided Placement
+25 DG083 Dr.Krupa S krupa.selvaraj@gmail.com 9884633870 PCC3 - Dr.Arunachalam: Prosthetically Driven Digital Implant Planning and Guided Placement
+26 DG085 Dr Chitra R Chandran drchitraa@gmail.com 9840425789
+27 DG087 Dr S Mitthra (alias) Malathi Suresh malu.dr2008@yahoo.com 9551416503
+28 DG088 Dr.Priya darshini priyadarshininarasimhan25@gmail.com 9791323790 PCC - 6 : CBCT
+29 DG089 Dr.Revathi Miglani drrevathi1976@gmail.com 98402233056
+30 DG090 Dr. Preethy. M preethedoc@gmail.com 8939118471 PCC2 - Dr.Abhishek Laha : Aesthetics Redefined
+31 DG091 Dr.Gayathri M murugangayathri86@gmail.com 9962974661 PCC3 - Dr.Arunachalam: Prosthetically Driven Digital Implant Planning and Guided Placement
+32 DG092 Dr.ARTHI SRI A.S drarthisri@gmail.com 9841680665 PCC - 6 : CBCT
+33 DG097 Dr.YAMINI RAGHUPATHI ryamini94@gmail.com 7871140047 PCC4 - Dr.Jabin Thomas:Tilted implants
+34 DG099 Dr Prabhalakshmi drlakshmiprabha2013@gmail.com 9840106221 PCC4 - Dr.Jabin Thomas:Tilted implants
+35 DG0103 Dr.A.Babu babuarthanari152000@gmail.com 9003160561 PCC2 - Dr.Abhishek Laha : Aesthetics Redefined
+36 DG0105 Dr.Bini Balakrishnan drbinib@gmail.com 8939924900 PCC1 - Dr.Premila and Dr Daya - Beyond the Beam: An Evidence - Based Evaluation of Laser Dentistry and Photobiomodulation in Clinical Practice 
+37 DG0111 Dr Sakthivel Rajendran dr.r.sakthivel@gmail.com 9884249289 PCC3 - Dr.Arunachalam: Prosthetically Driven Digital Implant Planning and Guided Placement
+38 DG0112 Dr.DEEPAK MOSES RAVINDRAN dentaldpak@gmail.com 9841311211
+39 DG0113 Dr.KARTHICK SOUNDARARAJAN endokarthick@gmail.com 9487537626 PCC3 - Dr.Arunachalam: Prosthetically Driven Digital Implant Planning and Guided Placement
+40 DG0115 Dr R Vindhiya surendhar vindubds.coolbabe@gmail.com 9600089355 PCC5 - Dr.Ganesh Jeevanandham Topic : Rotary Pedodontics
+41 DG0116 Dr K PREMKUMAR drprem89@gmail.com 9566773334
+42 DG0119 Dr.sivasankari.s sivasankarisk91@gmail.com 9677494993 PCC - 6 : CBCT
+43 DG0120 Dr.Chimera J dentglitz@gmail.com 7904427244 PCC5 - Dr.Ganesh Jeevanandham Topic : Rotary Pedodontics
+44 DG0121 Dr Thiyaneswaran N thiyaneswaran@saveetha.com 9884176432 PCC1 - Dr.Premila and Dr Daya - Beyond the Beam: An Evidence - Based Evaluation of Laser Dentistry and Photobiomodulation in Clinical Practice 
+45 DG0123 Dr.Aparna Ashok ashokaparna1996@gmail.com 7708926934
+46 DG0124 Dr Jeyapriya MP jeyapriyamp1@gmail.com 9589471057 PCC4 - Dr.Jabin Thomas:Tilted implants
+47 DG0126 Dr.S.Anbu Meena anbu.meena.s@gmail.com 7373974023 PCC4 - Dr.Jabin Thomas:Tilted implants
+48 DG0129 Dr. Meenakshi Muthiah meenu30796@gmail.com 9840353259 PCC5 - Dr.Ganesh Jeevanandham Topic : Rotary Pedodontics
+49 DG0130 Pooja Mahalakshmi drpoojakalyan@gmail.com 9551674070 PCC5 - Dr.Ganesh Jeevanandham Topic : Rotary Pedodontics
+50 DG0135 Dr.Rathi Vadhana drrathi.mds@gmail.com 9789845567 PCC1 - Dr.Premila and Dr Daya - Beyond the Beam: An Evidence - Based Evaluation of Laser Dentistry and Photobiomodulation in Clinical Practice 
+51 DG0138 Dr. Aishwarya aisharun297@gmail.com 9840405582 PCC5 - Dr.Ganesh Jeevanandham Topic : Rotary Pedodontics
+52 DG0139 Dr.GEETHA LAKSHMI drgeethamds@gmail.com 7708832350 PCC - 6 : CBCT
+53 DG0140 Dr. G S V Nivashini drnivashini.endo@gmail.com 8778029560
+54 DG0143 Dr.V.Poongodi,MDS,PhD drpoongodi.omrd@madch.edu.in 8056190854 PCC - 6 : CBCT
+55 DG0144 Dr. Lekha A lekha.lekhs@gmail.com 9884076445
+56 DG0149 Dr. Swarna Priya. R y.swarnapriya@gmail.com 9176611953 PCC1 - Dr.Premila and Dr Daya - Beyond the Beam: An Evidence - Based Evaluation of Laser Dentistry and Photobiomodulation in Clinical Practice 
+57 DG0150 Dr.Pragya S pragubaby@gmail.com 9840311250
+58 DG0152 Dr.Deebalakshmi S dheedentists@gmail.com 9884040482 PCC1 - Dr.Premila and Dr Daya - Beyond the Beam: An Evidence - Based Evaluation of Laser Dentistry and Photobiomodulation in Clinical Practice 
+59 DG001 Dr.Ramesh Kumar 9884151913
+60 DG002 Dr.Chandrasekar 13 9841109912 PCC 4
+61 DG003 Dr.Arun suraj 9840163467
+62 DG004 Dr.Dhanadhivya 9500001881 PCC 2
+63 DG005 Dr.S.Thanalekshmi 9444609020 PCC 2
+64 DG006 Dr.Jayachandra K.J 9840133077
+65 DG007 Dr.Priyadharshini P.S 9445817797 PCC 4
+66 DG008 Dr.Angel rathilin 9489880269 PCC 5
+67 DG009 Dr.V.Rathna prabhu 9444376057
+68 DG010 Dr.Meenakshi Muthukumar 9840131179
+69 DG011 Dr.T.Elangovan 9884323430
+70 DG012 Dr.M.S.Chandragupta 9884128209
+71 DG013 Dr.S.C.Ahila 9443607653
+72 DG014 Dr.J.Selvakumar 8838780154 PCC 2
+73 DG015 Dr.K.PranavBalaji 9840183849
+74 DG016 Dr.M.Venkat Prasad 9841763 974
+75 DG017 Dr.Vidyaa Hari Iyer 9840176088
+76 DG018 Dr.B.Jayakrishna 9940196936
+77 DG019 Dr.R.Sridharan 9444170808
+78 DG020 Dr.M.S.Saravanakumar 9444522345
+79 DG021 Dr.Ganesh Puttu 8438295269
+80 DG022 Dr.P.Mahesh Kumar 9841397411
+81 DG023 Dr.S.Gopalkrishnan 9884379869
+82 DG024 Dr.Raghavendhar Karthick 9840053735
+83 DG025 Dr.Poornima 9840781076
+84 DG026 Dr.P.Janaradhanam 9840905566
+85 DG027 Dr.V.Rangarajan 9840027829
+86 DG028 Dr.Dayashree 9941908484
+87 DG029 Dr.Vanmathi 8956116252
+88 DG030 Dr.V.Balakumar 9841046319
+89 DG031 Dr.Sathish kumar 9094404417
+90 DG032 Dr.A.P.Maheshwar 9840036713
+91 DG033 Dr.Mohith Ashok 9003224422
+92 DG034 Dr.Shewta V 9003124349
+93 DG035 Dr.Arunmohzhi U 9840453005
+94 DG159 Dr G SURESH KUMAR 9444871015
+95 DG160 Dr.Rathinavelu 9841164165
+96 DG163 Dr Manikandan N 8682891009
+97 DG036 Dr.Archana Arun
+98 DG166 Dr.V KANAGAPRIYAA 9500871826
+99 DG167 Dr.SATHIYAGOMATHI 9445152150
+</script>
+
+<script>
+    document.addEventListener("DOMContentLoaded", () => {
+        const rawData = document.getElementById('raw-data').textContent.trim();
+        const lines = rawData.split('\n').filter(line => line.trim() !== '');
+        
+        const delegates = lines.map(line => {
+            const parts = line.trim().split(' ');
+            const sno = parts[0];
+            const regId = parts[1];
+            
+            // Reconstruct the rest
+            const rest = parts.slice(2).join(' ');
+            
+            // Find email (contains @)
+            const emailMatch = rest.match(/[\w\.-]+@[\w\.-]+\.\w+/);
+            const email = emailMatch ? emailMatch[0] : '';
+            
+            // Find mobile (10 digits or more, maybe spaces)
+            const mobileMatch = rest.match(/\b\d{7,12}\b/);
+            const mobile = mobileMatch ? mobileMatch[0] : '';
+            
+            // Name is before email/mobile
+            let name = rest;
+            if (email) {
+                name = name.split(email)[0].trim();
+            } else if (mobile) {
+                name = name.split(mobile)[0].trim();
+            } else if (rest.includes('PCC')) {
+                name = name.split('PCC')[0].trim();
+            }
+            
+            return {
+                sno,
+                regId,
+                name: name || 'Delegate',
+                role: 'Delegate'
+            };
+        });
+
+        delegates.forEach(delegate => {
+            const card = document.createElement('div');
+            card.className = 'id-card';
+            card.innerHTML = `
+                <div class="header">
+                    <h1>MIDAS 5</h1>
+                    <p>Annual Conference</p>
+                </div>
+                <div class="photo-placeholder">👤</div>
+                <div class="content">
+                    <div class="name">${delegate.name}</div>
+                    <div class="role">${delegate.role}</div>
+                    
+                    <div class="details">
+                        <div class="details-row">
+                            <span class="details-label">Reg ID:</span>
+                            <span>${delegate.regId}</span>
+                        </div>
+                        <div class="details-row">
+                            <span class="details-label">S.No:</span>
+                            <span>${delegate.sno}</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="qr-placeholder">QR</div>
+                <div class="footer">
+                    Valid for all conference days
+                </div>
+            `;
+            document.body.appendChild(card);
+        });
+    });
+</script>
+
+</body>
+</html>

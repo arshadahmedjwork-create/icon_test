@@ -424,14 +424,7 @@ export default function StudentOverviewPage() {
                                         Reg ID: {user.registrationId}
                                     </p>
                                 )}
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => downloadIdCard(user)}
-                                    className="mt-2 h-7 px-3 text-xs border-primary/20 text-primary hover:bg-primary hover:text-white"
-                                >
-                                    Download ID Card
-                                </Button>
+
                             </div>
                             <div className="bg-white p-2 border border-slate-200 rounded-xl shadow-sm">
                                 <img
@@ -468,14 +461,7 @@ export default function StudentOverviewPage() {
                                     Reg ID: {user.registrationId}
                                 </span>
                             )}
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => downloadIdCard(user)}
-                                className="mt-2 h-7 px-3 text-xs border-primary/20 text-primary hover:bg-primary hover:text-white w-full"
-                            >
-                                Download ID Card
-                            </Button>
+
                         </div>
                     )}
                 </div>

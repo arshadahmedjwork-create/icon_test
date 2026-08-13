@@ -749,7 +749,8 @@ export const getCollegesList = async (): Promise<{ value: string, label: string 
         { value: "vels_dental_college_and_hospital", label: "Vels Dental College and Hospital" },
         { value: "adhiparasakthi_dental_college_and_hospital", label: "Adhiparasakthi Dental College and Hospital" },
         { value: "penang_international_dental_college", label: "Penang International Dental College" },
-        { value: "annai_theresa_dental_college_and_hospital", label: "Annai Theresa Dental College and Hospital" }
+        { value: "annai_theresa_dental_college_and_hospital", label: "Annai Theresa Dental College and Hospital" },
+        { value: "KLE_VK_Institute_of_Dental_Sciences_Belagavi", label: "KLE VK Institute of Dental Sciences, Belagavi"}
     ];
 };
 
