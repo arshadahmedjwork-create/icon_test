@@ -199,8 +199,8 @@ export default function StudentSubmissionsPage() {
             return;
         }
 
-        if (isIcon && !newForm.speciality) {
-            toast.error("Speciality is required for ICON submissions");
+        if (!newForm.speciality) {
+            toast.error("Speciality / Specialization is required for abstract submission");
             return;
         }
 
@@ -234,7 +234,7 @@ export default function StudentSubmissionsPage() {
                 remarks: newForm.remarks,
                 eventType: dbType,
                 eventMode: dbMode,
-                subject: isIcon ? newForm.speciality : (event as any)?.raw?.subject,
+                subject: newForm.speciality || (event as any)?.raw?.subject || "General",
                 program: currentProgram,
                 keywords: newForm.keywords.split(",").map(k => k.trim()).filter(k => k),
                 hodName: newForm.hodName
@@ -489,17 +489,15 @@ export default function StudentSubmissionsPage() {
                                     </SelectContent>
                                 </Select>
                             </div>
-                            {isIcon && (
-                                <div className="space-y-2">
-                                    <Label>Speciality *</Label>
-                                    <Select value={newForm.speciality} onValueChange={(v) => setNewForm({ ...newForm, speciality: v })}>
-                                        <SelectTrigger className="h-11 rounded-xl"><SelectValue placeholder="Select speciality" /></SelectTrigger>
-                                        <SelectContent>
-                                            {iconSpecialities.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-                            )}
+                            <div className="space-y-2">
+                                <Label>Speciality *</Label>
+                                <Select value={newForm.speciality} onValueChange={(v) => setNewForm({ ...newForm, speciality: v })}>
+                                    <SelectTrigger className="h-11 rounded-xl"><SelectValue placeholder="Select speciality" /></SelectTrigger>
+                                    <SelectContent className="max-h-60 overflow-y-auto">
+                                        {iconSpecialities.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                                    </SelectContent>
+                                </Select>
+                            </div>
                         </div>
 
                         <div className="space-y-2">

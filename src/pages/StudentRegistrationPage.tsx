@@ -424,8 +424,12 @@ export default function StudentRegistrationPage() {
                                     <Label>College *</Label>
                                     <Select value={formData.college} onValueChange={(v) => handleSelectChange("college", v)}>
                                         <SelectTrigger className="h-12 rounded-xl"><SelectValue placeholder="Select College" /></SelectTrigger>
-                                        <SelectContent>
-                                            {colleges.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                                        <SelectContent className="max-h-60 overflow-y-auto">
+                                            {collegesList.map(opt => (
+                                                <SelectItem key={opt.value} value={opt.label}>
+                                                    {opt.label}
+                                                </SelectItem>
+                                            ))}
                                         </SelectContent>
                                     </Select>
                                 </div>
@@ -464,7 +468,7 @@ export default function StudentRegistrationPage() {
                                                 <SelectTrigger className="h-12 rounded-xl">
                                                     <SelectValue placeholder="Select College" />
                                                 </SelectTrigger>
-                                                <SelectContent>
+                                                <SelectContent className="max-h-60 overflow-y-auto">
                                                     {collegesList.map(opt => (
                                                         <SelectItem key={opt.value} value={opt.label}>
                                                             {opt.label}
@@ -481,7 +485,7 @@ export default function StudentRegistrationPage() {
                                                 <Label>Qualification *</Label>
                                                 <Select value={formData.qualification} onValueChange={(v) => handleSelectChange("qualification", v)}>
                                                     <SelectTrigger className="h-12 rounded-xl"><SelectValue placeholder="Select Qualification" /></SelectTrigger>
-                                                    <SelectContent>
+                                                    <SelectContent className="max-h-60 overflow-y-auto">
                                                         <SelectItem value="BDS">BDS</SelectItem>
                                                         <SelectItem value="MDS">MDS</SelectItem>
                                                     </SelectContent>
@@ -492,7 +496,7 @@ export default function StudentRegistrationPage() {
                                                     <Label>Speciality *</Label>
                                                     <Select value={formData.speciality} onValueChange={(v) => handleSelectChange("speciality", v)}>
                                                         <SelectTrigger className="h-12 rounded-xl"><SelectValue placeholder="Select Speciality" /></SelectTrigger>
-                                                        <SelectContent>
+                                                        <SelectContent className="max-h-60 overflow-y-auto">
                                                             {iconSpecialities.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
                                                         </SelectContent>
                                                     </Select>
@@ -507,7 +511,7 @@ export default function StudentRegistrationPage() {
                                                     <SelectTrigger className="h-12 rounded-xl">
                                                         <SelectValue placeholder="Select College" />
                                                     </SelectTrigger>
-                                                    <SelectContent>
+                                                    <SelectContent className="max-h-60 overflow-y-auto">
                                                         {collegesList.map(opt => (
                                                             <SelectItem key={opt.value} value={opt.label}>
                                                                 {opt.label}
