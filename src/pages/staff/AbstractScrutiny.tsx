@@ -94,7 +94,7 @@ export default function AbstractScrutiny() {
     // Get unique subjects for filter
     const subjects = Array.from(new Set(abstracts.map(a => a.subject)));
 
-    const pendingAbstracts = abstracts.filter(a => a.status === "pending" || a.status === "revision_requested");
+    const pendingAbstracts = abstracts.filter(a => a.status === "submitted" || a.status === "pending" || a.status === "revision_requested");
 
     const filteredAbstracts = pendingAbstracts.filter(a => {
         const matchesSearch = a.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -122,8 +122,8 @@ export default function AbstractScrutiny() {
 
         switch (type) {
             case "approve":
-                newStatus = "approved";
-                successMessage = "Abstract approved successfully.";
+                newStatus = "staff_approved";
+                successMessage = "Abstract approved by Staff Coordinator and forwarded to Core Team.";
                 break;
             case "reject":
                 newStatus = "rejected";

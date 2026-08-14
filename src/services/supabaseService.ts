@@ -718,17 +718,10 @@ export const updateEventConfig = async (config: EventConfig) => {
 };
 
 export const getCollegesList = async (): Promise<{ value: string, label: string }[]> => {
-    try {
-        const config = await getEventConfig();
-        if (config?.capacities && (config.capacities as any).colleges) {
-            return (config.capacities as any).colleges;
-        }
-    } catch (e) {
-        console.error("Failed to load colleges from database config", e);
-    }
-    
-    // Fallback to the 21 default colleges
-    return [
+    const collegesMap = new Map<string, string>();
+
+    // Default baseline colleges list
+    const defaults = [
         { value: "saveetha_dental_college_and_hospitals", label: "Saveetha Dental College And Hospitals" },
         { value: "srm_dental_college", label: "SRM Dental College" },
         { value: "srm_kattankulathur_dental_college_and_hospital", label: "SRM Kattankulathur Dental College and Hospital" },
@@ -750,8 +743,58 @@ export const getCollegesList = async (): Promise<{ value: string, label: string 
         { value: "adhiparasakthi_dental_college_and_hospital", label: "Adhiparasakthi Dental College and Hospital" },
         { value: "penang_international_dental_college", label: "Penang International Dental College" },
         { value: "annai_theresa_dental_college_and_hospital", label: "Annai Theresa Dental College and Hospital" },
-        { value: "KLE_VK_Institute_of_Dental_Sciences_Belagavi", label: "KLE VK Institute of Dental Sciences, Belagavi"}
+        { value: "KLE_VK_Institute_of_Dental_Sciences_Belagavi", label: "KLE VK Institute of Dental Sciences, Belagavi" },
+        { value: "SDM_College_of_Dental_Sciences_Dharwad", label: "SDM College of Dental Sciences, Dharwad" },
+        { value: "Government_Dental_College_Bangalore", label: "Government Dental College, Bangalore" },
+        { value: "Bapuji_Dental_College_Davangere", label: "Bapuji Dental College, Davangere" },
+        { value: "Manipal_College_of_Dental_Sciences", label: "Manipal College of Dental Sciences" }
     ];
+
+    defaults.forEach(c => collegesMap.set(c.label.trim().toLowerCase(), c.label.trim()));
+
+    // 1. Config colleges
+    try {
+        const config = await getEventConfig();
+        if (config?.capacities && (config.capacities as any).colleges) {
+            const configCols = (config.capacities as any).colleges;
+            configCols.forEach((c: any) => {
+                const label = typeof c === 'string' ? c : c.label || c.value;
+                if (label) collegesMap.set(label.trim().toLowerCase(), label.trim());
+            });
+        }
+    } catch (e) {
+        console.error("Failed to load colleges from database config", e);
+    }
+
+    // 2. Query distinct colleges from event_students & members tables to include all colleges stored in DB
+    try {
+        const [studentsRes, membersRes] = await Promise.all([
+            supabase.from('event_students').select('college'),
+            supabase.from('members').select('staffCoordinatorCollege')
+        ]);
+
+        if (studentsRes.data) {
+            studentsRes.data.forEach(s => {
+                if (s.college && s.college.trim()) {
+                    collegesMap.set(s.college.trim().toLowerCase(), s.college.trim());
+                }
+            });
+        }
+        if (membersRes.data) {
+            membersRes.data.forEach(m => {
+                if (m.staffCoordinatorCollege && m.staffCoordinatorCollege.trim()) {
+                    collegesMap.set(m.staffCoordinatorCollege.trim().toLowerCase(), m.staffCoordinatorCollege.trim());
+                }
+            });
+        }
+    } catch (e) {
+        console.error("Failed to load colleges from event_students or members", e);
+    }
+
+    return Array.from(collegesMap.values()).sort().map(name => ({
+        value: name,
+        label: name
+    }));
 };
 
 export const saveCollegesList = async (colleges: { value: string, label: string }[]) => {
@@ -888,7 +931,7 @@ export const getAbstracts = async (program?: string): Promise<Abstract[]> => {
         college: "Unknown", 
         type: s.eventType === "PAPER" ? "Paper" : "Poster",
         mode: s.eventMode,
-        status: s.status === "DRAFT" ? "pending" : s.status === "APPROVED" ? "approved" : s.status === "REJECTED" ? "rejected" : s.status === "revision_requested" ? "revision_requested" : s.status,
+        status: s.status === "DRAFT" ? "pending" : s.status === "SUBMITTED" ? "submitted" : s.status === "STAFF_APPROVED" ? "staff_approved" : s.status === "APPROVED" ? "approved" : s.status === "REJECTED" ? "rejected" : s.status === "revision_requested" || s.status === "REVISION_REQUESTED" ? "revision_requested" : s.status,
         fileUrl: resolveUrl(s.abstractFileUrl),
         presentationUrl: resolveUrl(s.presentationUrl),
         feedback: s.remarks,
@@ -909,7 +952,7 @@ export const addAbstract = async (abstract: Omit<Abstract, 'id' | 'submittedAt' 
         abstractFileUrl: abstract.fileUrl,
         presentationUrl: abstract.presentationUrl,
         remarks: abstract.feedback,
-        status: "DRAFT"
+        status: "SUBMITTED"
     };
     const { error } = await supabase.from('submissions').insert(dbData);
     if (error) throw error;
@@ -917,7 +960,7 @@ export const addAbstract = async (abstract: Omit<Abstract, 'id' | 'submittedAt' 
 
 export const updateAbstractStatus = async (id: string, status: Abstract["status"], feedback?: string) => {
     // Map abstract status back to DB SubmissionStatus enum
-    const dbStatus = status === "pending" ? "DRAFT" : status === "approved" ? "APPROVED" : status === "rejected" ? "REJECTED" : "STAFF_APPROVED";
+    const dbStatus = status === "staff_approved" ? "STAFF_APPROVED" : status === "approved" ? "APPROVED" : status === "rejected" ? "REJECTED" : status === "revision_requested" ? "revision_requested" : status === "pending" ? "DRAFT" : "SUBMITTED";
     const { error } = await supabase.from('submissions').update({ status: dbStatus, remarks: feedback }).eq('id', id);
     if (error) throw error;
 
@@ -966,7 +1009,7 @@ export const updateAbstract = async (id: string, updates: Partial<Abstract>) => 
     if (updates.fileUrl) dbUpdates.abstractFileUrl = updates.fileUrl;
     if (updates.presentationUrl) dbUpdates.presentationUrl = updates.presentationUrl;
     if (updates.status) {
-        dbUpdates.status = updates.status === "pending" ? "DRAFT" : updates.status === "approved" ? "APPROVED" : updates.status === "rejected" ? "REJECTED" : "STAFF_APPROVED";
+        dbUpdates.status = updates.status === "staff_approved" ? "STAFF_APPROVED" : updates.status === "approved" ? "APPROVED" : updates.status === "rejected" ? "REJECTED" : updates.status === "revision_requested" ? "revision_requested" : updates.status === "pending" ? "DRAFT" : "SUBMITTED";
     }
     if (updates.feedback) dbUpdates.remarks = updates.feedback;
 

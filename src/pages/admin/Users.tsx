@@ -28,7 +28,7 @@ import {
 import { Label } from "@/components/ui/label";
 import { Plus, Search, Trash2, Mail, Upload, AlertTriangle } from "lucide-react";
 import * as XLSX from "xlsx";
-import { getUsers, createMember, deleteUser } from "@/services/supabaseService";
+import { getUsers, createMember, deleteUser, getCollegesList } from "@/services/supabaseService";
 import { User, UserRole } from "@/types";
 import { useToast } from "@/hooks/use-toast";
 import { sendAccountCreationEmail } from "@/services/emailService";
@@ -50,15 +50,6 @@ const reverseRoleMap: Record<string, string> = {
     volunteer: 'VOLUNTEER',
 };
 
-const colleges = [
-    "KLE VK Institute of Dental Sciences, Belagavi",
-    "SDM College of Dental Sciences, Dharwad",
-    "Government Dental College, Bangalore",
-    "Bapuji Dental College, Davangere",
-    "Manipal College of Dental Sciences",
-    "Other"
-];
-
 // Generate a random temp password
 const generateTempPassword = () => {
     const chars = 'ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
@@ -72,9 +63,27 @@ export default function AdminUsers() {
     const [searchQuery, setSearchQuery] = useState("");
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const [isCreating, setIsCreating] = useState(false);
+    const [collegesList, setCollegesList] = useState<{ value: string, label: string }[]>([]);
     const { toast } = useToast();
     const { currentProgram } = useProgram();
     const isIcon = currentProgram === 'ICON';
+
+    useEffect(() => {
+        const fetchColleges = async () => {
+            try {
+                const list = await getCollegesList();
+                setCollegesList(list);
+            } catch (err) {
+                console.error("Failed to load colleges list", err);
+            }
+        };
+        fetchColleges();
+    }, []);
+
+    const collegeOptions = Array.from(new Set([
+        ...collegesList.map(c => c.label),
+        ...users.map(u => u.college).filter((c): c is string => Boolean(c && c.trim()))
+    ])).sort();
 
     const [formData, setFormData] = useState({
         name: "",
@@ -392,8 +401,8 @@ export default function AdminUsers() {
                                         <SelectTrigger>
                                             <SelectValue placeholder="Select College" />
                                         </SelectTrigger>
-                                        <SelectContent>
-                                            {colleges.map((college) => (
+                                        <SelectContent className="max-h-60 overflow-y-auto">
+                                            {collegeOptions.map((college) => (
                                                 <SelectItem key={college} value={college}>{college}</SelectItem>
                                             ))}
                                         </SelectContent>

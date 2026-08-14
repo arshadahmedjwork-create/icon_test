@@ -144,7 +144,7 @@ export interface Abstract {
     college: string; // Inherited from Student for faster lookups
     type: string;
     mode: string;
-    status: "pending" | "approved" | "rejected" | "revision_requested";
+    status: "pending" | "submitted" | "staff_approved" | "approved" | "rejected" | "revision_requested";
     fileUrl: string;
     presentationUrl?: string; // Final PPT/PDF uploaded before event day
     feedback?: string;

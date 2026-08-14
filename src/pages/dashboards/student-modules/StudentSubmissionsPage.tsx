@@ -43,10 +43,16 @@ interface SubmissionItem {
 
 const statusConfig: Record<string, any> = {
     DRAFT: { label: "Draft", icon: Clock, color: "bg-slate-50 text-slate-700 border-slate-200", dot: "bg-slate-500" },
-    SUBMITTED: { label: "Submitted", icon: Clock, color: "bg-blue-50 text-blue-700 border-blue-200", dot: "bg-blue-500" },
+    SUBMITTED: { label: "Pending Staff Approval", icon: Clock, color: "bg-blue-50 text-blue-700 border-blue-200", dot: "bg-blue-500" },
+    submitted: { label: "Pending Staff Approval", icon: Clock, color: "bg-blue-50 text-blue-700 border-blue-200", dot: "bg-blue-500" },
+    STAFF_APPROVED: { label: "Staff Approved (Core Team Review)", icon: Clock, color: "bg-purple-50 text-purple-700 border-purple-200", dot: "bg-purple-500" },
+    staff_approved: { label: "Staff Approved (Core Team Review)", icon: Clock, color: "bg-purple-50 text-purple-700 border-purple-200", dot: "bg-purple-500" },
     PENDING: { label: "Pending Review", icon: Clock, color: "bg-amber-50 text-amber-700 border-amber-200", dot: "bg-amber-500" },
     APPROVED: { label: "Approved", icon: CheckCircle2, color: "bg-green-50 text-green-700 border-green-200", dot: "bg-green-500" },
+    approved: { label: "Approved", icon: CheckCircle2, color: "bg-green-50 text-green-700 border-green-200", dot: "bg-green-500" },
     REJECTED: { label: "Rejected", icon: XCircle, color: "bg-red-50 text-red-700 border-red-200", dot: "bg-red-500" },
+    rejected: { label: "Rejected", icon: XCircle, color: "bg-red-50 text-red-700 border-red-200", dot: "bg-red-500" },
+    revision_requested: { label: "Revision Requested", icon: Clock, color: "bg-yellow-50 text-yellow-700 border-yellow-200", dot: "bg-yellow-500" },
 };
 
 const iconSpecialities = [

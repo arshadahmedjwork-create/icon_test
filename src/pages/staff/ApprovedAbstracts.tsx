@@ -61,8 +61,8 @@ export default function ApprovedAbstracts() {
     // Get unique subjects for filter
     const subjects = Array.from(new Set(abstracts.map(a => a.subject)));
 
-    // Only approved abstracts
-    const approvedAbstracts = abstracts.filter(a => a.status === "approved");
+    // Only approved abstracts (staff approved or final approved)
+    const approvedAbstracts = abstracts.filter(a => a.status === "approved" || a.status === "staff_approved");
 
     const filteredAbstracts = approvedAbstracts.filter(a => {
         const matchesSearch = a.title.toLowerCase().includes(searchQuery.toLowerCase()) ||

@@ -101,6 +101,10 @@ export default function AbstractApproval() {
 
     // Filters and sorting
     const filteredAbstracts = abstracts.filter(a => {
+        // Core Team only sees abstracts after Staff Coordinator approval
+        const isStaffApproved = a.status === "staff_approved" || a.status === "approved" || a.status === "rejected" || a.status === "revision_requested";
+        if (!isStaffApproved) return false;
+
         const matchesSearch = a.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
             getStudentName(a.studentId).toLowerCase().includes(searchQuery.toLowerCase()) ||
             getStudentCollege(a.studentId).toLowerCase().includes(searchQuery.toLowerCase());
@@ -111,7 +115,7 @@ export default function AbstractApproval() {
     // Push already approved abstracts to the down
     const sortedAbstracts = [...filteredAbstracts].sort((a, b) => {
         const getScore = (status: string) => {
-            if (status === "pending") return 0;
+            if (status === "staff_approved") return 0;
             if (status === "revision_requested") return 1;
             if (status === "approved") return 2;
             if (status === "rejected") return 3;
@@ -215,7 +219,7 @@ export default function AbstractApproval() {
                         {sortedAbstracts.length === 0 ? (
                             <TableRow>
                                 <TableCell colSpan={5} className="text-center h-24 text-muted-foreground">
-                                    No abstracts found.
+                                    No abstracts pending Core Team approval.
                                 </TableCell>
                             </TableRow>
                         ) : (
@@ -226,7 +230,7 @@ export default function AbstractApproval() {
                                         <div className="text-xs text-muted-foreground">{abstract.subject}</div>
                                     </TableCell>
                                     <TableCell>
-                                        <div className="text-sm font-semibold">{getStudentName(abstract.studentId)}</div>
+                                        <div className="text-sm font-medium">{getStudentName(abstract.studentId)}</div>
                                         <div className="text-xs text-muted-foreground">{getStudentCollege(abstract.studentId)}</div>
                                         <div className="text-xs text-muted-foreground mt-1">
                                             <span className="font-medium text-primary/80">ICON:</span> {getStudentIconId(abstract.studentId)}
@@ -240,13 +244,15 @@ export default function AbstractApproval() {
                                     </TableCell>
                                     <TableCell>
                                         {abstract.status === "approved" ? (
-                                            <Badge variant="secondary" className="bg-green-100 text-green-800 hover:bg-green-100">Approved</Badge>
+                                            <Badge variant="secondary" className="bg-emerald-100 text-emerald-800 hover:bg-emerald-100">Approved</Badge>
                                         ) : abstract.status === "rejected" ? (
                                             <Badge variant="secondary" className="bg-red-100 text-red-800 hover:bg-red-100">Rejected</Badge>
-                                        ) : abstract.status === "revision_requested" || abstract.status === "STAFF_APPROVED" ? (
-                                            <Badge variant="secondary" className="bg-yellow-100 text-yellow-800 hover:bg-yellow-100">Revision Pending</Badge>
+                                        ) : abstract.status === "revision_requested" ? (
+                                            <Badge variant="secondary" className="bg-yellow-100 text-yellow-800 hover:bg-yellow-100">Revision Requested</Badge>
+                                        ) : abstract.status === "staff_approved" ? (
+                                            <Badge variant="secondary" className="bg-amber-100 text-amber-800 hover:bg-amber-100">Staff Approved</Badge>
                                         ) : (
-                                            <Badge variant="secondary">New</Badge>
+                                            <Badge variant="secondary">Pending Review</Badge>
                                         )}
                                     </TableCell>
                                     <TableCell className="text-right">
