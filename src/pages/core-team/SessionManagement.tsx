@@ -569,19 +569,54 @@ export default function SessionManagement() {
     };
 
     // Filter available abstracts based on selected criteria and check for duplicate scheduling
-    const availableAbstracts = abstracts.filter(a =>
-        (!formData.subject || formData.subject.split(',').map(s => s.trim().toLowerCase()).includes(a.subject.toLowerCase())) &&
-        (!formData.type || a.type.toLowerCase() === formData.type.toLowerCase()) &&
-        (!formData.mode || a.mode.toLowerCase() === formData.mode.toLowerCase()) &&
-        (!formData.delegateTypeFilter || formData.delegateTypeFilter === "All" || (students.find(s => s.id === a.studentId)?.delegateType || 'UG') === formData.delegateTypeFilter) &&
-        // Exclude if scheduled in a different session
-        !sessions.some(s => s.id !== editingSession?.id && s.abstractIds?.includes(a.id))
-    );
+    const linkedEvent = events.find(e => e.id === formData.eventId);
+
+    const availableAbstracts = abstracts.filter(a => {
+        const selectedSubjects = formData.subject
+            ? formData.subject.split(',').map(s => s.trim().toLowerCase()).filter(Boolean)
+            : [];
+        
+        const matchesSubject = selectedSubjects.length === 0 || selectedSubjects.some(sub => 
+            a.subject.toLowerCase().includes(sub) || sub.includes(a.subject.toLowerCase())
+        );
+
+        const targetType = formData.type || linkedEvent?.type;
+        const matchesType = !targetType || 
+            a.type.toLowerCase().includes(targetType.toLowerCase()) ||
+            targetType.toLowerCase().includes(a.type.toLowerCase());
+
+        const targetMode = formData.mode || linkedEvent?.mode;
+        const matchesMode = !targetMode || 
+            a.mode.toLowerCase() === targetMode.toLowerCase();
+
+        const student = students.find(s => s.id === a.studentId);
+        const matchesDelegate = !formData.delegateTypeFilter || 
+            formData.delegateTypeFilter === "All" || 
+            (student?.delegateType || 'UG') === formData.delegateTypeFilter;
+
+        const notScheduledElsewhere = !sessions.some(s => s.id !== editingSession?.id && s.abstractIds?.includes(a.id));
+
+        return matchesSubject && matchesType && matchesMode && matchesDelegate && notScheduledElsewhere;
+    });
+
+    const defaultSpecialities = [
+        "Oral & Maxillofacial Surgery",
+        "Orthodontics",
+        "Periodontics",
+        "Conservative Dentistry & Endodontics",
+        "Prosthodontics",
+        "Oral Medicine & Radiology",
+        "Oral Pathology",
+        "Pedodontics",
+        "Public Health Dentistry"
+    ];
 
     const subjectsOptions = Array.from(new Set([
-        ...(currentProgram === 'ICON' ? abstracts.map(a => a.subject) : events.map(e => e.name)),
+        ...defaultSpecialities,
+        ...abstracts.map(a => a.subject),
+        ...events.map(e => e.name),
         ...(formData.subject ? formData.subject.split(',').map(s => s.trim()) : [])
-    ].filter(Boolean) as string[]));
+    ].filter(Boolean) as string[])).sort();
 
     const typesOptions = Array.from(new Set([
         ...events.map(e => e.type),
