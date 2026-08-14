@@ -150,7 +150,7 @@ export default function SessionManagement() {
         
         setSessions(fetchedSessions);
         setJudges(fetchedJudges);
-        setAbstracts(fetchedAbstracts.filter(a => a.status === "approved"));
+        setAbstracts(fetchedAbstracts.filter(a => a.status === "approved" || a.status === "staff_approved"));
         setStudents(fetchedStudents);
         setEvents(fetchedEvents);
     };
@@ -577,7 +577,10 @@ export default function SessionManagement() {
             : [];
         
         const matchesSubject = selectedSubjects.length === 0 || selectedSubjects.some(sub => 
-            a.subject.toLowerCase().includes(sub) || sub.includes(a.subject.toLowerCase())
+            a.subject.toLowerCase().includes(sub) || 
+            sub.includes(a.subject.toLowerCase()) || 
+            (a.eventName && (a.eventName.toLowerCase().includes(sub) || sub.includes(a.eventName.toLowerCase()))) ||
+            (linkedEvent && (linkedEvent.name.toLowerCase().includes(sub) || sub.includes(linkedEvent.name.toLowerCase())))
         );
 
         const targetType = formData.type || linkedEvent?.type;
