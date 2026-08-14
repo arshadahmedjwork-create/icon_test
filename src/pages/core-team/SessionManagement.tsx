@@ -583,12 +583,12 @@ export default function SessionManagement() {
             (linkedEvent && (linkedEvent.name.toLowerCase().includes(sub) || sub.includes(linkedEvent.name.toLowerCase())))
         );
 
-        const targetType = formData.type || linkedEvent?.type;
+        const targetType = linkedEvent?.type || formData.type;
         const matchesType = !targetType || 
             a.type.toLowerCase().includes(targetType.toLowerCase()) ||
             targetType.toLowerCase().includes(a.type.toLowerCase());
 
-        const targetMode = formData.mode || linkedEvent?.mode;
+        const targetMode = linkedEvent?.mode || formData.mode;
         const matchesMode = !targetMode || 
             a.mode.toLowerCase() === targetMode.toLowerCase();
 
@@ -945,7 +945,19 @@ export default function SessionManagement() {
                             </div>
                             <div className="space-y-2 col-span-1 sm:col-span-2">
                                 <Label>Linked Event (Optional)</Label>
-                                <Select value={formData.eventId || "none"} onValueChange={(val) => updateForm("eventId", val === "none" ? null : val)}>
+                                <Select value={formData.eventId || "none"} onValueChange={(val) => {
+                                    const selectedEv = events.find(e => e.id === val);
+                                    if (selectedEv) {
+                                        setFormData(prev => ({
+                                            ...prev,
+                                            eventId: val,
+                                            mode: selectedEv.mode,
+                                            type: selectedEv.type
+                                        }));
+                                    } else {
+                                        updateForm("eventId", val === "none" ? null : val);
+                                    }
+                                }}>
                                     <SelectTrigger>
                                         <SelectValue placeholder="Select Event to Link" />
                                     </SelectTrigger>
