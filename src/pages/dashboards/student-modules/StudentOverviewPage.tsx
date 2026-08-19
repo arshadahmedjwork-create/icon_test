@@ -18,7 +18,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { supabase } from "@/lib/supabaseClient";
 import { useProgram } from "@/contexts/ProgramContext";
 import { generateMidasId, generateQRCodeUrl, sendRegistrationEmail } from "@/services/emailService";
-import { getStudentDashboardStats, getLatestMidasId, updateEventStudent, uploadBonafide, getCollegesList } from "@/services/supabaseService";
+import { getStudentDashboardStats, getLatestMidasId, updateEventStudent, uploadBonafide, uploadPassportPhoto, getCollegesList } from "@/services/supabaseService";
 import { downloadIdCard } from "@/services/idCardEngine";
 
 const courses = [
@@ -70,6 +70,10 @@ export default function StudentOverviewPage() {
 
     const [submittingMissing, setSubmittingMissing] = useState(false);
     const [missingForm, setMissingForm] = useState({
+        name: user?.name || "",
+        mobile: user?.mobile || user?.phone || "",
+        idCardNumber: (user as any)?.idCardNumber || "",
+        gender: (user as any)?.gender || "",
         college: user?.college || "",
         course: user?.course || "",
         year: (user?.year === "N/A" ? "" : user?.year) || "",
@@ -83,6 +87,8 @@ export default function StudentOverviewPage() {
         teachingExperience: (user as any)?.teachingExperience || "",
     });
 
+    const [passportPhotoFile, setPassportPhotoFile] = useState<File | null>(null);
+    const [passportPhotoPreviewUrl, setPassportPhotoPreviewUrl] = useState<string | null>(null);
     const [bonafideFile, setBonafideFile] = useState<File | null>(null);
     const [dciCertFile, setDciCertFile] = useState<File | null>(null);
     const [colleges, setColleges] = useState<{ value: string; label: string }[]>([]);
@@ -107,6 +113,10 @@ export default function StudentOverviewPage() {
     useEffect(() => {
         if (user) {
             setMissingForm({
+                name: user.name || "",
+                mobile: user.mobile || user.phone || "",
+                idCardNumber: (user as any).idCardNumber || "",
+                gender: (user as any).gender || "",
                 college: user.college || "",
                 course: user.course || "",
                 year: (user.year === "N/A" ? "" : user.year) || "",
@@ -130,12 +140,15 @@ export default function StudentOverviewPage() {
         if (!user) return missing;
         
         if (!user.name || !user.name.trim()) missing.push("Name");
-        if (!user.mobile || !user.mobile.trim()) missing.push("Mobile");
-        if (!user.college || !user.college.trim()) missing.push("College");
+        if (!user.mobile || !user.mobile.trim()) missing.push("Mobile Number");
+        if (!user.college || !user.college.trim() || user.college === "N/A") missing.push("College");
+        if (!(user as any).idCardNumber || !(user as any).idCardNumber.trim()) missing.push("ID Card Number");
+        if (!(user as any).gender || !(user as any).gender.trim()) missing.push("Gender");
+        if (!(user as any).passportPhotoUrl) missing.push("Passport Photo");
         
         if (isMidas) {
             if (!user.year || user.year === 'N/A' || !user.year.trim()) missing.push("Year of Study");
-            if (!user.course || !user.course.trim()) missing.push("Course");
+            if (!user.idProofUrl) missing.push("ID Proof / Bonafide");
         } else {
             const delegateType = (user as any).delegateType;
             if (!delegateType) {
@@ -157,12 +170,48 @@ export default function StudentOverviewPage() {
     const missingFieldsList = getMissingFields();
     const showMissingFieldsPopup = !user?.mustChangePassword && missingFieldsList.length > 0 && !manuallyClosed && !completeProfileDismissed;
 
+    const handlePassportPhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        if (!['image/jpeg', 'image/jpg', 'image/png'].includes(file.type)) {
+            toast.error("Please upload a JPG or PNG passport photo.");
+            return;
+        }
+        if (file.size > 5 * 1024 * 1024) {
+            toast.error("Photo file size must be less than 5MB.");
+            return;
+        }
+        setPassportPhotoFile(file);
+        setPassportPhotoPreviewUrl(URL.createObjectURL(file));
+    };
+
     const handleSaveMissingFields = async () => {
         if (!user) return;
+
+        // Validations
+        if ((!(user as any).idCardNumber || !(user as any).idCardNumber.trim()) && !missingForm.idCardNumber.trim()) {
+            toast.error("Please enter your ID Card Number.");
+            return;
+        }
+        if ((!(user as any).gender || !(user as any).gender.trim()) && !missingForm.gender) {
+            toast.error("Please select your gender.");
+            return;
+        }
+        if (!(user as any).passportPhotoUrl && !passportPhotoFile) {
+            toast.error("Please upload your passport-size photo.");
+            return;
+        }
+
         setSubmittingMissing(true);
         try {
             let idProofUrl = user.idProofUrl;
+            let passportPhotoUrl = (user as any).passportPhotoUrl;
             let dciCertificateUrl = (user as any).dciCertificateUrl;
+
+            if (passportPhotoFile) {
+                const url = await uploadPassportPhoto(user.mobile || user.id, passportPhotoFile);
+                if (url) passportPhotoUrl = url;
+            }
 
             if (bonafideFile) {
                 const url = await uploadBonafide(`${user.mobile || user.id}_bonafide`, bonafideFile);
@@ -179,9 +228,14 @@ export default function StudentOverviewPage() {
             }
 
             const updates: any = {
-                college: missingForm.college || null,
-                course: missingForm.course || null,
-                year: missingForm.year || 'N/A',
+                participantName: missingForm.name.trim() || user.name,
+                mobile: missingForm.mobile.trim() || user.mobile,
+                idCardNumber: missingForm.idCardNumber.trim() || (user as any).idCardNumber,
+                gender: missingForm.gender || (user as any).gender,
+                passportPhotoUrl: passportPhotoUrl || (user as any).passportPhotoUrl,
+                college: missingForm.college || user.college,
+                course: missingForm.course || user.course,
+                year: missingForm.year || user.year || 'N/A',
                 delegateType: missingForm.delegateType || null,
                 dciNumber: missingForm.dciNumber || null,
                 speciality: missingForm.speciality || null,
@@ -195,7 +249,7 @@ export default function StudentOverviewPage() {
             };
 
             await updateEventStudent(user.id, updates);
-            toast.success("Profile updated successfully!");
+            toast.success("Profile details updated successfully!");
             setManuallyClosed(true);
             setCompleteProfileDismissed(true);
             await refreshUser();
@@ -339,6 +393,29 @@ export default function StudentOverviewPage() {
                 </div>
             </div>
 
+
+            {/* Incomplete Profile Alert Banner for Admin-Added Students */}
+            {missingFieldsList.length > 0 && (
+                <div className="bg-amber-500/10 border-2 border-amber-500/30 p-5 rounded-2xl flex flex-col md:flex-row items-center justify-between gap-4 shadow-sm">
+                    <div className="flex items-center gap-3">
+                        <div className="w-11 h-11 rounded-xl bg-amber-500/20 flex items-center justify-center shrink-0">
+                            <AlertCircle className="w-6 h-6 text-amber-700" />
+                        </div>
+                        <div>
+                            <h3 className="font-bold text-amber-900 text-base">Incomplete Registration Profile</h3>
+                            <p className="text-xs text-amber-800 mt-0.5 max-w-xl leading-relaxed">
+                                Your account was created by an administrator. Please fill in your remaining details (<strong>{missingFieldsList.join(", ")}</strong>) to complete your MIDAS registration.
+                            </p>
+                        </div>
+                    </div>
+                    <Button
+                        onClick={() => setManuallyClosed(false)}
+                        className="bg-amber-700 hover:bg-amber-800 text-white font-bold h-11 px-6 rounded-xl shrink-0 text-xs shadow-md"
+                    >
+                        Complete Profile Form →
+                    </Button>
+                </div>
+            )}
 
             {/* Stats Grid */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -551,9 +628,66 @@ export default function StudentOverviewPage() {
                     </DialogHeader>
 
                     <div className="space-y-4 my-4 max-h-[60vh] overflow-y-auto px-1">
-                        <p className="text-sm text-slate-500">
-                            Before accessing your dashboard, please fill in the following missing registration details:
-                        </p>
+                        <div className="bg-amber-50 border border-amber-200 p-3.5 rounded-2xl text-xs text-amber-900 leading-relaxed font-medium">
+                            <strong>Notice:</strong> Your account was added by an administrator. Please fill in all required registration fields below to complete your profile.
+                        </div>
+
+                        {/* ID Card Number */}
+                        {(!(user as any)?.idCardNumber || !(user as any)?.idCardNumber.trim()) && (
+                            <div className="space-y-1.5">
+                                <Label htmlFor="missing-id-card">ID Card Number *</Label>
+                                <Input
+                                    id="missing-id-card"
+                                    value={missingForm.idCardNumber}
+                                    onChange={(e) => setMissingForm({ ...missingForm, idCardNumber: e.target.value })}
+                                    placeholder="Enter your College / Govt ID Card Number"
+                                    className="h-11 rounded-xl font-mono uppercase"
+                                />
+                            </div>
+                        )}
+
+                        {/* Gender */}
+                        {(!(user as any)?.gender || !(user as any)?.gender.trim()) && (
+                            <div className="space-y-1.5">
+                                <Label htmlFor="missing-gender">Gender *</Label>
+                                <Select 
+                                    value={missingForm.gender} 
+                                    onValueChange={(val) => setMissingForm({ ...missingForm, gender: val })}
+                                >
+                                    <SelectTrigger id="missing-gender" className="h-11 rounded-xl">
+                                        <SelectValue placeholder="Select Gender" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="Male">Male</SelectItem>
+                                        <SelectItem value="Female">Female</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        )}
+
+                        {/* Passport Size Photo */}
+                        {!(user as any)?.passportPhotoUrl && (
+                            <div className="space-y-1.5 bg-slate-50 p-3.5 rounded-2xl border border-slate-200">
+                                <Label htmlFor="missing-photo" className="font-bold text-slate-800 flex items-center gap-2">
+                                    <ImageIcon className="w-4 h-4 text-emerald-700" /> Passport Size Photo *
+                                </Label>
+                                <p className="text-[11px] text-slate-500">
+                                    Upload a clear, front-facing passport-size photo (JPG or PNG, Max 5MB).
+                                </p>
+                                {passportPhotoPreviewUrl && (
+                                    <div className="w-16 h-16 rounded-xl overflow-hidden border-2 border-emerald-500 my-1">
+                                        <img src={passportPhotoPreviewUrl} alt="Passport Preview" className="w-full h-full object-cover" />
+                                    </div>
+                                )}
+                                <Input
+                                    id="missing-photo"
+                                    type="file"
+                                    accept="image/jpeg,image/jpg,image/png"
+                                    onChange={handlePassportPhotoChange}
+                                    className="h-11 rounded-xl bg-white"
+                                />
+                            </div>
+                        )}
 
                         {(!user?.college || user.college.trim() === "" || ((user as any)?.delegateType !== "Clinician" && user.college.trim() === "N/A")) && (
                             <div className="space-y-1.5">
