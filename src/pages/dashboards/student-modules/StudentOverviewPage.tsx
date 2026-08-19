@@ -8,10 +8,11 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
+import { Badge } from "@/components/ui/badge";
 import {
     User, Mail, Phone, Building2, GraduationCap, CalendarDays,
     Upload, CheckCircle2, AlertCircle, Loader2, FileText,
-    Calendar, CreditCard, Award, Lock, UserCircle2
+    Calendar, CreditCard, Award, Lock, UserCircle2, Clock, XCircle, ShieldAlert
 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { supabase } from "@/lib/supabaseClient";
@@ -364,23 +365,35 @@ export default function StudentOverviewPage() {
             </div>
 
             {/* Status / Payment Banner */}
-            {!isPaid && (
-                <div className="bg-white rounded-2xl border border-amber-200 overflow-hidden shadow-sm">
-                    <div className="bg-amber-50 p-6 flex flex-col md:flex-row items-center justify-between gap-6">
+            {(!isPaid || !isApproved || isRejected) && (
+                <div className={`bg-white rounded-2xl border overflow-hidden shadow-sm ${
+                    isRejected ? "border-red-200" : !isApproved ? "border-amber-200" : "border-amber-200"
+                }`}>
+                    <div className={`p-6 flex flex-col md:flex-row items-center justify-between gap-6 ${
+                        isRejected ? "bg-red-50" : !isApproved ? "bg-amber-50/80" : "bg-amber-50"
+                    }`}>
                         <div className="flex items-start gap-4">
-                            <div className="w-12 h-12 rounded-full bg-amber-100 flex items-center justify-center shrink-0">
-                                <AlertCircle className="w-6 h-6 text-amber-600" />
+                            <div className={`w-12 h-12 rounded-full flex items-center justify-center shrink-0 ${
+                                isRejected ? "bg-red-100 text-red-600" : !isApproved ? "bg-amber-100 text-amber-600" : "bg-amber-100 text-amber-600"
+                            }`}>
+                                {isRejected ? <XCircle className="w-6 h-6 text-red-600" /> : <Clock className="w-6 h-6 text-amber-600 animate-spin" />}
                             </div>
                             <div>
-                                <h3 className="text-lg font-bold text-amber-900">
-                                    {isRejected ? "Registration Rejected" : !isApproved ? "Registration Pending Approval" : "Payment Required"}
-                                </h3>
-                                <p className="text-amber-700 mt-1 text-sm max-w-lg">
+                                <h3 className={`text-lg font-bold ${isRejected ? "text-red-900" : "text-amber-900"}`}>
                                     {isRejected
-                                        ? "Your registration has been rejected by the staff coordinator."
+                                        ? "Registration Rejected"
                                         : !isApproved
-                                            ? "Your staff coordinator is reviewing your registration. Please check back later. Event access will remain locked until approved and paid."
-                                            : "Your registration is approved! Please complete the payment of ₹1030 to unlock the event dashboard and abstract submissions."}
+                                            ? "Staff Coordinator Approval Pending"
+                                            : "Payment Required"}
+                                </h3>
+                                <p className={`mt-1 text-sm max-w-xl leading-relaxed ${isRejected ? "text-red-700" : "text-amber-800"}`}>
+                                    {isRejected
+                                        ? "Your registration has been rejected by the staff coordinator. Please contact support."
+                                        : !isApproved
+                                            ? isPaid
+                                                ? `Your registration fee payment of ₹1.00 is confirmed! Your profile and documents are currently awaiting verification and approval by your Staff Coordinator (${user?.college || "your college"}).`
+                                                : `Your staff coordinator is reviewing your registration. Please complete the registration fee payment to receive your ${isIcon ? 'ICON' : 'MIDAS'} ID.`
+                                            : "Your registration is approved! Please complete the payment of ₹1.00 to unlock event dashboard features and abstract submission."}
                                 </p>
                             </div>
                         </div>
@@ -388,12 +401,12 @@ export default function StudentOverviewPage() {
                         {isApproved && !isPaid && (
                             <div className="flex flex-col gap-2 shrink-0 w-full md:w-auto">
                                 <Button
-                                    onClick={() => handlePayment(1030)}
+                                    onClick={() => handlePayment(1)}
                                     disabled={loadingPayment}
                                     className={`${themeColor} text-white font-bold h-12 px-8 rounded-xl shadow-lg`}
                                 >
                                     {loadingPayment ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <CreditCard className="w-4 h-4 mr-2" />}
-                                    Pay Now — ₹1030
+                                    Pay Now — ₹1.00
                                 </Button>
                             </div>
                         )}
@@ -407,8 +420,23 @@ export default function StudentOverviewPage() {
                     <div className={`w-16 h-16 rounded-full bg-gradient-to-br ${isIcon ? 'from-[#7f1d1d] to-[#b91c1c]' : 'from-[#004d40] to-[#2e7d32]'} flex items-center justify-center text-white font-bold text-2xl shadow-inner`}>
                         {user?.name?.charAt(0) || "U"}
                     </div>
-                    <div className="flex-1 min-w-0">
-                        <h3 className="text-xl font-black text-slate-900 truncate">{user?.name}</h3>
+                    <div className="flex-1 min-w-0 space-y-1">
+                        <div className="flex items-center gap-3 flex-wrap">
+                            <h3 className="text-xl font-black text-slate-900 truncate">{user?.name}</h3>
+                            {isRejected ? (
+                                <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200 font-bold text-xs gap-1 py-1 px-3">
+                                    <XCircle className="w-3.5 h-3.5 text-red-600" /> Registration Rejected
+                                </Badge>
+                            ) : !isApproved ? (
+                                <Badge variant="outline" className="bg-amber-50 text-amber-800 border-amber-300 font-bold text-xs gap-1.5 py-1 px-3 shadow-xs">
+                                    <Clock className="w-3.5 h-3.5 text-amber-600 animate-pulse" /> Staff Coordinator Approval Pending
+                                </Badge>
+                            ) : (
+                                <Badge variant="outline" className="bg-emerald-50 text-emerald-800 border-emerald-300 font-bold text-xs gap-1.5 py-1 px-3 shadow-xs">
+                                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> Approved by Staff Coordinator
+                                </Badge>
+                            )}
+                        </div>
                         <p className="text-sm font-medium text-slate-500 truncate flex flex-wrap gap-2 items-center">
                             <Building2 className="w-3.5 h-3.5" /> {user?.college}
                         </p>
