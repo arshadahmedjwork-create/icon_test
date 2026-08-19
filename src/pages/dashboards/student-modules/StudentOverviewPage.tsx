@@ -12,7 +12,8 @@ import { Badge } from "@/components/ui/badge";
 import {
     User, Mail, Phone, Building2, GraduationCap, CalendarDays,
     Upload, CheckCircle2, AlertCircle, Loader2, FileText,
-    Calendar, CreditCard, Award, Lock, UserCircle2, Clock, XCircle, ShieldAlert
+    Calendar, CreditCard, Award, Lock, UserCircle2, Clock, XCircle, ShieldAlert,
+    Image as ImageIcon
 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { supabase } from "@/lib/supabaseClient";
