@@ -76,7 +76,7 @@ export function PaymentComponent({ onPaymentComplete }: { onPaymentComplete: (us
                 // 3. Record payment in payments table
                 await supabase.from("payments").insert({
                     eventStudentId: user.id,
-                    amount: 1030,
+                    amount: 1,
                     currency: "INR",
                     status: "PAID",
                     paymentGatewayId: paymentId,
@@ -104,7 +104,7 @@ export function PaymentComponent({ onPaymentComplete }: { onPaymentComplete: (us
                         midas_id: midasId,
                         id_card_number: (user as any).idCardNumber || "N/A",
                         payment_reference: paymentId,
-                        amount_paid: "₹1,030.00",
+                        amount_paid: "₹1.00",
                         payment_date: new Date().toLocaleDateString("en-IN"),
                         college_name: collegeName,
                         event_type: isIcon ? "Professional Delegate" : "UG Delegate",
@@ -140,7 +140,7 @@ export function PaymentComponent({ onPaymentComplete }: { onPaymentComplete: (us
 
         const options = {
             key: razorpayKey,
-            amount: 103000, // ₹1030 in paise
+            amount: 100, // ₹1 in paise
             currency: "INR",
             name: isIcon ? "Madras ICON" : "MIDAS Scientific Event",
             description: isIcon ? "Professional Registration Fee" : "Registration Fee — Conference Kit, Lunch, Certificate",
@@ -202,7 +202,7 @@ export function PaymentComponent({ onPaymentComplete }: { onPaymentComplete: (us
                     <div className="bg-white p-4 rounded-lg border">
                         <div className="flex justify-between items-center mb-2">
                             <span className="text-sm text-muted-foreground">Registration Fee</span>
-                            <span className="font-semibold">₹1,030.00</span>
+                            <span className="font-semibold">₹1.00</span>
                         </div>
                         <div className="flex justify-between items-center text-sm">
                             <span className="text-muted-foreground">Includes</span>
@@ -223,7 +223,7 @@ export function PaymentComponent({ onPaymentComplete }: { onPaymentComplete: (us
                                 </>
                             ) : (
                                 <>
-                                    <CreditCard className="mr-2 h-4 w-4" /> Review & Pay ₹1,030
+                                    <CreditCard className="mr-2 h-4 w-4" /> Review & Pay ₹1.00
                                 </>
                             )}
                         </Button>

@@ -98,7 +98,7 @@ export default function StudentPaymentsPage() {
                 id: "pending_reg",
                 eventName: "Delegate Registration Fee",
                 eventType: "REGISTRATION",
-                amount: 1030,
+                amount: 1,
                 status: "PENDING",
                 transactionId: null,
                 paymentDate: null
@@ -170,7 +170,7 @@ export default function StudentPaymentsPage() {
                                     midas_id: midasId,
                                     id_card_number: (user as any)?.idCardNumber || 'N/A',
                                     payment_reference: response.razorpay_payment_id,
-                                    amount_paid: "₹1,030.00",
+                                    amount_paid: "₹1.00",
                                     payment_date: new Date().toLocaleDateString("en-IN"),
                                     college_name: collegeName,
                                     event_type: isIcon ? "Professional Delegate" : "UG Delegate",

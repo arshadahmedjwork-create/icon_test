@@ -329,7 +329,7 @@ export default function StudentRegistrationPage() {
 
             const options = {
                 key: razorpayKey,
-                amount: 103000, // ₹1030 in paise
+                amount: 100, // ₹1 in paise
                 currency: "INR",
                 name: isIcon ? "Madras ICON" : "MIDAS Scientific Event",
                 description: `${isIcon ? 'Professional' : 'UG'} Registration Fee — Conference Kit, Lunch, Certificate`,
@@ -407,7 +407,7 @@ export default function StudentRegistrationPage() {
             // 3. Insert into payments table
             await supabase.from("payments").insert({
                 eventStudentId: studentId,
-                amount: 1030,
+                amount: 1,
                 currency: "INR",
                 status: "PAID",
                 paymentGatewayId: paymentId,
@@ -428,14 +428,13 @@ export default function StudentRegistrationPage() {
             });
 
             // 5. Send Payment Confirmation Email immediately
-            try {
-                await sendPaymentSuccessEmail({
+            tr                await sendPaymentSuccessEmail({
                     student_name: participantName,
                     student_email: formData.email,
                     midas_id: midasId,
                     id_card_number: formData.idCardNumber.trim(),
                     payment_reference: paymentId,
-                    amount_paid: "₹1,030.00",
+                    amount_paid: "₹1.00",
                     payment_date: new Date().toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" }),
                     college_name: collegeName,
                     event_type: isIcon ? "Professional Delegate" : "UG Delegate",
@@ -813,10 +812,10 @@ export default function StudentRegistrationPage() {
                             <Loader2 className="w-16 h-16 animate-spin text-[#004d40] mx-auto" />
                             <h3 className="text-2xl font-bold text-slate-900">Opening Payment Gateway...</h3>
                             <p className="text-slate-500 text-sm max-w-md mx-auto">
-                                Please complete your registration fee payment of ₹1,030.00 in the Razorpay popup. Do not refresh or close this window.
+                                Please complete your registration fee payment of ₹1.00 in the Razorpay popup. Do not refresh or close this window.
                             </p>
                         </div>
-                    )}
+                    )}            )}
 
                     {/* CANCELLED STATE */}
                     {currentStep === 'cancelled' && (
