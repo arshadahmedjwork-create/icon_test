@@ -1919,6 +1919,101 @@ export const uploadBonafide = async (userId: string, file: File): Promise<string
     }
 };
 
+export const uploadPassportPhoto = async (userId: string, file: File): Promise<string | null> => {
+    try {
+        const fileExt = file.name.split('.').pop();
+        const fileName = `${userId}_photo_${Date.now()}.${fileExt}`;
+
+        const { error: uploadError } = await supabase.storage
+            .from('documents')
+            .upload(fileName, file, { upsert: true });
+
+        if (uploadError) {
+            console.error('Storage upload photo error:', uploadError);
+            return null;
+        }
+
+        const { data } = supabase.storage.from('documents').getPublicUrl(fileName);
+        return data.publicUrl;
+    } catch (e) {
+        console.error('Failed to upload passport photo:', e);
+        return null;
+    }
+};
+
+export const checkDuplicateIdCardNumber = async (idCardNumber: string, currentStudentId?: string): Promise<boolean> => {
+    try {
+        const trimmed = idCardNumber.trim();
+        if (!trimmed) return false;
+
+        let query = supabase
+            .from('event_students')
+            .select('id')
+            .eq('idCardNumber', trimmed);
+
+        if (currentStudentId) {
+            query = query.neq('id', currentStudentId);
+        }
+
+        const { data, error } = await query;
+        if (error) {
+            console.error('Error checking duplicate ID Card Number:', error);
+            return false;
+        }
+        return (data || []).length > 0;
+    } catch (e) {
+        console.error('Failed to check duplicate ID Card Number:', e);
+        return false;
+    }
+};
+
+export const recordUndertakingAcceptance = async (data: {
+    eventStudentId: string;
+    idCardNumber: string;
+    declarationAccepted: boolean;
+    termsAccepted: boolean;
+    refundPolicyAccepted: boolean;
+    termsVersion: string;
+    refundPolicyVersion: string;
+    ipAddress?: string;
+    paymentReference?: string;
+}) => {
+    try {
+        // 1. Update event_students table
+        await supabase
+            .from('event_students')
+            .update({
+                idCardNumber: data.idCardNumber.trim(),
+                declarationAccepted: data.declarationAccepted,
+                termsAccepted: data.termsAccepted,
+                refundPolicyAccepted: data.refundPolicyAccepted,
+                termsVersion: data.termsVersion,
+                refundPolicyVersion: data.refundPolicyVersion,
+                acceptedAt: new Date().toISOString(),
+                ipAddress: data.ipAddress || null,
+            })
+            .eq('id', data.eventStudentId);
+
+        // 2. Insert into undertaking_acceptances audit table
+        await supabase
+            .from('undertaking_acceptances')
+            .insert({
+                eventStudentId: data.eventStudentId,
+                idCardNumber: data.idCardNumber.trim(),
+                declarationAccepted: data.declarationAccepted,
+                termsAccepted: data.termsAccepted,
+                refundPolicyAccepted: data.refundPolicyAccepted,
+                termsVersion: data.termsVersion,
+                refundPolicyVersion: data.refundPolicyVersion,
+                ipAddress: data.ipAddress || null,
+                paymentReference: data.paymentReference || null,
+                acceptedAt: new Date().toISOString(),
+            });
+    } catch (err) {
+        console.error("Failed recording undertaking acceptance:", err);
+    }
+};
+
 export const uploadAbstractFile = async (abstractId: string, file: File): Promise<string | null> => {
     try {
         const fileExt = file.name.split('.').pop();

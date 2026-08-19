@@ -630,8 +630,10 @@ export default function AdminRegistrations() {
                     <TableHeader>
                         <TableRow>
                             <TableHead>Student</TableHead>
+                            <TableHead>ID Card / Gender</TableHead>
                             <TableHead>Contact / Mobile</TableHead>
                             <TableHead>College</TableHead>
+                            <TableHead>Passport Photo</TableHead>
                             <TableHead>Bonafide</TableHead>
                             {isIcon && (
                                 <>
@@ -647,7 +649,7 @@ export default function AdminRegistrations() {
                     <TableBody>
                         {filteredStudents.length === 0 ? (
                             <TableRow>
-                                <TableCell colSpan={isIcon ? 9 : 7} className="text-center h-24 text-muted-foreground">
+                                <TableCell colSpan={isIcon ? 11 : 9} className="text-center h-24 text-muted-foreground">
                                     No registrations found.
                                 </TableCell>
                             </TableRow>
@@ -662,11 +664,24 @@ export default function AdminRegistrations() {
                                         )}
                                     </TableCell>
                                     <TableCell>
+                                        <div className="font-mono text-xs font-bold text-slate-800">{student.idCardNumber || "—"}</div>
+                                        <div className="text-xs text-slate-500">{student.gender || "—"}</div>
+                                    </TableCell>
+                                    <TableCell>
                                         <div className="text-sm">{student.email}</div>
                                         <div className="text-xs font-semibold text-slate-700 mt-0.5">{student.phone || "—"}</div>
                                     </TableCell>
-                                    <TableCell className="max-w-[200px] truncate" title={student.college}>
+                                    <TableCell className="max-w-[180px] truncate" title={student.college}>
                                         {student.college}
+                                    </TableCell>
+                                    <TableCell>
+                                        {student.passportPhotoUrl ? (
+                                            <a href={student.passportPhotoUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-xs text-emerald-700 hover:text-emerald-900 bg-emerald-50 px-2 py-1 rounded-md border border-emerald-100 hover:underline">
+                                                Photo <ExternalLink className="w-3 h-3" />
+                                            </a>
+                                        ) : (
+                                            <span className="text-xs text-muted-foreground italic">—</span>
+                                        )}
                                     </TableCell>
                                     <TableCell>
                                         {student.idProofUrl ? (

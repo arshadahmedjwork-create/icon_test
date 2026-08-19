@@ -157,18 +157,24 @@ export default function StudentPaymentsPage() {
                                 midasId: midasId,
                                 qrCodeUrl: qrCodeUrl,
                             }).eq("id", user?.id);
+                            
+                            // Automatically record undertaking acceptance on payment
+                            await recordUndertakingAcceptance(user!.id);
 
-                            // Send official registration confirmation email
+                             // Send official registration confirmation email
                             try {
-                                await sendRegistrationEmail({
+                                const { sendPaymentSuccessEmail } = await import("@/services/emailService");
+                                await sendPaymentSuccessEmail({
                                     student_name: participantName,
                                     student_email: user?.email || '',
                                     midas_id: midasId,
+                                    id_card_number: (user as any)?.idCardNumber || 'N/A',
+                                    payment_reference: response.razorpay_payment_id,
+                                    amount_paid: "₹1,030.00",
+                                    payment_date: new Date().toLocaleDateString("en-IN"),
                                     college_name: collegeName,
                                     event_type: isIcon ? "Professional Delegate" : "UG Delegate",
-                                    mode: "Offline",
                                     qr_code_url: qrCodeUrl,
-                                    registration_date: new Date().toLocaleDateString("en-IN"),
                                 });
                             } catch (emailErr) {
                                 console.warn("Email sending error after payment:", emailErr);

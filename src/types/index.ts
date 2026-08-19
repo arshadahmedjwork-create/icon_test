@@ -110,6 +110,18 @@ export interface Student extends User {
     }[]; // Events selected by student after payment
     program?: Program;
     
+    // MIDAS Registration & Undertaking Fields
+    idCardNumber?: string;
+    gender?: string;
+    passportPhotoUrl?: string;
+    declarationAccepted?: boolean;
+    termsAccepted?: boolean;
+    refundPolicyAccepted?: boolean;
+    termsVersion?: string;
+    refundPolicyVersion?: string;
+    acceptedAt?: string;
+    ipAddress?: string;
+
     // ICON Specific Fields
     dciNumber?: string;
     state?: string;

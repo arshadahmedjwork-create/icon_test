@@ -251,15 +251,18 @@ export default function StudentOverviewPage() {
 
                 // 4. Send official registration confirmation email
                 try {
-                    await sendRegistrationEmail({
+                    const { sendPaymentSuccessEmail } = await import("@/services/emailService");
+                    await sendPaymentSuccessEmail({
                         student_name: participantName,
                         student_email: user?.email || '',
                         midas_id: midasId,
+                        id_card_number: (user as any)?.idCardNumber || 'N/A',
+                        payment_reference: paymentId,
+                        amount_paid: `₹${amount}.00`,
+                        payment_date: new Date().toLocaleDateString("en-IN"),
                         college_name: collegeName,
                         event_type: isIcon ? "Professional Delegate" : "UG Delegate",
-                        mode: "Offline",
                         qr_code_url: qrCodeUrl,
-                        registration_date: new Date().toLocaleDateString("en-IN"),
                     });
                 } catch (emailErr) {
                     console.warn("Email sending error after payment:", emailErr);

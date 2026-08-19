@@ -371,3 +371,41 @@ export async function sendViaBackend(
             : sendAllocationEmail(data as AllocationEmailData);
     }
 }
+
+export interface PaymentSuccessEmailData {
+    student_name: string;
+    student_email: string;
+    midas_id: string;
+    id_card_number: string;
+    registration_id?: string;
+    payment_reference: string;
+    amount_paid: string;
+    payment_date: string;
+    college_name: string;
+    event_type: string;
+    qr_code_url: string;
+}
+
+export async function sendPaymentSuccessEmail(data: PaymentSuccessEmailData) {
+    console.log('[EmailService] Sending payment success confirmation to:', data.student_email);
+    const templateParams = {
+        to_email: data.student_email,
+        student_email: data.student_email,
+        student_name: data.student_name,
+        to_name: data.student_name,
+        midas_id: data.midas_id,
+        id_card_number: data.id_card_number,
+        registration_id: data.registration_id || 'N/A',
+        payment_reference: data.payment_reference,
+        amount_paid: data.amount_paid,
+        payment_date: data.payment_date,
+        college_name: data.college_name,
+        event_type: data.event_type,
+        qr_code_url: data.qr_code_url,
+        subject: 'MIDAS Registration Confirmation — Payment Successful',
+        notice_message: 'Your MIDAS registration payment has been successfully received. The registration fee is non-refundable in accordance with the MIDAS Refund Policy.',
+    };
+
+    return sendEmailJS(EMAILJS_CONFIG.templates.registration, templateParams);
+}
+

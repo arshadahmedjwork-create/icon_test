@@ -3,13 +3,14 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/lib/supabaseClient";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { CheckCircle, CreditCard, Loader2 } from "lucide-react";
+import { CheckCircle, CreditCard, Loader2, ShieldCheck } from "lucide-react";
 import { Student } from "@/types";
-import { generateMidasId, generateQRCodeUrl, sendRegistrationEmail } from "@/services/emailService";
-import { getLatestMidasId } from "@/services/supabaseService";
+import { generateMidasId, generateQRCodeUrl, sendPaymentSuccessEmail } from "@/services/emailService";
+import { getLatestMidasId, recordUndertakingAcceptance } from "@/services/supabaseService";
 import { useProgram } from "@/contexts/ProgramContext";
-
+import DeclarationUndertakingStep from "@/components/legal/DeclarationUndertakingStep";
 
 declare global {
     interface Window {
@@ -21,16 +22,28 @@ export function PaymentComponent({ onPaymentComplete }: { onPaymentComplete: (us
     const { user } = useAuth();
     const { currentProgram } = useProgram();
     const [isProcessing, setIsProcessing] = useState(false);
-    
-    const isIcon = currentProgram === 'ICON';
+    const [showDeclarationModal, setShowDeclarationModal] = useState(false);
 
-    const handlePayment = async () => {
+    const isIcon = currentProgram === 'ICON';
+    const themeColor = isIcon ? "#b91c1c" : "#004d40";
+
+    const handleOpenDeclaration = () => {
+        setShowDeclarationModal(true);
+    };
+
+    const handleProceedToPayment = async (acceptanceData: {
+        declarationAccepted: boolean;
+        termsAccepted: boolean;
+        refundPolicyAccepted: boolean;
+        termsVersion: string;
+        refundPolicyVersion: string;
+    }) => {
         if (!user) return;
+        setIsProcessing(true);
 
         const processSuccess = async (paymentId: string) => {
-            setIsProcessing(true);
             try {
-                // 1. Generate Program ID and QR Code now that payment is successful
+                // 1. Generate Program MIDAS ID and QR Code
                 const latestId = await getLatestMidasId(currentProgram);
                 const midasId = generateMidasId(latestId || 0, currentProgram);
                 const collegeName = user.college || "Dental College";
@@ -47,6 +60,12 @@ export function PaymentComponent({ onPaymentComplete }: { onPaymentComplete: (us
                         paymentId: paymentId,
                         midasId: midasId,
                         qrCodeUrl: qrCodeUrl,
+                        declarationAccepted: acceptanceData.declarationAccepted,
+                        termsAccepted: acceptanceData.termsAccepted,
+                        refundPolicyAccepted: acceptanceData.refundPolicyAccepted,
+                        termsVersion: acceptanceData.termsVersion,
+                        refundPolicyVersion: acceptanceData.refundPolicyVersion,
+                        acceptedAt: new Date().toISOString(),
                     })
                     .eq("id", user.id)
                     .select()
@@ -54,7 +73,7 @@ export function PaymentComponent({ onPaymentComplete }: { onPaymentComplete: (us
 
                 if (studentError) throw studentError;
 
-                // Record payment in payments table (₹1030)
+                // 3. Record payment in payments table
                 await supabase.from("payments").insert({
                     eventStudentId: user.id,
                     amount: 1030,
@@ -64,11 +83,42 @@ export function PaymentComponent({ onPaymentComplete }: { onPaymentComplete: (us
                     transactionId: paymentId,
                     program: currentProgram,
                 });
-                
-                // Registration email is not sent after payment to avoid duplicate emails
-                toast.success(`Payment Successful! Your ${isIcon ? 'ICON' : 'MIDAS'} ID is ` + midasId);
+
+                // 4. Record Audit log
+                await recordUndertakingAcceptance({
+                    eventStudentId: user.id,
+                    idCardNumber: (user as any).idCardNumber || (user as any).mobile || user.id,
+                    declarationAccepted: true,
+                    termsAccepted: true,
+                    refundPolicyAccepted: true,
+                    termsVersion: acceptanceData.termsVersion,
+                    refundPolicyVersion: acceptanceData.refundPolicyVersion,
+                    paymentReference: paymentId,
+                });
+
+                // 5. Send Payment Confirmation Email
+                try {
+                    await sendPaymentSuccessEmail({
+                        student_name: participantName,
+                        student_email: user.email,
+                        midas_id: midasId,
+                        id_card_number: (user as any).idCardNumber || "N/A",
+                        payment_reference: paymentId,
+                        amount_paid: "₹1,030.00",
+                        payment_date: new Date().toLocaleDateString("en-IN"),
+                        college_name: collegeName,
+                        event_type: isIcon ? "Professional Delegate" : "UG Delegate",
+                        qr_code_url: qrCodeUrl,
+                    });
+                } catch (emailErr) {
+                    console.error("Email sending error:", emailErr);
+                }
+
+                toast.success(`Payment Successful! Your ${isIcon ? 'ICON' : 'MIDAS'} ID is ${midasId}`);
+                setShowDeclarationModal(false);
                 onPaymentComplete({
                     ...(updatedStudent || user as Student),
+                    midasId: midasId,
                     registrationStatus: "completed",
                     paymentStatus: "completed",
                 });
@@ -84,6 +134,7 @@ export function PaymentComponent({ onPaymentComplete }: { onPaymentComplete: (us
         const razorpayKey = import.meta.env.VITE_RAZORPAY_LIVE_KEY;
         if (!razorpayKey) {
             toast.error("Payment configuration error. Please contact admin.");
+            setIsProcessing(false);
             return;
         }
 
@@ -101,9 +152,10 @@ export function PaymentComponent({ onPaymentComplete }: { onPaymentComplete: (us
                 email: user.email,
                 contact: user.mobile || "",
             },
-            theme: { color: isIcon ? "#b91c1c" : "#004d40" },
+            theme: { color: themeColor },
             modal: {
                 ondismiss: function () {
+                    setIsProcessing(false);
                     toast.info("Payment cancelled.");
                 },
             },
@@ -111,57 +163,91 @@ export function PaymentComponent({ onPaymentComplete }: { onPaymentComplete: (us
 
         const rzp = new window.Razorpay(options);
         rzp.on("payment.failed", function (response: any) {
+            setIsProcessing(false);
             toast.error("Payment failed: " + (response.error?.description || "Unknown error"));
         });
         rzp.open();
     };
 
-    return (
-        <Card className="max-w-md mx-auto mt-8 border-green-200 bg-green-50/50">
-            <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                    <CheckCircle className="text-green-600 h-6 w-6" />
-                    Registration Approved
-                </CardTitle>
-                <CardDescription className="text-green-700">
-                    Your application has been verified by the staff coordinator.
-                </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-                <div className="bg-white p-4 rounded-lg border">
-                    <div className="flex justify-between items-center mb-2">
-                        <span className="text-sm text-muted-foreground">Registration Fee</span>
-                        <span className="font-semibold">₹1,030.00</span>
-                    </div>
-                    <div className="flex justify-between items-center text-sm">
-                        <span className="text-muted-foreground">Includes</span>
-                        <span>Conference Kit, Lunch, Certificate</span>
-                    </div>
-                </div>
+    const nameParts = (user?.name || "").split(" ");
+    const firstName = nameParts[0] || "";
+    const lastName = nameParts.slice(1).join(" ") || "";
 
-                <div className="flex flex-col gap-2">
-                    <Button
-                        onClick={handlePayment}
-                        className="w-full bg-green-600 hover:bg-green-700 font-bold"
-                        size="lg"
-                        disabled={isProcessing}
-                    >
-                        {isProcessing ? (
-                            <>
-                                <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Processing...
-                            </>
-                        ) : (
-                            <>
-                                <CreditCard className="mr-2 h-4 w-4" /> Pay ₹1,030
-                            </>
-                        )}
-                    </Button>
-                </div>
-                
-                <p className="text-xs text-center text-muted-foreground">
-                    Secure payment via Razorpay.
-                </p>
-            </CardContent>
-        </Card>
+    const userFormData = {
+        firstName,
+        lastName,
+        email: user?.email || "",
+        mobile: user?.mobile || user?.phone || "",
+        idCardNumber: (user as any)?.idCardNumber || (user as any)?.mobile || "N/A",
+        gender: (user as any)?.gender || "Not specified",
+        college: user?.college || "",
+        year: user?.year || "N/A",
+        dciNumber: (user as any)?.dciNumber || "",
+        delegateType: (user as any)?.delegateType || (isIcon ? "PG" : "UG"),
+    };
+
+    return (
+        <>
+            <Card className="max-w-md mx-auto mt-8 border-green-200 bg-green-50/50">
+                <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                        <CheckCircle className="text-green-600 h-6 w-6" />
+                        Registration Verification
+                    </CardTitle>
+                    <CardDescription className="text-green-700">
+                        Please complete your fee payment to receive your {isIcon ? 'ICON' : 'MIDAS'} ID.
+                    </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                    <div className="bg-white p-4 rounded-lg border">
+                        <div className="flex justify-between items-center mb-2">
+                            <span className="text-sm text-muted-foreground">Registration Fee</span>
+                            <span className="font-semibold">₹1,030.00</span>
+                        </div>
+                        <div className="flex justify-between items-center text-sm">
+                            <span className="text-muted-foreground">Includes</span>
+                            <span>Conference Kit, Lunch, Certificate</span>
+                        </div>
+                    </div>
+
+                    <div className="flex flex-col gap-2">
+                        <Button
+                            onClick={handleOpenDeclaration}
+                            className="w-full bg-green-600 hover:bg-green-700 font-bold"
+                            size="lg"
+                            disabled={isProcessing}
+                        >
+                            {isProcessing ? (
+                                <>
+                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Processing...
+                                </>
+                            ) : (
+                                <>
+                                    <CreditCard className="mr-2 h-4 w-4" /> Review & Pay ₹1,030
+                                </>
+                            )}
+                        </Button>
+                    </div>
+
+                    <p className="text-xs text-center text-muted-foreground">
+                        Requires legal undertaking confirmation before payment.
+                    </p>
+                </CardContent>
+            </Card>
+
+            <Dialog open={showDeclarationModal} onOpenChange={setShowDeclarationModal}>
+                <DialogContent className="sm:max-w-3xl rounded-3xl p-4 max-h-[90vh] overflow-y-auto">
+                    <DeclarationUndertakingStep
+                        formData={userFormData}
+                        passportPhotoPreviewUrl={(user as any)?.passportPhotoUrl}
+                        isIcon={isIcon}
+                        themeColor={themeColor}
+                        onEditRegistration={() => setShowDeclarationModal(false)}
+                        onProceedToPayment={handleProceedToPayment}
+                        isProcessing={isProcessing}
+                    />
+                </DialogContent>
+            </Dialog>
+        </>
     );
 }
