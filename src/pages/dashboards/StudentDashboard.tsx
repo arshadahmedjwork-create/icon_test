@@ -142,8 +142,12 @@ export default function StudentDashboard() {
         {/* User + Sign Out */}
         <div className="p-4 border-t border-white/10 space-y-3">
           <div className="flex items-center gap-3 px-2">
-            <div className={cn("w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold bg-gradient-to-br", isIcon ? "from-red-700 to-red-500" : "from-[#004d40] to-[#2e7d32]")}>
-              {user.name?.charAt(0)?.toUpperCase() || "S"}
+            <div className={cn("w-9 h-9 rounded-full overflow-hidden shrink-0 flex items-center justify-center text-xs font-bold bg-gradient-to-br", isIcon ? "from-red-700 to-red-500" : "from-[#004d40] to-[#2e7d32]")}>
+              {user.passportPhotoUrl ? (
+                <img src={user.passportPhotoUrl} alt={user.name || "Student"} className="w-full h-full object-cover" />
+              ) : (
+                user.name?.charAt(0)?.toUpperCase() || "S"
+              )}
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-semibold truncate">{user.name || "Student"}</p>

@@ -416,9 +416,19 @@ export default function StudentOverviewPage() {
 
             {/* Profile Card */}
             <div className="bg-white rounded-2xl border border-slate-100 p-6 shadow-sm">
-                <div className="flex items-center gap-3 mb-4 border-b border-slate-100 pb-4">
-                    <div className={`w-16 h-16 rounded-full bg-gradient-to-br ${isIcon ? 'from-[#7f1d1d] to-[#b91c1c]' : 'from-[#004d40] to-[#2e7d32]'} flex items-center justify-center text-white font-bold text-2xl shadow-inner`}>
-                        {user?.name?.charAt(0) || "U"}
+                <div className="flex items-center gap-4 mb-4 border-b border-slate-100 pb-4">
+                    <div className={`w-16 h-16 rounded-full overflow-hidden shrink-0 border-2 border-slate-200 shadow-md ${
+                        !user?.passportPhotoUrl ? `bg-gradient-to-br ${isIcon ? 'from-[#7f1d1d] to-[#b91c1c]' : 'from-[#004d40] to-[#2e7d32]'} flex items-center justify-center text-white font-bold text-2xl` : 'bg-slate-100'
+                    }`}>
+                        {user?.passportPhotoUrl ? (
+                            <img
+                                src={user.passportPhotoUrl}
+                                alt={user?.name || "Profile Photo"}
+                                className="w-full h-full object-cover"
+                            />
+                        ) : (
+                            user?.name?.charAt(0) || "U"
+                        )}
                     </div>
                     <div className="flex-1 min-w-0 space-y-1">
                         <div className="flex items-center gap-3 flex-wrap">

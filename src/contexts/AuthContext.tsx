@@ -45,6 +45,9 @@ export interface AuthUser {
     dciNumber?: string;
     dciCertificateUrl?: string;
     idProofUrl?: string;
+    passportPhotoUrl?: string;
+    idCardNumber?: string;
+    gender?: string;
     state?: string;
     speciality?: string;
     qualification?: string;
@@ -219,6 +222,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             dciNumber: student.dciNumber,
             dciCertificateUrl: student.dciCertificateUrl,
             idProofUrl: student.idProofUrl,
+            passportPhotoUrl: student.passportPhotoUrl,
+            idCardNumber: student.idCardNumber,
+            gender: student.gender,
             state: student.state,
             speciality: student.speciality,
             qualification: student.qualification,
@@ -335,6 +341,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                         dciNumber: student.dciNumber,
                         dciCertificateUrl: student.dciCertificateUrl,
                         idProofUrl: student.idProofUrl,
+                        passportPhotoUrl: student.passportPhotoUrl,
+                        idCardNumber: student.idCardNumber,
+                        gender: student.gender,
                         state: student.state,
                         speciality: student.speciality,
                         qualification: student.qualification,
