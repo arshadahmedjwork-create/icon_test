@@ -428,7 +428,8 @@ export default function StudentRegistrationPage() {
             });
 
             // 5. Send Payment Confirmation Email immediately
-            tr                await sendPaymentSuccessEmail({
+            try {
+                await sendPaymentSuccessEmail({
                     student_name: participantName,
                     student_email: formData.email,
                     midas_id: midasId,
@@ -815,7 +816,7 @@ export default function StudentRegistrationPage() {
                                 Please complete your registration fee payment of ₹1.00 in the Razorpay popup. Do not refresh or close this window.
                             </p>
                         </div>
-                    )}            )}
+                    )}
 
                     {/* CANCELLED STATE */}
                     {currentStep === 'cancelled' && (
