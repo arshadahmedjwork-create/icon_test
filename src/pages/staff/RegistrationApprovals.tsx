@@ -76,25 +76,23 @@ export default function RegistrationApprovals() {
 
     const handleApprove = async (student: any) => {
         try {
-            const tempPassword = Math.random().toString(36).slice(-8);
-            const hashedPassword = await bcrypt.hash(tempPassword, 10);
-
+            // Update student status to APPROVED (preserve existing password)
             await updateEventStudent(student.id, {
                 approvalStatus: "APPROVED",
-                password: hashedPassword
             });
 
+            // Notify student about their approval
             try {
                 await sendApprovalEmail({
                     student_name: student.participantName || student.name,
                     student_email: student.email,
-                    temp_password: tempPassword,
+                    midas_id: student.midasId || "N/A",
                     login_url: window.location.origin + "/member-login"
                 });
-                toast({ title: "Approved", description: `${student.participantName || student.name} is approved and notified.` });
+                toast({ title: "Approved", description: `${student.participantName || student.name} has been approved and notified.` });
             } catch (emailError) {
                 console.error("Email failed:", emailError);
-                toast({ title: "Approved (Email Failed)", description: `${student.participantName || student.name} approved, but email failed to send.`, variant: "destructive" });
+                toast({ title: "Approved (Email Failed)", description: `${student.participantName || student.name} approved, but notification email failed to send.`, variant: "destructive" });
             }
 
             setStudents(prev => prev.map(u => u.id === student.id ? { ...u, approvalStatus: "APPROVED" } : u));

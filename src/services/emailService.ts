@@ -54,7 +54,8 @@ export interface ProvisionalAcceptanceEmailData {
 export interface ApprovalEmailData {
     student_name: string;
     student_email: string;
-    temp_password: string;
+    midas_id?: string;
+    temp_password?: string;
     login_url: string;
 }
 
@@ -292,8 +293,19 @@ export async function sendAbstractStatusEmail(data: AbstractStatusEmailData) {
 }
 
 export async function sendApprovalEmail(data: ApprovalEmailData) {
-    console.log('[EmailService] Sending registration approval to:', data.student_email);
-    return sendEmailJS(EMAILJS_CONFIG.templates.approval, data as unknown as Record<string, string>);
+    console.log('[EmailService] Sending registration approval notification to:', data.student_email);
+    const templateParams = {
+        to_email: data.student_email,
+        student_email: data.student_email,
+        to_name: data.student_name,
+        student_name: data.student_name,
+        midas_id: data.midas_id || 'N/A',
+        login_url: data.login_url,
+        temp_password: data.temp_password || '',
+        subject: 'MIDAS Registration Approved — Staff Coordinator Verification',
+        notice_message: 'Your MIDAS registration details and submitted documents have been successfully verified and approved by your Staff Coordinator.',
+    };
+    return sendEmailJS(EMAILJS_CONFIG.templates.approval, templateParams);
 }
 
 
